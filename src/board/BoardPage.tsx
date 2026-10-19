@@ -45,8 +45,7 @@ export function BoardPage({ group }: { group: string }) {
           <p className="board-rules-emoji" aria-hidden>
             🦦
           </p>
-          <p>Для других ты аноним. Админ видит авторов, чтобы бороться со спамом и травлей.</p>
-          <p>Запрещено: оскорбления, травля, личные данные других людей, реклама, 18+. За нарушения — бан.</p>
+          <p className="board-rules-text">Для других ты аноним.</p>
         </div>
         <p className="section-footer">
           Доска группы — {short(state.group)}, как в профиле. Поменять её потом сможет только админ.

@@ -1229,6 +1229,12 @@ p {
   line-height: 1.45;
 }
 
+.board-rules-text {
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+}
+
 .board-rules-emoji {
   font-size: 40px;
   line-height: 1;
