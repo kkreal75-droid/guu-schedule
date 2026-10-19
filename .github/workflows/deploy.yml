@@ -1,0 +1,109 @@
+# Сборка и деплой на GitHub Pages + ежечасная проверка расписания на guu.ru.
+#
+#   push в main          → сборка и деплой
+#   каждый час (cron)    → update.py; если что-то поменялось — коммит, сборка и деплой
+#   вручную (Run workflow) → update.py (можно с --force), затем сборка и деплой
+
+name: Update & deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *" # раз в час, в :17 UTC — в ровные часы очереди GitHub длиннее
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Скачать и пересобрать расписание, даже если файл на guu.ru не менялся"
+        type: boolean
+        default: false
+
+# один запуск за раз: ежечасная проверка не должна пересечься с деплоем после push
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # коммит обновлённого schedule.json
+    outputs:
+      pushed: ${{ steps.commit.outputs.pushed }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - id: update
+        run: python update.py ${{ inputs.force && '--force' || '' }}
+
+      - id: commit
+        env:
+          # текст из имени файла на guu.ru — только через env, не подставляем в скрипт напрямую
+          MESSAGE: ${{ steps.update.outputs.message }}
+        run: |
+          if [ -z "$(git status --porcelain -- schedule.json data)" ]; then
+            echo "Изменений нет."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add schedule.json data
+            git commit -m "${MESSAGE:-Обновление расписания}"
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: update
+    # update пропускается на push — поэтому always() и явная проверка результата
+    if: >-
+      always() &&
+      (needs.update.result == 'success' || needs.update.result == 'skipped') &&
+      (github.event_name != 'schedule' || needs.update.outputs.pushed == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # после коммита из update собираем уже новую версию
+          ref: ${{ needs.update.outputs.sha || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
