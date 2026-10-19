@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { formatStamp } from './format'
-import { CalendarIcon, UserIcon } from './icons'
+import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
 import { usePrefs } from './prefs'
+import { MoreScreen } from './screens/MoreScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleScreen'
 import { fromCache, schedule } from './schedule'
-import { haptic } from './telegram'
+import { haptic, type CheckIn } from './telegram'
 import { useTheme } from './theme'
 
-type Tab = 'schedule' | 'profile'
+type Tab = 'schedule' | 'more' | 'profile'
 
-export default function App() {
+// status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен
+export default function App({ status }: { status: CheckIn | null }) {
   const [prefs, updatePrefs] = usePrefs()
   const { notes, setNote } = useNotes()
   useTheme(prefs.theme)
@@ -41,6 +43,8 @@ export default function App() {
           notes={notes}
           onSaveNote={setNote}
         />
+      ) : tab === 'more' ? (
+        <MoreScreen admin={Boolean(status?.admin)} />
       ) : (
         <ProfileScreen
           noteCount={Object.keys(notes).length}
@@ -63,6 +67,10 @@ export default function App() {
         <button type="button" className="tab" aria-current={tab === 'schedule'} onClick={() => switchTab('schedule')}>
           <CalendarIcon />
           <span>Расписание</span>
+        </button>
+        <button type="button" className="tab" aria-current={tab === 'more'} onClick={() => switchTab('more')}>
+          <MoreIcon />
+          <span>Ещё</span>
         </button>
         <button type="button" className="tab" aria-current={tab === 'profile'} onClick={() => switchTab('profile')}>
           <UserIcon />

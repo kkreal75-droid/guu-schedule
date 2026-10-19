@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
 import { CheckIcon, ExternalIcon } from '../icons'
@@ -14,16 +14,6 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: 'Системная' },
   { value: 'dark', label: 'Тёмная' },
 ]
-
-function Section({ title, footer, children }: { title: string; footer?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="section">
-      <h3 className="section-title">{title}</h3>
-      <div className="section-body">{children}</div>
-      {footer && <p className="section-footer">{footer}</p>}
-    </section>
-  )
-}
 
 function UserCard() {
   const user = telegramUser()

@@ -941,3 +941,156 @@ p {
 .tab[aria-current='true'] {
   color: var(--accent-ink);
 }
+
+/* ---------- «Ещё» и вложенные страницы ---------- */
+
+.more {
+  padding: 16px 16px 24px;
+}
+
+.more-title {
+  margin: 4px 4px 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.more .section:first-of-type {
+  margin-top: 16px;
+}
+
+.row-nav {
+  justify-content: flex-start;
+}
+
+.row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.row-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--hint);
+}
+
+.row-text {
+  display: block;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+/* маленькая точка «есть новое» — без счётчиков */
+.new-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.tab {
+  position: relative;
+}
+
+.tab .new-dot {
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 10px);
+}
+
+.page-head {
+  margin: 0 0 12px;
+}
+
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+  padding: 4px 6px 4px 0;
+  font-size: 15px;
+  color: var(--accent-ink);
+}
+
+.page-back svg {
+  width: 20px;
+  height: 20px;
+}
+
+.page-title {
+  margin: 4px 4px 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-body .section {
+  margin-top: 8px;
+}
+
+.lead {
+  margin: 0 4px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.bullets {
+  margin: 0 4px;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.button-primary {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.button-primary:active {
+  opacity: 0.85;
+}
+
+.button-primary:disabled {
+  opacity: 0.5;
+}
+
+.button-secondary {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+}

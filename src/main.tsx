@@ -28,7 +28,7 @@ Promise.all([loadSchedule(), status])
     const { default: App } = await import('./App')
     root.render(
       <StrictMode>
-        <App />
+        <App status={checked} />
       </StrictMode>,
     )
   })

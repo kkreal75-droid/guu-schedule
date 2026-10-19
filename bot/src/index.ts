@@ -1,19 +1,21 @@
 // Бот «Расписание ГУУ» на Cloudflare Workers.
 //
 //   POST /webhook — обновления Telegram (ключ вебхука в заголовке, чужие — 403):
-//                   inline-запросы — inline.ts,
-//                   личные сообщения и команды — commands.ts, кнопки рассылки — broadcast.ts.
+//                   личные сообщения и команды — commands.ts, беседы — chats.ts,
+//                   inline-запросы — inline.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
-//   cron (раз в минуту) — досылает рассылки пачками.
+//   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID. Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
-import { drainBroadcasts, onBroadcastButton } from './broadcast'
+import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
+import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { touchUser } from './db'
+import { detectChanges, runDigests } from './digest'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
 import { setupBot } from './setup'
@@ -26,6 +28,12 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
   if (update.message) {
     const message = update.message
     if (message.chat.type === 'private') await handlePrivateMessage(env, ctx, message)
+    else await safely(env, 'Сообщение в беседе', message.chat.id, () => handleGroupMessage(env, message))
+    return
+  }
+  if (update.my_chat_member) {
+    const change = update.my_chat_member
+    await safely(env, 'Добавление в беседу', null, () => handleMembership(env, change))
     return
   }
   if (update.inline_query) {
@@ -39,6 +47,7 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
     await safely(env, 'Кнопка', query.message?.chat.id ?? null, async () => {
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
+      else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
       else await answerCallback(env, query.id)
     })
   }
@@ -104,7 +113,19 @@ export default {
     return new Response('not found', { status: 404 })
   },
 
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(drainBroadcasts(env).catch((err) => reportError(env, 'Досылка рассылок', err)))
+  // Раз в минуту. Лимит — 50 подзапросов на вызов: сначала то, что привязано ко времени
+  // (сводки, изменения), рассылкам — что осталось; недосланное подхватит следующая минута.
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const now = controller.scheduledTime
+    const run = async () => {
+      let used = 0
+      used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
+      if (new Date(now).getUTCMinutes() % 10 === 5) {
+        used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
+      }
+      const batch = Math.max(0, BATCH - used)
+      if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))
+    }
+    ctx.waitUntil(run())
   },
 } satisfies ExportedHandler<Env>

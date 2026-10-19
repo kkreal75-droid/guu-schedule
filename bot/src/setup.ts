@@ -19,6 +19,13 @@ const PUBLIC_COMMANDS = [
   { command: 'tomorrow', description: 'Пары на завтра' },
 ]
 
+const GROUP_COMMANDS = [
+  { command: 'today', description: 'Пары на сегодня' },
+  { command: 'tomorrow', description: 'Пары на завтра' },
+  { command: 'setup', description: 'Настроить (для админов беседы)' },
+  { command: 'off', description: 'Выключить автосообщения' },
+]
+
 const ADMIN_COMMANDS = [
   ...PUBLIC_COMMANDS,
   { command: 'stats', description: 'Статистика' },
@@ -38,6 +45,7 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
   if (force || info.url !== url || !sameUpdates) {
     await tg(env, 'setWebhook', { url, secret_token: await webhookSecret(env), allowed_updates: ALLOWED_UPDATES })
     await tg(env, 'setMyCommands', { commands: PUBLIC_COMMANDS, scope: { type: 'default' } })
+    await tg(env, 'setMyCommands', { commands: GROUP_COMMANDS, scope: { type: 'all_group_chats' } })
     await tg(env, 'setMyCommands', { commands: ADMIN_COMMANDS, scope: { type: 'chat', chat_id: Number(env.OWNER_ID) } })
     info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
     changed = true

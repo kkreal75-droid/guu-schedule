@@ -28,6 +28,12 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener')
 }
 
+// Ссылки t.me открываем внутри Telegram (выбор беседы, бот и т. п.)
+export function openTelegramLink(url: string) {
+  if (supports('6.1')) tg!.openTelegramLink(url)
+  else window.open(url, '_blank', 'noopener')
+}
+
 // Адрес бота (bot/). В dev — только если явно задан VITE_BOT_URL (локальный wrangler dev),
 // чтобы локальная разработка не трогала настоящую статистику.
 export const BOT_URL: string | null =

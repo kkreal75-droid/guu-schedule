@@ -28,6 +28,7 @@ export type TgUpdate = {
   message?: TgMessage
   callback_query?: TgCallbackQuery
   inline_query?: { id: string; from: TgUser; query: string; chat_type?: string }
+  my_chat_member?: { chat: TgChat; from: TgUser; new_chat_member: { status: string }; old_chat_member: { status: string } }
 }
 
 export type InlineButton = { text: string; callback_data?: string; url?: string; web_app?: { url: string } }

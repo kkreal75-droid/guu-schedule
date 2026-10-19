@@ -6,7 +6,7 @@ import { GROUPS, shortGroup } from './db'
 import { TelegramError, answerCallback, sendMessage, tg, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
 import { entitiesToHtml, escapeHtml, formatMsk, hasFormatting, stripCommand } from './util'
 
-const BATCH = 30
+export const BATCH = 30
 const PAUSE_MS = 50
 const CAPTION_LIMIT = 1024
 const TEXT_LIMIT = 4096
@@ -159,8 +159,8 @@ export async function onBroadcastButton(env: Env, ctx: ExecutionContext, query: 
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-// Досылает очередь: до BATCH сообщений за вызов. Возвращает, сколько отправлено.
-export async function drainBroadcasts(env: Env): Promise<number> {
+// Досылает очередь: до batch сообщений за вызов. Возвращает, сколько отправлено.
+export async function drainBroadcasts(env: Env, batch = BATCH): Promise<number> {
   const [, picked] = await env.DB.batch([
     // забанили, пока рассылка стояла в очереди, — не шлём
     env.DB.prepare(
@@ -172,7 +172,7 @@ export async function drainBroadcasts(env: Env): Promise<number> {
        FROM broadcast_queue q JOIN broadcasts b ON b.id = q.broadcast_id
        WHERE q.status = 'pending' AND b.status = 'sending'
        ORDER BY q.broadcast_id LIMIT ?`,
-    ).bind(BATCH),
+    ).bind(batch),
   ])
   const pending = picked.results as { broadcast_id: number; user_id: number; text: string; photo: string | null }[]
   if (!pending.length) {
