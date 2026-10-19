@@ -6,7 +6,7 @@
   "vars": {
     "WEBAPP_URL": "https://kkreal75-droid.github.io/guu-schedule/"
   },
-  // статистика для /stats: по ключу user:<telegram id>, только ID и время
+  // статистика для /stats: по ключу user:<telegram id> — ник, имя, счётчики и время
   "kv_namespaces": [
     {
       "binding": "STATS",

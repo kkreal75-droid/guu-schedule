@@ -38,8 +38,19 @@ type ExecutionContext = { waitUntil(promise: Promise<unknown>): void }
 type Message = {
   text?: string
   chat: { id: number; type: string }
-  from?: { id: number; first_name?: string }
+  from?: TelegramUser
 }
+
+type TelegramUser = { id: number; username?: string; first_name?: string; last_name?: string }
+
+// кто это: ник и имя из Telegram — для списка в /stats
+type Profile = { id: number; username?: string; name?: string }
+
+const profileOf = (user: TelegramUser): Profile => ({
+  id: user.id,
+  username: user.username || undefined,
+  name: [user.first_name, user.last_name].filter(Boolean).join(' ').slice(0, 64) || undefined,
+})
 
 type Update = { message?: Message }
 
@@ -51,13 +62,15 @@ type WebhookInfo = {
 }
 
 // Статистика: по ключу на пользователя (user:<id>), данные — в metadata,
-// чтобы /stats собирал всё одним list() без чтения каждого ключа. Имён не храним.
+// чтобы /stats собирал всё одним list() без чтения каждого ключа.
 type UserStats = {
   first: number // впервые замечен (любым способом)
   last: number // последний раз замечен
   starts: number // сколько раз нажимал /start
   opens?: number // сколько раз открывал мини-приложение (не чаще раза в OPEN_THROTTLE_MS)
   lastOpen?: number
+  username?: string // ник Telegram, если есть
+  name?: string // имя и фамилия из профиля Telegram
 }
 
 const ERROR_REPLY = 'Что-то сломалось 🛠'
@@ -116,23 +129,29 @@ const reply = (env: Env, message: Message, text: string, extra: object = {}) =>
 
 // ---------- статистика ----------
 
-// Обновляет запись пользователя; change возвращает null, если писать в KV не нужно
-async function touchUser(kv: KV, userId: number, change: (s: UserStats, now: number) => UserStats | null) {
-  const key = `user:${userId}`
+// Обновляет запись пользователя и его ник/имя; change возвращает null, если счётчики менять не нужно
+async function touchUser(kv: KV, profile: Profile, change: (s: UserStats, now: number) => UserStats | null) {
+  const key = `user:${profile.id}`
   const now = Date.now()
   const { metadata } = await kv.getWithMetadata<UserStats>(key)
-  const next = change(metadata ?? { first: now, last: now, starts: 0, opens: 0 }, now)
-  if (next) await kv.put(key, '', { metadata: { ...next, last: now } })
+  const current: UserStats = metadata ?? { first: now, last: now, starts: 0, opens: 0 }
+  const changed = change(current, now)
+  const profileChanged = current.username !== profile.username || current.name !== profile.name
+  // ни счётчики, ни ник с именем не поменялись — KV не трогаем (лимит записей)
+  if (!changed && !profileChanged) return
+  await kv.put(key, '', {
+    metadata: { ...(changed ?? current), username: profile.username, name: profile.name, last: now },
+  })
 }
 
 async function recordStart(message: Message, env: Env): Promise<void> {
   if (!env.STATS || !message.from) return
-  await touchUser(env.STATS, message.from.id, (s) => ({ ...s, starts: s.starts + 1 }))
+  await touchUser(env.STATS, profileOf(message.from), (s) => ({ ...s, starts: s.starts + 1 }))
 }
 
-async function recordOpen(userId: number, env: Env): Promise<void> {
+async function recordOpen(profile: Profile, env: Env): Promise<void> {
   if (!env.STATS) throw new Error('KV namespace STATS не подключён (wrangler.jsonc → kv_namespaces)')
-  await touchUser(env.STATS, userId, (s, now) =>
+  await touchUser(env.STATS, profile, (s, now) =>
     s.lastOpen && now - s.lastOpen < OPEN_THROTTLE_MS ? null : { ...s, opens: (s.opens ?? 0) + 1, lastOpen: now },
   )
 }
@@ -147,8 +166,8 @@ async function hmac(key: BufferSource, data: string): Promise<ArrayBuffer> {
 
 const toHex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
 
-// Возвращает Telegram ID, если initData подписан нашим ботом и не старше суток; иначе null
-async function verifyInitData(initData: string, env: Env): Promise<number | null> {
+// Возвращает пользователя, если initData подписан нашим ботом и не старше суток; иначе null
+async function verifyInitData(initData: string, env: Env): Promise<Profile | null> {
   const params = new URLSearchParams(initData)
   const hash = params.get('hash')
   if (!hash) return null
@@ -171,19 +190,23 @@ async function verifyInitData(initData: string, env: Env): Promise<number | null
   const authDate = Number(params.get('auth_date'))
   if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_S) return null
   try {
-    const user = JSON.parse(params.get('user') ?? '') as { id?: number }
-    return typeof user.id === 'number' ? user.id : null
+    const user = JSON.parse(params.get('user') ?? '') as Partial<TelegramUser>
+    return typeof user.id === 'number' ? profileOf(user as TelegramUser) : null
   } catch {
     return null
   }
 }
 
-async function allUsers(kv: KV): Promise<UserStats[]> {
-  const users: UserStats[] = []
+type UserRecord = UserStats & { id: number }
+
+async function allUsers(kv: KV): Promise<UserRecord[]> {
+  const users: UserRecord[] = []
   let cursor: string | undefined
   do {
     const page = await kv.list<UserStats>({ prefix: 'user:', cursor })
-    for (const key of page.keys) if (key.metadata) users.push(key.metadata)
+    for (const key of page.keys) {
+      if (key.metadata) users.push({ ...key.metadata, id: Number(key.name.slice('user:'.length)) })
+    }
     cursor = page.list_complete ? undefined : page.cursor
   } while (cursor)
   return users
@@ -212,23 +235,54 @@ async function handleStats(message: Message, env: Env): Promise<void> {
   }
   if (!env.STATS) throw new Error('KV namespace STATS не подключён (wrangler.jsonc → kv_namespaces)')
 
-  const users = await allUsers(env.STATS)
+  const users = (await allUsers(env.STATS)).sort((a, b) => b.last - a.last) // последние сверху
   const now = Date.now()
   const count = (pred: (u: UserStats) => boolean) => users.filter(pred).length
+  const totalOpens = users.reduce((sum, u) => sum + (u.opens ?? 0), 0)
   const since = users.length ? Math.min(...users.map((u) => u.first)) : now
-  await reply(
-    env,
-    message,
-    `📊 <b>Статистика бота</b>
+
+  const header = `📊 <b>Статистика бота</b>
 
 👥 Пользователей: <b>${users.length}</b>
-📱 Открывали приложение: <b>${count((u) => (u.opens ?? 0) > 0)}</b>
+📱 Открытий приложения: <b>${totalOpens}</b> (людей: <b>${count((u) => (u.opens ?? 0) > 0)}</b>)
 ▶️ Нажимали /start: <b>${count((u) => u.starts > 0)}</b>
 🆕 Новых за 7 дней: <b>${count((u) => u.first >= now - 7 * DAY_MS)}</b>
-🔥 Были за сутки: <b>${count((u) => u.last >= now - DAY_MS)}</b>
+🔥 Были за сутки: <b>${count((u) => u.last >= now - DAY_MS)}</b>`
+  const footer = `\n\n<i>Данные с ${formatMsk(since)} МСК: раньше бот ничего не записывал. Открытия одного человека в течение 10 минут считаются за одно.</i>`
 
-<i>Данные с ${formatMsk(since)} МСК: раньше бот ничего не записывал.</i>`,
-  )
+  // список «кто заходил»; Telegram не примет сообщение длиннее 4096 символов
+  const lines: string[] = []
+  let length = header.length + footer.length + 40
+  for (const [i, user] of users.entries()) {
+    const line = `${i + 1}. ${userLabel(user, env)} — ${userActivity(user)}`
+    if (length + line.length + 1 > 4000) {
+      lines.push(`…и ещё ${users.length - i}`)
+      break
+    }
+    lines.push(line)
+    length += line.length + 1
+  }
+  const list = lines.length ? `\n\n<b>Кто заходил</b> (последние сверху):\n${lines.join('\n')}` : ''
+
+  await reply(env, message, header + list + footer)
+}
+
+// @ник, а если его нет — имя со ссылкой на профиль
+function userLabel(user: UserRecord, env: Env): string {
+  const label = user.username
+    ? `@${escapeHtml(user.username)}`
+    : `<a href="tg://user?id=${user.id}">${escapeHtml(user.name || `id ${user.id}`)}</a>`
+  return String(user.id) === env.OWNER_ID?.trim() ? `${label} (вы)` : label
+}
+
+function userActivity(user: UserStats): string {
+  return [
+    user.opens ? `📱 ${user.opens}` : null,
+    user.starts ? `▶️ ${user.starts}` : null,
+    formatMsk(user.last),
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 // «19.10 16:07» по Москве
@@ -307,10 +361,10 @@ export default {
 
     if (url.pathname === '/seen' && request.method === 'POST') {
       // приложение шлёт text/plain в режиме no-cors — без CORS-заголовков и предзапросов
-      const userId = await verifyInitData(await request.text(), env)
-      if (userId === null) return new Response('forbidden', { status: 403 })
+      const profile = await verifyInitData(await request.text(), env)
+      if (profile === null) return new Response('forbidden', { status: 403 })
       try {
-        await recordOpen(userId, env)
+        await recordOpen(profile, env)
         return new Response('ok')
       } catch (err) {
         console.error('Открытие приложения не записалось:', err)
