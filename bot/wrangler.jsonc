@@ -7,7 +7,10 @@
     // сайт мини-приложения: оттуда же бот берёт schedule.json и overrides.json
     "WEBAPP_URL": "https://kkreal75-droid.github.io/guu-schedule/",
     // имя бота — для ссылок t.me/<бот>/schedule (проверяется в GET / через getMe)
-    "BOT_USERNAME": "GUU_Scheduule_bot"
+    "BOT_USERNAME": "GUU_Scheduule_bot",
+    // «Обновить сейчас» в админ-панели запускает этот workflow (нужен секрет GITHUB_TOKEN)
+    "GITHUB_REPO": "kkreal75-droid/guu-schedule",
+    "GITHUB_WORKFLOW": "deploy.yml"
   },
   // D1 — всё, что часто пишется: пользователи, визиты, рассылки (миграции — в migrations/)
   "d1_databases": [

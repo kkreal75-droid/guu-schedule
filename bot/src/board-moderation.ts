@@ -45,7 +45,7 @@ export async function deleteMessage(env: Env, id: number, now: number): Promise<
   ])
 }
 
-async function setBoardBan(env: Env, userId: number, until: number | null): Promise<void> {
+export async function setBoardBan(env: Env, userId: number, until: number | null): Promise<void> {
   await env.DB.prepare(
     `INSERT INTO users (id, first_seen, last_seen, board_banned_until) VALUES (?1, ?2, ?2, ?3)
      ON CONFLICT (id) DO UPDATE SET board_banned_until = ?3`,
@@ -54,35 +54,37 @@ async function setBoardBan(env: Env, userId: number, until: number | null): Prom
     .run()
 }
 
-// Кнопки под жалобой: bd:del | bd:ban | bd:ign : <id сообщения>
-export async function onBoardButton(env: Env, query: TgCallbackQuery): Promise<void> {
-  if (!isOwner(env, query.from.id)) return void (await answerCallback(env, query.id))
-  const [, action, rawId] = (query.data ?? '').split(':')
-  if (action === 'done') return void (await answerCallback(env, query.id))
-  const id = Number(rawId)
+export type ModerationAction = 'del' | 'ban' | 'ign'
+
+// Решение по сообщению — из кнопок под жалобой и из админ-панели. Возвращает итог для показа.
+export async function moderate(env: Env, id: number, action: ModerationAction): Promise<string> {
   const message = await env.DB.prepare('SELECT id, user_id, deleted FROM board_messages WHERE id = ?')
     .bind(id)
     .first<{ id: number; user_id: number; deleted: number }>()
   const now = Date.now()
-  let status: string
-  if (!message) {
-    status = 'Сообщения уже нет'
-  } else if (action === 'del') {
+  if (!message) return 'Сообщения уже нет'
+  if (action === 'del') {
     await deleteMessage(env, id, now)
-    status = '✅ Удалено'
-  } else if (action === 'ban') {
+    return '✅ Удалено'
+  }
+  if (action === 'ban') {
     await deleteMessage(env, id, now)
     if (!isOwner(env, message.user_id)) await setBoardBan(env, message.user_id, FOREVER)
-    status = '✅ Удалено, автор забанен на доске'
-  } else if (action === 'ign') {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE board_reports SET status = 'ignored' WHERE message_id = ? AND status = 'open'").bind(id),
-      env.DB.prepare('UPDATE board_messages SET hidden = 0, updated_at = ? WHERE id = ? AND hidden = 1').bind(now, id),
-    ])
-    status = '👌 Проигнорировано'
-  } else {
-    return void (await answerCallback(env, query.id))
+    return '✅ Удалено, автор забанен на доске'
   }
+  await env.DB.batch([
+    env.DB.prepare("UPDATE board_reports SET status = 'ignored' WHERE message_id = ? AND status = 'open'").bind(id),
+    env.DB.prepare('UPDATE board_messages SET hidden = 0, updated_at = ? WHERE id = ? AND hidden = 1').bind(now, id),
+  ])
+  return '👌 Проигнорировано'
+}
+
+// Кнопки под жалобой: bd:del | bd:ban | bd:ign : <id сообщения>
+export async function onBoardButton(env: Env, query: TgCallbackQuery): Promise<void> {
+  if (!isOwner(env, query.from.id)) return void (await answerCallback(env, query.id))
+  const [, action, rawId] = (query.data ?? '').split(':')
+  if (action !== 'del' && action !== 'ban' && action !== 'ign') return void (await answerCallback(env, query.id))
+  const status = await moderate(env, Number(rawId), action)
   if (query.message) {
     await tg(env, 'editMessageReplyMarkup', {
       chat_id: query.message.chat.id,

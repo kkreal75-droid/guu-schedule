@@ -1,7 +1,8 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
+import { AdminPage } from '../admin/AdminPage'
 import { BoardPage } from '../board/BoardPage'
-import { BoardIcon, ChevronLeft, ChevronRight, GroupChatIcon, PhoneCalendarIcon } from '../icons'
+import { BoardIcon, ChevronLeft, ChevronRight, GroupChatIcon, PhoneCalendarIcon, ShieldIcon } from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
 import { GroupBotPage } from '../more/GroupBotPage'
 import { haptic } from '../telegram'
@@ -14,6 +15,7 @@ type Item = {
   icon: ComponentType<SVGProps<SVGSVGElement>>
   render: () => ReactNode // элемент, а не компонент: иначе при перерисовке страница сбрасывала бы состояние
   dot?: boolean
+  bare?: boolean // страница рисует свою шапку (у админ-панели вложенные разделы)
 }
 
 // boardNew — точка «есть новое» на доске; onBoardOpen — человек зашёл на доску, точку убрать
@@ -25,16 +27,17 @@ export function MoreScreen({ admin, group, boardNew, onBoardOpen }: Props) {
     { id: 'calendar', title: 'Календарь на телефоне', icon: PhoneCalendarIcon, render: () => <CalendarPage group={group} /> },
     { id: 'groupbot', title: 'Бот в беседе группы', icon: GroupChatIcon, render: () => <GroupBotPage /> },
   ]
-  void admin // пункт «Админ-панель» появится на этапе 6
-
   const [openId, setOpenId] = useState<string | null>(null)
   const close = useCallback(() => {
     setOpenId(null)
     window.scrollTo(0, 0)
   }, [])
+  // только у владельца: у остальных ни пункта, ни намёка (права всё равно проверяет бот)
+  if (admin) items.push({ id: 'admin', title: 'Админ-панель', icon: ShieldIcon, render: () => <AdminPage onExit={close} />, bare: true })
   useBackButton(openId ? close : null)
 
   const open = items.find((item) => item.id === openId)
+  if (open?.bare) return open.render()
   if (open) {
     return (
       <div className="screen more">

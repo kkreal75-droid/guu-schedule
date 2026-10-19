@@ -3,7 +3,7 @@
 // поэтому за раз отправляем BATCH сообщений, остальное досылает cron раз в минуту.
 import { isOwner } from './auth'
 import { GROUPS, shortGroup } from './db'
-import { TelegramError, answerCallback, sendMessage, tg, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
+import { TelegramError, answerCallback, sendMessage, tg, tgForm, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
 import { entitiesToHtml, escapeHtml, formatMsk, hasFormatting, stripCommand } from './util'
 
 export const BATCH = 30
@@ -11,10 +11,10 @@ const PAUSE_MS = 50
 const CAPTION_LIMIT = 1024
 const TEXT_LIMIT = 4096
 
-type Audience = 'all' | '1-1' | '1-2'
-const AUDIENCE_TITLE: Record<Audience, string> = { all: 'всем', '1-1': 'МБ(МП) 1-1', '1-2': 'МБ(МП) 1-2' }
+export type Audience = 'all' | '1-1' | '1-2'
+export const AUDIENCE_TITLE: Record<Audience, string> = { all: 'всем', '1-1': 'МБ(МП) 1-1', '1-2': 'МБ(МП) 1-2' }
 
-type BroadcastRow = {
+export type BroadcastRow = {
   id: number
   created_at: number
   text: string
@@ -34,7 +34,7 @@ type BroadcastRow = {
 const RECIPIENTS = 'can_message = 1 AND blocked_bot = 0 AND banned = 0'
 const groupOf = (audience: Audience) => GROUPS.find((g) => shortGroup(g) === audience) ?? null
 
-async function audienceCounts(db: D1Database): Promise<Record<Audience, number>> {
+export async function audienceCounts(db: D1Database): Promise<Record<Audience, number>> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS total,
@@ -135,14 +135,21 @@ export async function onBroadcastButton(env: Env, ctx: ExecutionContext, query: 
   }
   if (!(choice in AUDIENCE_TITLE)) return void (await answerCallback(env, query.id))
   const audience = choice as Audience
-  const group = groupOf(audience)
+  const total = await enqueue(env, id, audience)
+  await Promise.all([removeButtons(), answerCallback(env, query.id, `Отправляю: ${total}`)])
+  await sendMessage(env, query.from.id, `⏳ Рассылка #${id} пошла: ${AUDIENCE_TITLE[audience]}, получателей — ${total}. Пришлю отчёт.`)
+  // первая пачка — сразу, остальное досылает cron
+  ctx.waitUntil(drainBroadcasts(env))
+}
 
-  // очередь доставки — одним запросом; бан/блокировку проверяем ещё раз перед отправкой
+// Очередь доставки — одним запросом; бан/блокировку проверяем ещё раз перед отправкой.
+// skip — кому уже отправлено (копия владельцу из админ-панели).
+async function enqueue(env: Env, id: number, audience: Audience, skip: number | null = null): Promise<number> {
   const [, , counted] = await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO broadcast_queue (broadcast_id, user_id)
-       SELECT ?1, id FROM users WHERE ${RECIPIENTS} AND (?2 IS NULL OR grp = ?2)`,
-    ).bind(id, group),
+       SELECT ?1, id FROM users WHERE ${RECIPIENTS} AND (?2 IS NULL OR grp = ?2) AND (?3 IS NULL OR id != ?3)`,
+    ).bind(id, groupOf(audience), skip),
     env.DB.prepare(
       `UPDATE broadcasts SET status = 'sending', audience = ?2,
          total = (SELECT COUNT(*) FROM broadcast_queue WHERE broadcast_id = ?1)
@@ -150,11 +157,60 @@ export async function onBroadcastButton(env: Env, ctx: ExecutionContext, query: 
     ).bind(id, audience),
     env.DB.prepare('SELECT total FROM broadcasts WHERE id = ?').bind(id),
   ])
-  const total = (counted.results as { total: number }[])[0]?.total ?? 0
-  await Promise.all([removeButtons(), answerCallback(env, query.id, `Отправляю: ${total}`)])
-  await sendMessage(env, query.from.id, `⏳ Рассылка #${id} пошла: ${AUDIENCE_TITLE[audience]}, получателей — ${total}. Пришлю отчёт.`)
-  // первая пачка — сразу, остальное досылает cron
+  return (counted.results as { total: number }[])[0]?.total ?? 0
+}
+
+// ---------- из админ-панели ----------
+
+export type PanelBroadcast = { text: string; photo: Uint8Array | null; audience: Audience | null }
+
+// Сначала — копия владельцу: так Telegram проверит HTML, а фото загрузится один раз (file_id).
+// audience null — только предпросмотр. Ошибка HTML — { error }.
+export async function panelBroadcast(
+  env: Env,
+  ctx: ExecutionContext,
+  { text, photo, audience }: PanelBroadcast,
+): Promise<{ id?: number; total?: number; error?: string }> {
+  const owner = Number(env.OWNER_ID)
+  const html = text.trim()
+  if (!html && !photo) return { error: 'Напишите текст или добавьте фото' }
+  if (html.length > (photo ? CAPTION_LIMIT : TEXT_LIMIT)) {
+    return { error: `Слишком длинно: ${photo ? 'подпись к фото' : 'сообщение'} — до ${photo ? CAPTION_LIMIT : TEXT_LIMIT} символов` }
+  }
+  let fileId: string | null = null
+  try {
+    if (photo) {
+      const form = new FormData()
+      form.append('chat_id', String(owner))
+      form.append('photo', new Blob([photo], { type: 'image/jpeg' }), 'broadcast.jpg')
+      if (html) {
+        form.append('caption', html)
+        form.append('parse_mode', 'HTML')
+      }
+      const sent = await tgForm<TgMessage>(env, 'sendPhoto', form)
+      fileId = sent.photo?.at(-1)?.file_id ?? null
+    } else {
+      await deliver(env, owner, { text: html, photo: null })
+    }
+  } catch (err) {
+    if (err instanceof TelegramError && err.code === 400) return { error: `Telegram не принял сообщение: ${err.description}` }
+    throw err
+  }
+  if (!audience) return {}
+
+  const row = await env.DB.prepare(
+    `INSERT INTO broadcasts (created_at, text, photo, status) VALUES (?, ?, ?, 'draft') RETURNING id`,
+  )
+    .bind(Date.now(), html, fileId)
+    .first<{ id: number }>()
+  const id = row!.id
+  const total = await enqueue(env, id, audience, owner)
   ctx.waitUntil(drainBroadcasts(env))
+  return { id, total }
+}
+
+export async function broadcastHistory(env: Env, limit = 20): Promise<BroadcastRow[]> {
+  return (await env.DB.prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT ?').bind(limit).all<BroadcastRow>()).results
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))

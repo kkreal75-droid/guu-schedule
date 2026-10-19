@@ -6,9 +6,10 @@ import {
   WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, formatRange, pluralPairs, weekTitle,
 } from '../format'
 import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
+import type { LessonEdit, ScheduleEdit } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import {
-  MAX_WEEK, dayOf, inSemester, lessonsOn, moscowNow, schedule, toMinutes, weekOf, weekdayOf,
+  MAX_WEEK, dayOf, inSemester, isoFromDay, lessonsOn, moscowNow, schedule, toMinutes, weekOf, weekdayOf,
 } from '../schedule'
 import { haptic } from '../telegram'
 
@@ -39,6 +40,7 @@ function useNow() {
 const GAP_MIN = 60 // показываем «окно», если между парами час и больше
 
 type Props = {
+  edits: ScheduleEdit[]
   group: string
   onGroupChange: (group: string) => void
   cursor: Cursor
@@ -47,7 +49,7 @@ type Props = {
   onSaveNote: (key: string, text: string) => void
 }
 
-export function ScheduleScreen({ group, onGroupChange, cursor, onCursorChange, notes, onSaveNote }: Props) {
+export function ScheduleScreen({ edits, group, onGroupChange, cursor, onCursorChange, notes, onSaveNote }: Props) {
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
@@ -91,8 +93,24 @@ export function ScheduleScreen({ group, onGroupChange, cursor, onCursorChange, n
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftDay(dx < 0 ? 1 : -1)
   }
 
+  // правки из админ-панели: отмена пары, пометки к паре и ко всему дню
+  const dayEdits = useMemo(() => {
+    const iso = isoFromDay(day)
+    return edits.filter((e) => e.group === group && e.date === iso)
+  }, [edits, group, day])
+  const lessonEdit = (start: string): LessonEdit | undefined => {
+    const own = dayEdits.filter((e) => e.start === start)
+    if (!own.length) return undefined
+    return { cancel: own.find((e) => e.kind === 'cancel') ?? null, notes: own.filter((e) => e.kind === 'note').map((e) => e.text) }
+  }
+  const starts = new Set(lessons.map((l) => l.start))
+  // ко всему дню — и пометки ко времени, где пары уже нет (расписание поменялось)
+  const dayWide = dayEdits.filter((e) => e.kind === 'note' && (e.start === null || !starts.has(e.start)))
+  const cancelled = new Set(dayEdits.filter((e) => e.kind === 'cancel').map((e) => e.start))
+
   const nowMinutes = isToday ? now.minutes : null
-  const nextIndex = nowMinutes === null ? -1 : lessons.findIndex((l) => toMinutes(l.start) > nowMinutes)
+  const nextIndex =
+    nowMinutes === null ? -1 : lessons.findIndex((l) => !cancelled.has(l.start) && toMinutes(l.start) > nowMinutes)
 
   const dayHint = [
     day === now.day + 1 ? 'Завтра' : day === now.day - 1 ? 'Вчера' : null,
@@ -188,6 +206,12 @@ export function ScheduleScreen({ group, onGroupChange, cursor, onCursorChange, n
         </div>
 
         <div key={`${group}|${day}`} className={`day-list${direction ? ` slide-${direction}` : ''}`}>
+          {dayWide.map((e) => (
+            <div key={e.id} className="edit-note">
+              📌 {e.start ? `${e.start} — ` : ''}
+              {e.text}
+            </div>
+          ))}
           {dayNote ? (
             <button type="button" className="day-note" onClick={editDayNote}>
               <NoteIcon className="day-note-icon" />
@@ -216,6 +240,7 @@ export function ScheduleScreen({ group, onGroupChange, cursor, onCursorChange, n
                     lesson={lesson}
                     nowMinutes={nowMinutes}
                     isNext={i === nextIndex}
+                    edit={lessonEdit(lesson.start)}
                     note={notes[noteKey]}
                     onEditNote={() =>
                       setEditing({

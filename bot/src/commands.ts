@@ -5,9 +5,9 @@ import { boardBanCommand } from './board-moderation'
 import { listBroadcasts, startBroadcast } from './broadcast'
 import { getUser, touchUser } from './db'
 import { reportError, safely } from './errors'
-import { GREETINGS } from './greetings'
 import { formatDay, loadTimetable, todayMsk } from './schedule'
-import { answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
+import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
+import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 
 export const BANNED_REPLY = 'Доступ к боту ограничен.'
@@ -17,13 +17,23 @@ type Handler = (c: Context) => Promise<void>
 
 // ---------- для всех ----------
 
-async function start({ env, message }: Context): Promise<void> {
-  const name = escapeHtml(message.from?.first_name?.trim() || 'брат')
-  const greet = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
-  await sendMessage(env, message.chat.id, greet(name), {
-    reply_markup: { inline_keyboard: [[{ text: '📅 Открыть расписание', web_app: { url: env.WEBAPP_URL } }]] },
-  })
+// Приветствие — одно из трёх (тексты меняются в админ-панели). Telegram не принял HTML —
+// шлём стандартное, а владельцу — ошибку.
+export async function sendGreeting(env: Env, chatId: number, firstName: string | undefined, index?: number): Promise<void> {
+  const name = escapeHtml(firstName?.trim() || 'брат')
+  const { greetings } = await loadSettings(env).catch(() => ({ greetings: DEFAULT_GREETINGS }))
+  const i = index ?? Math.floor(Math.random() * greetings.length)
+  const extra = { reply_markup: { inline_keyboard: [[{ text: '📅 Открыть расписание', web_app: { url: env.WEBAPP_URL } }]] } }
+  try {
+    await sendMessage(env, chatId, renderGreeting(greetings[i], name), extra)
+  } catch (err) {
+    if (!(err instanceof TelegramError && err.code === 400) || greetings === DEFAULT_GREETINGS) throw err
+    await sendMessage(env, chatId, renderGreeting(DEFAULT_GREETINGS[i] ?? DEFAULT_GREETINGS[0], name), extra)
+    await reportError(env, `Приветствие №${i + 1} из админ-панели`, err)
+  }
 }
+
+const start = ({ env, message }: Context) => sendGreeting(env, message.chat.id, message.from?.first_name)
 
 // /today, /tomorrow — для группы, выбранной в приложении; не выбрана — для обеих
 const dayCommand =

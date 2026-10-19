@@ -572,10 +572,15 @@ async function erase(call: Call, board: BoardId): Promise<Response> {
   return json({ ok: true, ids: results.map((row) => row.id) })
 }
 
-// очистка холста админом: сначала PNG-снимок в архив (KV), потом штрихи помечаются удалёнными
 async function clear(call: Call, board: BoardId): Promise<Response> {
-  const { env, ctx, req, now } = call
-  const png = typeof req.body.png === 'string' ? req.body.png.replace(/^data:image\/png;base64,/, '') : ''
+  return clearCanvas(call.env, call.ctx, board, call.req.body.png)
+}
+
+// Очистка холста админом (доска и админ-панель): сначала PNG-снимок в архив (KV), потом штрихи
+// помечаются удалёнными
+export async function clearCanvas(env: Env, ctx: ExecutionContext, board: BoardId, image: unknown): Promise<Response> {
+  const now = Date.now()
+  const png = typeof image === 'string' ? image.replace(/^data:image\/png;base64,/, '') : ''
   let bytes: Uint8Array
   try {
     bytes = Uint8Array.from(atob(png), (ch) => ch.charCodeAt(0))

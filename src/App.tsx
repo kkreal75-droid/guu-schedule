@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 import { hasNew, markSeen } from './board/seen'
+import { NoticeBar } from './components/NoticeBar'
+import type { ScheduleEdit } from './edits'
 import { formatStamp } from './format'
 import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
@@ -13,8 +15,9 @@ import { useTheme } from './theme'
 
 type Tab = 'schedule' | 'more' | 'profile'
 
-// status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен
-export default function App({ status }: { status: CheckIn | null }) {
+// status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен.
+// edits — ручные правки расписания из админ-панели.
+export default function App({ status, edits }: { status: CheckIn | null; edits: ScheduleEdit[] }) {
   const [prefs, updatePrefs] = usePrefs()
   const { notes, setNote } = useNotes()
   useTheme(prefs.theme)
@@ -41,8 +44,10 @@ export default function App({ status }: { status: CheckIn | null }) {
 
   return (
     <div className="app">
+      {tab === 'schedule' && status?.notice && <NoticeBar notice={status.notice} />}
       {tab === 'schedule' ? (
         <ScheduleScreen
+          edits={edits}
           group={viewGroup ?? prefs.group}
           onGroupChange={setViewGroup}
           cursor={cursor}

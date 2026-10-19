@@ -3,7 +3,7 @@ import { makeTimetable, type Lesson, type Overrides, type Schedule, type Timetab
 import { readLocal, writeLocal } from './storage'
 
 // Логика недель и правок — общая с ботом, в shared/schedule-core.ts
-export { DAY_MS, moscowNow, toMinutes } from '../shared/schedule-core'
+export { DAY_MS, dayFromIso, isoFromDay, moscowNow, toMinutes } from '../shared/schedule-core'
 export { isEvenWeek } from '../shared/format-core'
 export type { Lesson, Schedule } from '../shared/schedule-core'
 

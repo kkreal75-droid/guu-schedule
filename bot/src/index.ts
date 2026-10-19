@@ -8,13 +8,16 @@
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимная доска (board.ts), жалобы и баны — board-moderation.ts.
+//   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
 //   раз в час — чистка доски.
 //
-// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT. Данные — D1 (DB), настройки — KV.
+// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
+// Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
+import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { cleanupBoard, onBoardButton } from './board-moderation'
@@ -24,8 +27,10 @@ import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chat
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { touchUser } from './db'
 import { detectChanges, runDigests } from './digest'
+import { loadEdits } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
+import { loadSettings } from './settings'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
 
@@ -69,8 +74,20 @@ async function guarded(env: Env, where: string, run: () => Promise<Response>): P
   }
 }
 
+// Что приложению показать при открытии: ручные правки расписания (за 2 недели назад и вперёд),
+// объявление-плашку и режим техработ (админу — никогда)
+async function appExtras(env: Env, admin: boolean) {
+  const [settings, edits] = await Promise.all([loadSettings(env), loadEdits(env)])
+  const since = new Date(Date.now() + 3 * 3_600_000 - 14 * 86_400_000).toISOString().slice(0, 10)
+  return {
+    edits: edits.filter((e) => e.date >= since).map(({ id, group, date, start, kind, text }) => ({ id, group, date, start, kind, text })),
+    notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
+    maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
+  }
+}
+
 // Открытие мини-приложения. Тело — JSON {initData, group} или просто initData (старые версии).
-// В ответе ещё время последних сообщений на досках — для точки «есть новое».
+// В ответе ещё время последних сообщений на досках (точка «есть новое») и appExtras.
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
@@ -88,12 +105,13 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   if (!profile) return json({ ok: false }, 403)
   try {
     const admin = isOwner(env, profile.id)
-    const [{ banned }, board] = await Promise.all([
+    const [{ banned }, board, extras] = await Promise.all([
       touchUser(env.DB, profile, 'open', group),
-      // доска не должна мешать открытию приложения
+      // доска, правки и настройки не должны мешать открытию приложения
       boardLatest(env, profile.id, admin, group).catch((err) => (console.error('Доска в /seen:', err), {})),
+      appExtras(env, admin).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
-    return json({ ok: true, banned: banned && !admin, admin, board })
+    return json({ ok: true, banned: banned && !admin, admin, board, ...extras })
   } catch (err) {
     await reportError(env, 'Открытие приложения', err)
     return json({ ok: false }, 500)
@@ -130,6 +148,12 @@ export default {
     const ics = url.pathname.match(/^\/cal\/([\w-]{20,})\.ics$/)
     if (ics && (request.method === 'GET' || request.method === 'HEAD')) {
       return guarded(env, 'Календарь .ics', () => handleIcs(env, ctx, ics[1]))
+    }
+
+    const admin = url.pathname.match(/^\/admin\/([a-z-]+)$/)
+    if (admin && request.method === 'POST') {
+      const action = admin[1]
+      return guarded(env, `Админ-панель: ${action}`, () => handleAdminApi(env, ctx, request, action))
     }
 
     const board = url.pathname.match(/^\/board\/([a-z]+)$/)

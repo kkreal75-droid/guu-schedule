@@ -61,6 +61,18 @@ function hits(s: Stroke, x: number, y: number) {
   return false
 }
 
+// Снимок холста в PNG (белый фон, 1000×1000) — для архива перед очисткой
+export function snapshotPng(strokes: Drawable[]): string {
+  const snapshot = document.createElement('canvas')
+  snapshot.width = SIZE
+  snapshot.height = SIZE
+  const ctx = snapshot.getContext('2d')!
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, SIZE, SIZE)
+  for (const s of strokes) paint(ctx, s, 1)
+  return snapshot.toDataURL('image/png')
+}
+
 export function BoardCanvas({ board, config, admin, bannedUntil, onBanned }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const strokes = useRef(new Map<number, Stroke>())
@@ -258,16 +270,9 @@ export function BoardCanvas({ board, config, admin, bannedUntil, onBanned }: Pro
   // админ: перед очисткой — снимок холста в PNG (бот сохранит его в архив)
   const clear = async () => {
     if (!(await confirmAction('Очистить холст для всех? Снимок сохранится в архиве.'))) return
-    const snapshot = document.createElement('canvas')
-    snapshot.width = SIZE
-    snapshot.height = SIZE
-    const ctx = snapshot.getContext('2d')!
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, SIZE, SIZE)
-    for (const s of strokes.current.values()) paint(ctx, s, 1)
     track(1)
     try {
-      const res = await boardApi.clear(board, snapshot.toDataURL('image/png'))
+      const res = await boardApi.clear(board, snapshotPng([...strokes.current.values()]))
       strokes.current.clear()
       redraw()
       flash(`Холст очищен, снимок №${res.snapshot} в архиве`)

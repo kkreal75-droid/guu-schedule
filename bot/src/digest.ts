@@ -8,7 +8,7 @@ import { isoFromDay, moscowNow, toMinutes, type Lesson, type Timetable } from '.
 import { DIGEST_TIMES, forgetIfGone, loadChats, type ChatSettings } from './chats'
 import { GROUPS, shortGroup } from './db'
 import { reportError } from './errors'
-import { formatDay, formatLesson, formatWeek, loadTimetable } from './schedule'
+import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
 import { sendMessage } from './telegram'
 import { escapeHtml } from './util'
 
@@ -16,7 +16,7 @@ const WEEKLY_AT = 19 * 60 // суббота, 19:00 МСК
 const LATE_WINDOW = 10 // cron опоздал — досылаем в течение 10 минут
 const MAX_SENDS = 20 // за один запуск (лимит 50 подзапросов делим с рассылками)
 
-type Slot = { id: string; chats: [string, ChatSettings][]; text: (tt: Timetable, group: string) => string | null }
+type Slot = { id: string; chats: [string, ChatSettings][]; text: (tt: BotTimetable, group: string) => string | null }
 
 function dueSlots(day: number, minutes: number, weekday: number, chats: Record<string, ChatSettings>): Slot[] {
   const enabled = Object.entries(chats).filter(([, c]) => c.group && c.time)

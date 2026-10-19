@@ -1,3 +1,5 @@
+import type { ScheduleEdit } from './edits'
+
 // Обёртка над window.Telegram.WebApp (скрипт подключён в index.html).
 // Вне Telegram объект тоже существует, но initData пустой и версия 6.0 —
 // поэтому все вызовы новых методов проверяем через supports().
@@ -47,8 +49,16 @@ export function openTelegramLink(url: string) {
 export const BOT_URL: string | null =
   import.meta.env.VITE_BOT_URL ?? (import.meta.env.DEV ? null : 'https://guu-schedule-bot.guu-schedule-bot.workers.dev')
 
-// board — время последнего сообщения на каждой видимой доске (для точки «есть новое»)
-export type CheckIn = { banned: boolean; admin: boolean; board: Record<string, number> }
+// board — время последнего сообщения на каждой видимой доске (для точки «есть новое»);
+// edits — ручные правки расписания; notice — объявление-плашка; maintenance — текст техработ
+export type CheckIn = {
+  banned: boolean
+  admin: boolean
+  board: Record<string, number>
+  edits: ScheduleEdit[]
+  notice: { id: number; text: string } | null
+  maintenance: string | null
+}
 
 // При открытии отправляем боту подписанный Telegram initData и выбранную группу
 // (bot → POST /seen проверяет подпись, отмечает визит). В ответ — бан и права админа.
@@ -71,7 +81,14 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
     })
     if (!res.ok) return null
     const data = (await res.json()) as Partial<CheckIn>
-    return { banned: Boolean(data.banned), admin: Boolean(data.admin), board: data.board ?? {} }
+    return {
+      banned: Boolean(data.banned),
+      admin: Boolean(data.admin),
+      board: data.board ?? {},
+      edits: Array.isArray(data.edits) ? data.edits : [],
+      notice: data.notice ?? null,
+      maintenance: data.maintenance ?? null,
+    }
   } catch {
     return null
   } finally {

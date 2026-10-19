@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
+import { cachedEdits, rememberEdits } from './edits'
 import { loadSchedule } from './schedule'
 import { checkIn, initTelegram } from './telegram'
 
@@ -24,11 +25,24 @@ Promise.all([loadSchedule(), status])
       )
       return
     }
+    // техработы включаются в админ-панели; самому админу бот этот текст не присылает
+    if (checked?.maintenance) {
+      root.render(
+        <div className="boot">
+          <p className="boot-title">🛠 Технические работы</p>
+          <p className="boot-text">{checked.maintenance}</p>
+        </div>,
+      )
+      return
+    }
+    // правки расписания: свежие от бота, а если он не ответил — последние сохранённые
+    if (checked) rememberEdits(checked.edits)
+    const edits = checked ? checked.edits : cachedEdits()
     // App подгружаем после данных: его модули читают schedule уже при запуске
     const { default: App } = await import('./App')
     root.render(
       <StrictMode>
-        <App status={checked} />
+        <App status={checked} edits={edits} />
       </StrictMode>,
     )
   })

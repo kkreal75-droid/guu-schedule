@@ -6,8 +6,8 @@ import { json, readApi } from './api'
 import { GROUPS, shortGroup } from './db'
 import { loadTimetable } from './schedule'
 
-// Ручная правка из админки (этап 6): отменённая пара или пометка
-export type CalendarEdit = { group: string; date: string; start: string; kind: 'cancel' | 'note'; text: string }
+// Ручная правка из админ-панели (edits.ts): отменённая пара или пометка (start null — ко всему дню)
+export type CalendarEdit = { group: string; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }
 
 type TokenRow = { token: string; user_id: number; grp: string; created_at: number }
 
@@ -87,8 +87,8 @@ export function buildIcs(tt: Timetable, group: string, edits: CalendarEdit[] = [
     for (const week of lesson.weeks) {
       if (!tt.inSemester(week)) continue
       const iso = isoFromDay(tt.dayOf(week, lesson.weekday))
-      const related = edits.filter((e) => e.group === group && e.date === iso && e.start === lesson.start)
-      const cancelled = related.some((e) => e.kind === 'cancel')
+      const related = edits.filter((e) => e.group === group && e.date === iso && (e.start === lesson.start || e.start === null))
+      const cancelled = related.some((e) => e.kind === 'cancel' && e.start === lesson.start)
       const notes = related.map((e) => (e.kind === 'cancel' ? `Отменена${e.text ? `: ${e.text}` : ''}` : e.text)).filter(Boolean)
       const description = [
         ...notes.map((n) => `⚠️ ${n}`),
@@ -154,7 +154,7 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
 }
 
 // GET /cal/<токен>.ics — забирают сами календари
-export async function handleIcs(env: Env, ctx: ExecutionContext, token: string, edits: CalendarEdit[] = []): Promise<Response> {
+export async function handleIcs(env: Env, ctx: ExecutionContext, token: string): Promise<Response> {
   const row = await env.DB.prepare('SELECT * FROM calendar_tokens WHERE token = ?').bind(token).first<TokenRow>()
   if (!row) return new Response('Календарь отключён', { status: 404 })
   ctx.waitUntil(
@@ -162,7 +162,8 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string, 
       .bind(Date.now(), token)
       .run(),
   )
-  const ics = buildIcs(await loadTimetable(env), row.grp, edits)
+  const tt = await loadTimetable(env)
+  const ics = buildIcs(tt, row.grp, tt.edits)
   return new Response(ics, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',

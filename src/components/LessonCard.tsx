@@ -1,5 +1,6 @@
 import { formatDuration } from '../format'
 import { NoteIcon, PersonIcon, PinIcon } from '../icons'
+import type { LessonEdit } from '../edits'
 import { pairNumber, toMinutes, type Lesson } from '../schedule'
 
 const KIND_CLASS: Record<string, string> = {
@@ -13,21 +14,24 @@ type Props = {
   // минуты от полуночи, если карточка показывается за сегодня; иначе null
   nowMinutes: number | null
   isNext: boolean
+  // правка из админ-панели: пара отменена и/или пометка
+  edit?: LessonEdit
   note: string | undefined
   onEditNote: () => void
 }
 
-export function LessonCard({ lesson, nowMinutes, isNext, note, onEditNote }: Props) {
+export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote }: Props) {
   const start = toMinutes(lesson.start)
   const end = toMinutes(lesson.end)
-  const live = nowMinutes !== null && nowMinutes >= start && nowMinutes < end
+  const cancelled = Boolean(edit?.cancel)
+  const live = !cancelled && nowMinutes !== null && nowMinutes >= start && nowMinutes < end
   const past = nowMinutes !== null && nowMinutes >= end
   const kindClass = (lesson.kind && KIND_CLASS[lesson.kind]) || 'k-other'
 
   return (
     // вся карточка открывает заметку; кнопка с карандашом — то же самое для клавиатуры и скринридеров
     <article
-      className={`lesson ${kindClass}${live ? ' is-live' : ''}${past ? ' is-past' : ''}`}
+      className={`lesson ${kindClass}${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
       onClick={onEditNote}
     >
       <div className="lesson-time">
@@ -74,6 +78,14 @@ export function LessonCard({ lesson, nowMinutes, isNext, note, onEditNote }: Pro
             </div>
           </div>
         )}
+        {edit?.cancel && (
+          <div className="lesson-cancel">Пара отменена{edit.cancel.text ? `: ${edit.cancel.text}` : ''}</div>
+        )}
+        {edit?.notes.map((text, i) => (
+          <div key={i} className="edit-note edit-note-lesson">
+            📌 {text}
+          </div>
+        ))}
         {isNext && !live && (
           <div className="lesson-status is-soon">Начнётся через {formatDuration(start - nowMinutes!)}</div>
         )}

@@ -1659,3 +1659,476 @@ p {
 .tool-btn:disabled {
   opacity: 0.5;
 }
+
+/* ---------- правки расписания, объявление, техработы ---------- */
+
+.boot-text {
+  max-width: 320px;
+  white-space: pre-wrap;
+}
+
+.notice-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 7px 6px 7px 12px;
+  border-radius: 10px;
+  background: rgb(var(--note) / 0.16);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--hint);
+}
+
+.notice-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* жёлтая пометка из админ-панели (ко всему дню или к паре) */
+.edit-note {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(var(--note) / 0.18);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.edit-note-lesson {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.lesson.is-cancelled .lesson-subject,
+.lesson.is-cancelled .lesson-start,
+.lesson.is-cancelled .lesson-end {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.lesson.is-cancelled::before {
+  opacity: 0.3;
+}
+
+.lesson-cancel {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--destructive);
+}
+
+/* ---------- админ-панель ---------- */
+
+.admin-flash {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  text-align: center;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.stat {
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.stat:nth-child(odd) {
+  border-right: 0.5px solid var(--separator);
+}
+
+.stat:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.stat-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.chart {
+  position: relative;
+  padding: 18px 12px 8px;
+}
+
+.chart-max {
+  position: absolute;
+  top: 2px;
+  left: 12px;
+  font-size: 11px;
+  color: var(--hint);
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 110px;
+}
+
+.chart-col {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.chart-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+}
+
+.chart-bar[data-zero] {
+  background: var(--fill);
+}
+
+.chart-axis {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--hint);
+}
+
+.chart-axis span {
+  flex: 1;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  /* 16px — иначе iOS зумит страницу при фокусе */
+  font: inherit;
+  font-size: 16px;
+}
+
+.section-body .input {
+  background: var(--fill);
+  box-shadow: none;
+}
+
+.input::placeholder {
+  color: var(--hint);
+}
+
+.textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.form-hint {
+  margin: -4px 4px 0;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.row-form {
+  display: flex;
+  gap: 8px;
+}
+
+.row-check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px;
+  font-size: 14px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.button-inline {
+  flex: none;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.danger,
+.button-inline.danger {
+  color: var(--destructive);
+}
+
+.link-btn {
+  padding: 2px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-ink);
+}
+
+.row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.section-body .row-chips {
+  justify-content: flex-end;
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.chip:disabled:not([aria-pressed='true']) {
+  opacity: 0.5;
+}
+
+.chip-accent {
+  color: var(--accent-ink);
+}
+
+.chip-danger {
+  color: var(--destructive);
+}
+
+.row-value-wrap {
+  overflow-wrap: anywhere;
+}
+
+.admin-sub-back {
+  align-self: flex-start;
+}
+
+.admin-card {
+  padding: 4px 4px 0;
+}
+
+.admin-card-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-card-sub {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.admin-msg {
+  align-items: flex-start;
+}
+
+.admin-msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-msg-meta {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.admin-msg-text {
+  margin-top: 2px;
+  font-size: 15px;
+  line-height: 1.38;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-msg-text.is-deleted {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.admin-report {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.snapshot-img {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* таблица пользователей: имя, группа, визиты, последний вход */
+.utable {
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.urow {
+  display: grid;
+  grid-template-columns: 1fr 36px 40px 46px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-top: 0.5px solid var(--separator);
+  font-size: 14px;
+  text-align: left;
+}
+
+.urow:first-child {
+  border-top: 0;
+}
+
+.urow > span:not(.uname) {
+  text-align: right;
+  color: var(--hint);
+}
+
+.uhead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hint);
+}
+
+.uname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uname small {
+  display: block;
+  font-size: 12px;
+  color: var(--hint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-bubble {
+  margin: 10px;
+  border-radius: 14px;
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.preview-photo {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.preview-text {
+  padding: 8px 12px 10px;
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.preview-link {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+.preview-spoiler {
+  background: var(--hint);
+  color: transparent;
+  border-radius: 4px;
+}
+
+.link-btn.danger {
+  color: var(--destructive);
+}
+
+.button-inline {
+  min-height: 42px;
+}
