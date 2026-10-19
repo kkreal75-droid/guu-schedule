@@ -7,13 +7,17 @@
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google.
+//   POST /board/<действие> — анонимная доска (board.ts), жалобы и баны — board-moderation.ts.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
-//   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок.
+//   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
+//   раз в час — чистка доски.
 //
-// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID. Данные — D1 (DB), настройки — KV.
+// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT. Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
 import { CORS, json } from './api'
+import { boardLatest, handleBoardApi, isBoardAction } from './board'
+import { cleanupBoard, onBoardButton } from './board-moderation'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
@@ -49,12 +53,24 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
+      else if (query.data?.startsWith('bd:')) await onBoardButton(env, query)
       else await answerCallback(env, query.id)
     })
   }
 }
 
+// Ошибка в обработчике API: приложению — 500 (оно покажет «Что-то сломалось 🛠»), владельцу — текст
+async function guarded(env: Env, where: string, run: () => Promise<Response>): Promise<Response> {
+  try {
+    return await run()
+  } catch (err) {
+    await reportError(env, where, err)
+    return json({ ok: false, error: 'internal' }, 500)
+  }
+}
+
 // Открытие мини-приложения. Тело — JSON {initData, group} или просто initData (старые версии).
+// В ответе ещё время последних сообщений на досках — для точки «есть новое».
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
@@ -71,9 +87,13 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   const profile = await verifyInitData(initData, env)
   if (!profile) return json({ ok: false }, 403)
   try {
-    const { banned } = await touchUser(env.DB, profile, 'open', group)
     const admin = isOwner(env, profile.id)
-    return json({ ok: true, banned: banned && !admin, admin })
+    const [{ banned }, board] = await Promise.all([
+      touchUser(env.DB, profile, 'open', group),
+      // доска не должна мешать открытию приложения
+      boardLatest(env, profile.id, admin, group).catch((err) => (console.error('Доска в /seen:', err), {})),
+    ])
+    return json({ ok: true, banned: banned && !admin, admin, board })
   } catch (err) {
     await reportError(env, 'Открытие приложения', err)
     return json({ ok: false }, 500)
@@ -104,9 +124,17 @@ export default {
 
     // календарь: подписка из приложения и сам .ics для Apple/Google
     const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)
-    if (cal && request.method === 'POST') return handleCalendarApi(env, request, cal[1])
+    if (cal && request.method === 'POST') return guarded(env, 'Календарь', () => handleCalendarApi(env, request, cal[1]))
     const ics = url.pathname.match(/^\/cal\/([\w-]{20,})\.ics$/)
-    if (ics && (request.method === 'GET' || request.method === 'HEAD')) return handleIcs(env, ctx, ics[1])
+    if (ics && (request.method === 'GET' || request.method === 'HEAD')) {
+      return guarded(env, 'Календарь .ics', () => handleIcs(env, ctx, ics[1]))
+    }
+
+    const board = url.pathname.match(/^\/board\/([a-z]+)$/)
+    if (board && request.method === 'POST' && isBoardAction(board[1])) {
+      const action = board[1]
+      return guarded(env, `Доска: ${action}`, () => handleBoardApi(env, ctx, request, action))
+    }
 
     if (url.pathname === '/' && request.method === 'GET') {
       try {
@@ -129,6 +157,9 @@ export default {
       used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
       if (new Date(now).getUTCMinutes() % 10 === 5) {
         used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
+      }
+      if (new Date(now).getUTCMinutes() === 35) {
+        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка доски', err), 0))
       }
       const batch = Math.max(0, BATCH - used)
       if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))

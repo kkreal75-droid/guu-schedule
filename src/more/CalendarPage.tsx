@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Section } from '../components/Section'
 import { botAvailable, callBot } from '../api'
-import { haptic, openLink, supports, tg } from '../telegram'
+import { confirmAction, haptic, openLink } from '../telegram'
 
 type Status = { connected: false } | { connected: true; url: string; group: string }
 
 const short = (group: string) => group.replace('МБ(МП) ', '')
-
-function confirmAction(message: string): Promise<boolean> {
-  if (supports('6.2')) return new Promise((resolve) => tg!.showConfirm(message, resolve))
-  return Promise.resolve(window.confirm(message))
-}
 
 export function CalendarPage({ group }: { group: string }) {
   const [status, setStatus] = useState<Status | null>(null)

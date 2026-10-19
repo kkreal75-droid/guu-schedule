@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { hasNew, markSeen } from './board/seen'
 import { formatStamp } from './format'
 import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
@@ -22,6 +23,12 @@ export default function App({ status }: { status: CheckIn | null }) {
   // группа, выбранная переключателем на экране расписания; null — показываем группу по умолчанию
   const [viewGroup, setViewGroup] = useState<string | null>(null)
   const [cursor, setCursor] = useState<Cursor>(initialCursor)
+  // точка «есть новое» на доске: «Ещё» и «Доска», без счётчиков
+  const [boardNew, setBoardNew] = useState(() => hasNew(status?.board))
+  const onBoardOpen = useCallback(() => {
+    markSeen(status?.board ?? {})
+    setBoardNew(false)
+  }, [status])
 
   const switchTab = (next: Tab) => {
     if (next === tab) return
@@ -44,7 +51,12 @@ export default function App({ status }: { status: CheckIn | null }) {
           onSaveNote={setNote}
         />
       ) : tab === 'more' ? (
-        <MoreScreen admin={Boolean(status?.admin)} group={viewGroup ?? prefs.group} />
+        <MoreScreen
+          admin={Boolean(status?.admin)}
+          group={viewGroup ?? prefs.group}
+          boardNew={boardNew}
+          onBoardOpen={onBoardOpen}
+        />
       ) : (
         <ProfileScreen
           noteCount={Object.keys(notes).length}
@@ -71,6 +83,7 @@ export default function App({ status }: { status: CheckIn | null }) {
         <button type="button" className="tab" aria-current={tab === 'more'} onClick={() => switchTab('more')}>
           <MoreIcon />
           <span>Ещё</span>
+          {boardNew && <span className="new-dot" aria-label="есть новое" />}
         </button>
         <button type="button" className="tab" aria-current={tab === 'profile'} onClick={() => switchTab('profile')}>
           <UserIcon />

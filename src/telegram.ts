@@ -28,6 +28,12 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener')
 }
 
+// Подтверждение в стиле Telegram (вне Telegram — обычный confirm)
+export function confirmAction(message: string): Promise<boolean> {
+  if (supports('6.2')) return new Promise((resolve) => tg!.showConfirm(message, resolve))
+  return Promise.resolve(window.confirm(message))
+}
+
 // Ссылки t.me открываем внутри Telegram (выбор беседы, бот и т. п.)
 export function openTelegramLink(url: string) {
   if (supports('6.1')) tg!.openTelegramLink(url)
@@ -39,7 +45,8 @@ export function openTelegramLink(url: string) {
 export const BOT_URL: string | null =
   import.meta.env.VITE_BOT_URL ?? (import.meta.env.DEV ? null : 'https://guu-schedule-bot.guu-schedule-bot.workers.dev')
 
-export type CheckIn = { banned: boolean; admin: boolean }
+// board — время последнего сообщения на каждой видимой доске (для точки «есть новое»)
+export type CheckIn = { banned: boolean; admin: boolean; board: Record<string, number> }
 
 // При открытии отправляем боту подписанный Telegram initData и выбранную группу
 // (bot → POST /seen проверяет подпись, отмечает визит). В ответ — бан и права админа.
@@ -62,7 +69,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
     })
     if (!res.ok) return null
     const data = (await res.json()) as Partial<CheckIn>
-    return { banned: Boolean(data.banned), admin: Boolean(data.admin) }
+    return { banned: Boolean(data.banned), admin: Boolean(data.admin), board: data.board ?? {} }
   } catch {
     return null
   } finally {

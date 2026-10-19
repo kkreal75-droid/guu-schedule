@@ -2,6 +2,7 @@
 interface Secrets {
   BOT_TOKEN: string
   OWNER_ID: string // Telegram ID владельца — админа бота
+  BOARD_SALT?: string // ключ для псевдонимов на доске; без него доска выключена
   TELEGRAM_API?: string // только для локальной проверки с поддельным Telegram
 }
 

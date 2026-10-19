@@ -1,5 +1,6 @@
 // Админские команды бота про пользователей: /stats, /export, /ban, /unban, /bans.
 import { isOwner } from './auth'
+import { boardBanTerm } from './board-moderation'
 import { allUsers, findUserByUsername, getUser, userLabel, type UserRow } from './db'
 import { sendMessage, tgForm } from './telegram'
 import { csv, escapeHtml, formatMsk, formatMskFull } from './util'
@@ -76,13 +77,13 @@ export async function exportUsers(env: Env, chatId: number): Promise<void> {
 // ---------- /ban, /unban, /bans ----------
 
 // «123456» или «@nick» → пользователь; по id можно забанить и того, кого бот ещё не видел
-async function resolveTarget(env: Env, target: string): Promise<UserRow | { id: number; unknown: true } | null> {
+export async function resolveTarget(env: Env, target: string): Promise<UserRow | { id: number; unknown: true } | null> {
   if (/^\d+$/.test(target)) return (await getUser(env.DB, Number(target))) ?? { id: Number(target), unknown: true }
   if (/^@?\w{3,}$/.test(target)) return findUserByUsername(env.DB, target)
   return null
 }
 
-const label = (user: UserRow | { id: number; unknown: true }) =>
+export const targetLabel = (user: UserRow | { id: number; unknown: true }) =>
   'unknown' in user ? `id ${user.id}` : `${userLabel(user, escapeHtml)} (id ${user.id})`
 
 export async function banCommand(env: Env, chatId: number, args: string): Promise<void> {
@@ -106,7 +107,7 @@ export async function banCommand(env: Env, chatId: number, args: string): Promis
   )
     .bind(user.id, now, reason)
     .run()
-  await sendMessage(env, chatId, `🚫 Забанен: ${label(user)}${reason ? `\nПричина: ${escapeHtml(reason)}` : ''}`)
+  await sendMessage(env, chatId, `🚫 Забанен: ${targetLabel(user)}${reason ? `\nПричина: ${escapeHtml(reason)}` : ''}`)
 }
 
 export async function unbanCommand(env: Env, chatId: number, args: string): Promise<void> {
@@ -118,15 +119,28 @@ export async function unbanCommand(env: Env, chatId: number, args: string): Prom
     return
   }
   await env.DB.prepare('UPDATE users SET banned = 0, ban_reason = NULL, banned_at = NULL WHERE id = ?').bind(user.id).run()
-  await sendMessage(env, chatId, `✅ Разбанен: ${label(user)}`)
+  await sendMessage(env, chatId, `✅ Разбанен: ${targetLabel(user)}`)
 }
 
 export async function listBans(env: Env, chatId: number): Promise<void> {
-  const { results } = await env.DB.prepare('SELECT * FROM users WHERE banned = 1 ORDER BY banned_at DESC').all<UserRow>()
-  if (!results.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
-  const lines = results.map(
-    (u, i) =>
-      `${i + 1}. ${label(u)} · ${u.banned_at ? formatMsk(u.banned_at) : '—'}${u.ban_reason ? `\n    ${escapeHtml(u.ban_reason)}` : ''}`,
-  )
-  await sendMessage(env, chatId, `🚫 <b>Забанены (${results.length})</b>\n\n${lines.join('\n')}`)
+  const [banned, boardBanned] = await env.DB.batch([
+    env.DB.prepare('SELECT * FROM users WHERE banned = 1 ORDER BY banned_at DESC'),
+    env.DB.prepare('SELECT * FROM users WHERE board_banned_until > ? ORDER BY board_banned_until DESC').bind(Date.now()),
+  ])
+  const bans = banned.results as UserRow[]
+  const boardBans = boardBanned.results as UserRow[]
+  if (!bans.length && !boardBans.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
+  const parts: string[] = []
+  if (bans.length) {
+    const lines = bans.map(
+      (u, i) =>
+        `${i + 1}. ${targetLabel(u)} · ${u.banned_at ? formatMsk(u.banned_at) : '—'}${u.ban_reason ? `\n    ${escapeHtml(u.ban_reason)}` : ''}`,
+    )
+    parts.push(`🚫 <b>Забанены (${bans.length})</b>\n\n${lines.join('\n')}`)
+  }
+  if (boardBans.length) {
+    const lines = boardBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${boardBanTerm(u.board_banned_until!)}`)
+    parts.push(`🔇 <b>Бан на доске (${boardBans.length})</b>\n\n${lines.join('\n')}`)
+  }
+  await sendMessage(env, chatId, parts.join('\n\n'))
 }
