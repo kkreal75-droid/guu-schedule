@@ -44,7 +44,7 @@ export default function App({ status }: { status: CheckIn | null }) {
           onSaveNote={setNote}
         />
       ) : tab === 'more' ? (
-        <MoreScreen admin={Boolean(status?.admin)} />
+        <MoreScreen admin={Boolean(status?.admin)} group={viewGroup ?? prefs.group} />
       ) : (
         <ProfileScreen
           noteCount={Object.keys(notes).length}

@@ -5,13 +5,17 @@
 //                   inline-запросы — inline.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
+//   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
+//   GET  /cal/<токен>.ics — сам календарь для Apple/Google.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID. Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
+import { CORS, json } from './api'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
+import { handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { touchUser } from './db'
@@ -20,9 +24,6 @@ import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
-
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' }
-const json = (data: unknown, status = 200) => Response.json(data, { status, headers: CORS })
 
 async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): Promise<void> {
   if (update.message) {
@@ -100,6 +101,12 @@ export default {
     }
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
+
+    // календарь: подписка из приложения и сам .ics для Apple/Google
+    const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)
+    if (cal && request.method === 'POST') return handleCalendarApi(env, request, cal[1])
+    const ics = url.pathname.match(/^\/cal\/([\w-]{20,})\.ics$/)
+    if (ics && (request.method === 'GET' || request.method === 'HEAD')) return handleIcs(env, ctx, ics[1])
 
     if (url.pathname === '/' && request.method === 'GET') {
       try {

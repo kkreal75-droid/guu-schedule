@@ -1,6 +1,7 @@
-import { useCallback, useState, type ComponentType, type SVGProps } from 'react'
+import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { ChevronLeft, ChevronRight, GroupChatIcon } from '../icons'
+import { ChevronLeft, ChevronRight, GroupChatIcon, PhoneCalendarIcon } from '../icons'
+import { CalendarPage } from '../more/CalendarPage'
 import { GroupBotPage } from '../more/GroupBotPage'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -10,14 +11,17 @@ type Item = {
   id: string
   title: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
-  page: ComponentType
+  render: () => ReactNode // элемент, а не компонент: иначе при перерисовке страница сбрасывала бы состояние
   dot?: boolean
 }
 
-type Props = { admin: boolean }
+type Props = { admin: boolean; group: string }
 
-export function MoreScreen({ admin }: Props) {
-  const items: Item[] = [{ id: 'groupbot', title: 'Бот в беседе группы', icon: GroupChatIcon, page: GroupBotPage }]
+export function MoreScreen({ admin, group }: Props) {
+  const items: Item[] = [
+    { id: 'calendar', title: 'Календарь на телефоне', icon: PhoneCalendarIcon, render: () => <CalendarPage group={group} /> },
+    { id: 'groupbot', title: 'Бот в беседе группы', icon: GroupChatIcon, render: () => <GroupBotPage /> },
+  ]
   void admin // пункт «Админ-панель» появится на этапе 6
 
   const [openId, setOpenId] = useState<string | null>(null)
@@ -29,7 +33,6 @@ export function MoreScreen({ admin }: Props) {
 
   const open = items.find((item) => item.id === openId)
   if (open) {
-    const Page = open.page
     return (
       <div className="screen more">
         <header className="page-head">
@@ -38,7 +41,7 @@ export function MoreScreen({ admin }: Props) {
           </button>
           <h2 className="page-title">{open.title}</h2>
         </header>
-        <Page />
+        {open.render()}
       </div>
     )
   }
