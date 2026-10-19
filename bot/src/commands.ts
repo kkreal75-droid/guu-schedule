@@ -1,0 +1,84 @@
+// Личные сообщения боту: команды для всех и админские (только OWNER_ID).
+import { banCommand, exportUsers, listBans, sendStats, unbanCommand } from './admin'
+import { isOwner, profileOf } from './auth'
+import { listBroadcasts, startBroadcast } from './broadcast'
+import { getUser, touchUser } from './db'
+import { reportError, safely } from './errors'
+import { GREETINGS } from './greetings'
+import { formatDay, loadTimetable, todayMsk } from './schedule'
+import { answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
+import { escapeHtml } from './util'
+
+export const BANNED_REPLY = 'Доступ к боту ограничен.'
+
+type Context = { env: Env; ctx: ExecutionContext; message: TgMessage; args: string }
+type Handler = (c: Context) => Promise<void>
+
+// ---------- для всех ----------
+
+async function start({ env, message }: Context): Promise<void> {
+  const name = escapeHtml(message.from?.first_name?.trim() || 'брат')
+  const greet = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
+  await sendMessage(env, message.chat.id, greet(name), {
+    reply_markup: { inline_keyboard: [[{ text: '📅 Открыть расписание', web_app: { url: env.WEBAPP_URL } }]] },
+  })
+}
+
+// /today, /tomorrow — для группы, выбранной в приложении; не выбрана — для обеих
+const dayCommand =
+  (offset: number): Handler =>
+  async ({ env, message }) => {
+    const [tt, user] = await Promise.all([loadTimetable(env), getUser(env.DB, message.from!.id)])
+    await sendMessage(env, message.chat.id, formatDay(tt, todayMsk() + offset, user?.grp ?? null))
+  }
+
+const PUBLIC: Record<string, Handler> = {
+  '/start': start,
+  '/today': dayCommand(0),
+  '/tomorrow': dayCommand(1),
+}
+
+// ---------- только для владельца ----------
+
+const ADMIN: Record<string, Handler> = {
+  '/stats': ({ env, message }) => sendStats(env, message.chat.id),
+  '/broadcast': ({ env, message }) => startBroadcast(env, message),
+  '/broadcasts': ({ env, message }) => listBroadcasts(env, message.chat.id),
+  '/export': ({ env, message }) => exportUsers(env, message.chat.id),
+  '/ban': ({ env, message, args }) => banCommand(env, message.chat.id, args),
+  '/unban': ({ env, message, args }) => unbanCommand(env, message.chat.id, args),
+  '/bans': ({ env, message }) => listBans(env, message.chat.id),
+}
+
+export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, message: TgMessage): Promise<void> {
+  const from = message.from
+  if (!from || from.is_bot) return
+  // команда — в тексте или в подписи к фото («/broadcast» с картинкой)
+  const text = (message.text ?? message.caption ?? '').trim()
+  const command = text.startsWith('/') ? text.split(/\s+/)[0].split('@')[0].toLowerCase() : null
+  const args = text.replace(/^\S+\s*/, '')
+  const owner = isOwner(env, from.id)
+
+  // учёт не должен мешать ответу: база недоступна — сообщаем владельцу и отвечаем как обычно
+  let banned = false
+  try {
+    banned = (await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')).banned
+  } catch (err) {
+    await reportError(env, 'Учёт пользователя', err)
+  }
+  if (banned && !owner) return void (await sendMessage(env, message.chat.id, BANNED_REPLY))
+  if (!command) return
+
+  // админские команды у остальных — как несуществующие: ни ответа, ни намёка
+  const handler = PUBLIC[command] ?? (owner ? ADMIN[command] : undefined)
+  if (!handler) return
+  await safely(env, `Команда ${command}`, message.chat.id, () => handler({ env, ctx, message, args }))
+}
+
+export async function handleBannedCallback(env: Env, query: TgCallbackQuery): Promise<boolean> {
+  if (isOwner(env, query.from.id)) return false
+  const user = await getUser(env.DB, query.from.id)
+  if (!user?.banned) return false
+  await answerCallback(env, query.id, BANNED_REPLY)
+  return true
+}

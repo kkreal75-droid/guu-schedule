@@ -1,11 +1,38 @@
 // Эмулятор клиента Telegram для локальной разработки. В production-сборку не попадает
 // (вызывается только под import.meta.env.DEV).
 //
-//   http://localhost:5173/?tg        — «как в Telegram», тёмная тема
-//   http://localhost:5173/?tg=light  — светлая тема
+//   http://localhost:5173/?tg              — «как в Telegram», тёмная тема
+//   http://localhost:5173/?tg=light        — светлая тема
+//   http://localhost:5173/?tg&uid=7&name=… — другой тестовый пользователь
 //
 // Приложение получает тестового пользователя и цвета темы через те же параметры запуска,
 // что передаёт настоящий Telegram, а CloudStorage работает поверх localStorage (ключ mock_cloud).
+// initData подписан фиктивным токеном из bot/.dev.vars — его принимает локальный `wrangler dev`
+// (VITE_BOT_URL=http://127.0.0.1:8787), настоящий бот — нет.
+
+const DEV_BOT_TOKEN: string = import.meta.env.VITE_DEV_BOT_TOKEN ?? '123456:LOCAL-TEST-TOKEN'
+
+const toHex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+
+async function hmac(key: BufferSource, data: string) {
+  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data))
+}
+
+// initData как у Telegram: hash = HMAC(HMAC("WebAppData", токен), строка полей)
+async function signedInitData(user: object): Promise<string> {
+  const fields: Record<string, string> = {
+    query_id: 'dev',
+    user: JSON.stringify(user),
+    auth_date: String(Math.floor(Date.now() / 1000)),
+  }
+  const check = Object.keys(fields)
+    .sort()
+    .map((key) => `${key}=${fields[key]}`)
+    .join('\n')
+  const secret = await hmac(new TextEncoder().encode('WebAppData'), DEV_BOT_TOKEN)
+  return new URLSearchParams({ ...fields, hash: toHex(await hmac(secret, check)) }).toString()
+}
 
 const THEMES: Record<string, Record<string, string>> = {
   dark: {
@@ -27,23 +54,27 @@ const THEMES: Record<string, Record<string, string>> = {
 const STORE = 'mock_cloud'
 
 export function installTelegramMock() {
-  const theme = new URLSearchParams(location.search).get('tg')
+  const search = new URLSearchParams(location.search)
+  const theme = search.get('tg')
 
   // 1. параметры запуска SDK читает из hash при загрузке — подставляем и перезагружаемся
   if (theme !== null && !location.hash.includes('tgWebAppData')) {
-    const initData = new URLSearchParams({
-      user: JSON.stringify({ id: 1, first_name: 'Test', last_name: 'User', username: 'test_user' }),
-      auth_date: '1',
-      hash: 'mock',
+    const user = {
+      id: Number(search.get('uid') ?? 1),
+      first_name: search.get('name') ?? 'Test',
+      last_name: 'User',
+      username: search.get('username') ?? `test_user_${search.get('uid') ?? 1}`,
+    }
+    void signedInitData(user).then((initData) => {
+      const launch = new URLSearchParams({
+        tgWebAppData: initData,
+        tgWebAppVersion: '8.0',
+        tgWebAppPlatform: 'ios',
+        tgWebAppThemeParams: JSON.stringify(THEMES[theme] ?? THEMES.dark),
+      })
+      location.hash = launch.toString().replace(/\+/g, '%20')
+      location.reload()
     })
-    const launch = new URLSearchParams({
-      tgWebAppData: initData.toString(),
-      tgWebAppVersion: '8.0',
-      tgWebAppPlatform: 'ios',
-      tgWebAppThemeParams: JSON.stringify(THEMES[theme] ?? THEMES.dark),
-    })
-    location.hash = launch.toString().replace(/\+/g, '%20')
-    location.reload()
     return
   }
 
@@ -54,7 +85,7 @@ export function installTelegramMock() {
   const hasRealClient = 'TelegramWebviewProxy' in window || window.parent !== window
   if (!window.Telegram?.WebApp?.initData || hasRealClient) return
 
-  const read =(): Record<string, string> => JSON.parse(localStorage.getItem(STORE) ?? '{}')
+  const read = (): Record<string, string> => JSON.parse(localStorage.getItem(STORE) ?? '{}')
   const write = (store: Record<string, string>) => localStorage.setItem(STORE, JSON.stringify(store))
   // Telegram.WebView — внутренний объект SDK, в @types/telegram-web-app его нет
   const webView = (window.Telegram as unknown as { WebView: { receiveEvent: (type: string, data: unknown) => void } })

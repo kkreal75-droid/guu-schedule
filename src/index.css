@@ -151,6 +151,12 @@ p {
   color: var(--hint);
 }
 
+.boot-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .boot-retry {
   padding: 8px 18px;
   border-radius: 999px;

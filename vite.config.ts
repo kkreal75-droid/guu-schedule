@@ -3,33 +3,44 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 
-const SCHEDULE_FILE = resolve(import.meta.dirname, 'schedule.json')
+// Эти файлы не встраиваются в JS, а лежат рядом с сайтом отдельно:
+// schedule.json приложение скачивает при каждом запуске (см. loadSchedule в src/schedule.ts),
+// а бот (bot/) берёт оба файла с сайта, чтобы показывать то же расписание.
+const DATA_FILES = ['schedule.json', 'overrides.json'].map((name) => ({
+  name,
+  path: resolve(import.meta.dirname, name),
+}))
 
-// schedule.json не встраивается в JS, а лежит рядом с сайтом отдельным файлом:
-// приложение скачивает его при каждом запуске (см. loadSchedule в src/schedule.ts).
-function scheduleJson(): Plugin {
+function dataFiles(): Plugin {
   return {
-    name: 'schedule-json',
+    name: 'data-files',
     configureServer(server) {
-      server.middlewares.use('/schedule.json', (_req, res) => {
-        res.setHeader('Content-Type', 'application/json; charset=utf-8')
-        res.setHeader('Cache-Control', 'no-store')
-        res.end(readFileSync(SCHEDULE_FILE))
-      })
+      for (const file of DATA_FILES) {
+        server.middlewares.use(`/${file.name}`, (req, res, next) => {
+          // «/overrides.json?import» — это приложение подключает файл как модуль: отдаёт сам Vite
+          const query = new URLSearchParams(req.url?.split('?')[1] ?? '')
+          if ([...query.keys()].some((key) => key !== 'v')) return next()
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-store')
+          res.end(readFileSync(file.path))
+        })
+        server.watcher.add(file.path)
+      }
       // update.py переписал файл — перезагружаем открытую страницу
-      server.watcher.add(SCHEDULE_FILE)
-      server.watcher.on('change', (file) => {
-        if (file === SCHEDULE_FILE) server.ws.send({ type: 'full-reload' })
+      server.watcher.on('change', (changed) => {
+        if (DATA_FILES.some((file) => file.path === changed)) server.ws.send({ type: 'full-reload' })
       })
     },
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'schedule.json', source: readFileSync(SCHEDULE_FILE) })
+      for (const file of DATA_FILES) {
+        this.emitFile({ type: 'asset', fileName: file.name, source: readFileSync(file.path) })
+      }
     },
   }
 }
 
 export default defineConfig({
-  plugins: [react(), scheduleJson()],
+  plugins: [react(), dataFiles()],
   // относительные пути — сайт работает и в корне домена, и на GitHub Pages (/<repo>/)
   base: './',
 })

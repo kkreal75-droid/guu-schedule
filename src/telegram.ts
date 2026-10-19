@@ -28,14 +28,40 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener')
 }
 
-// Бот считает, сколько людей открывали приложение: отправляем ему подписанный Telegram
-// initData (bot/src/index.ts → POST /seen проверяет подпись). Режим no-cors и text/plain —
-// «простой» запрос без CORS-настроек; ответ не нужен, ошибки не мешают приложению.
-const SEEN_URL = 'https://guu-schedule-bot.guu-schedule-bot.workers.dev/seen'
+// Адрес бота (bot/). В dev — только если явно задан VITE_BOT_URL (локальный wrangler dev),
+// чтобы локальная разработка не трогала настоящую статистику.
+export const BOT_URL: string | null =
+  import.meta.env.VITE_BOT_URL ?? (import.meta.env.DEV ? null : 'https://guu-schedule-bot.guu-schedule-bot.workers.dev')
 
-export function reportOpen() {
-  if (!inTelegram || import.meta.env.DEV) return
-  fetch(SEEN_URL, { method: 'POST', mode: 'no-cors', body: tg!.initData, keepalive: true }).catch(() => {})
+export type CheckIn = { banned: boolean; admin: boolean }
+
+// При открытии отправляем боту подписанный Telegram initData и выбранную группу
+// (bot → POST /seen проверяет подпись, отмечает визит). В ответ — бан и права админа.
+// text/plain — «простой» запрос без CORS-предзапроса. Ошибки и таймаут не мешают приложению.
+export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
+  if (!inTelegram || !BOT_URL) return null
+  let group: string | null = null
+  try {
+    group = (JSON.parse(localStorage.getItem('prefs') ?? '{}') as { group?: string }).group ?? null
+  } catch {
+    // нет сохранённых настроек — группу не передаём
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${BOT_URL}/seen`, {
+      method: 'POST',
+      body: JSON.stringify({ initData: tg!.initData, group }),
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as Partial<CheckIn>
+    return { banned: Boolean(data.banned), admin: Boolean(data.admin) }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export function telegramUser() {

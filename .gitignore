@@ -8,3 +8,4 @@ __pycache__/
 .claude/
 .dev.vars
 .wrangler/
+bot/worker-configuration.d.ts

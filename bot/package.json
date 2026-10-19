@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "tsc --noEmit"
+    "check": "wrangler types && tsc --noEmit",
+    "migrate": "wrangler d1 migrations apply guu-bot --remote"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
