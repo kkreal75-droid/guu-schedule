@@ -1,0 +1,14 @@
+{
+  "name": "guu-schedule-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "wrangler": "^4.151.2"
+  }
+}

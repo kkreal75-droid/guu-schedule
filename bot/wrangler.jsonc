@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "guu-schedule-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "vars": {
+    "WEBAPP_URL": "https://kkreal75-droid.github.io/guu-schedule/"
+  },
+  // логи воркера видны в панели Cloudflare и в `npx wrangler tail`
+  "observability": { "enabled": true }
+}
