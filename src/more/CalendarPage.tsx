@@ -91,7 +91,8 @@ export function CalendarPage({ group }: { group: string }) {
               Переключить на {short(group)} (как в профиле)
             </button>
           )}
-          <button type="button" className="button-primary" onClick={() => openLink(webcal)}>
+          {/* Telegram открывает только http(s): страница бота сама передаст webcal:// Календарю */}
+          <button type="button" className="button-primary" onClick={() => openLink(status.url.replace(/\.ics$/, '/apple'))}>
             Apple Календарь
           </button>
           <button

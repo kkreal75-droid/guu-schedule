@@ -6,7 +6,7 @@
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
-//   GET  /cal/<токен>.ics — сам календарь для Apple/Google.
+//   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимная доска (board.ts), жалобы и баны — board-moderation.ts.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
@@ -19,7 +19,7 @@ import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
-import { handleCalendarApi, handleIcs } from './calendar'
+import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { touchUser } from './db'
@@ -125,6 +125,8 @@ export default {
     // календарь: подписка из приложения и сам .ics для Apple/Google
     const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)
     if (cal && request.method === 'POST') return guarded(env, 'Календарь', () => handleCalendarApi(env, request, cal[1]))
+    const apple = url.pathname.match(/^\/cal\/([\w-]{20,})\/apple$/)
+    if (apple && request.method === 'GET') return guarded(env, 'Календарь Apple', () => handleAppleSubscribe(env, request, apple[1]))
     const ics = url.pathname.match(/^\/cal\/([\w-]{20,})\.ics$/)
     if (ics && (request.method === 'GET' || request.method === 'HEAD')) {
       return guarded(env, 'Календарь .ics', () => handleIcs(env, ctx, ics[1]))

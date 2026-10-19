@@ -23,9 +23,11 @@ export function haptic(kind: 'select' | 'light' = 'select') {
   else tg!.HapticFeedback.impactOccurred('light')
 }
 
+// Telegram открывает только http(s); другие схемы (webcal: и т. п.) — обычным переходом
 export function openLink(url: string) {
-  if (inTelegram) tg!.openLink(url)
-  else window.open(url, '_blank', 'noopener')
+  if (inTelegram && /^https?:/i.test(url)) tg!.openLink(url)
+  else if (/^https?:/i.test(url)) window.open(url, '_blank', 'noopener')
+  else window.location.href = url
 }
 
 // Подтверждение в стиле Telegram (вне Telegram — обычный confirm)

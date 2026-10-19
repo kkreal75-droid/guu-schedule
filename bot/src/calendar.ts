@@ -171,3 +171,32 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string, 
     },
   })
 }
+
+// GET /cal/<токен>/apple — страница для iPhone. Telegram открывает из мини-приложения только
+// http(s)-ссылки, поэтому кнопка «Apple Календарь» ведёт сюда, а страница уже открывает
+// webcal:// — Календарь предлагает подписаться.
+export async function handleAppleSubscribe(env: Env, request: Request, token: string): Promise<Response> {
+  const row = await env.DB.prepare('SELECT grp FROM calendar_tokens WHERE token = ?').bind(token).first<{ grp: string }>()
+  const html = (body: string, status = 200) =>
+    new Response(
+      `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подписка на расписание</title>
+<style>
+body{margin:0;padding:40px 20px;font:17px/1.4 -apple-system,system-ui,sans-serif;text-align:center;background:#f2f2f7;color:#111}
+h1{font-size:22px;margin:0 0 12px}p{color:#666;margin:8px 0}
+a.btn{display:inline-block;margin:20px 0 8px;padding:14px 24px;border-radius:12px;background:#007aff;color:#fff;font-weight:600;text-decoration:none}
+@media (prefers-color-scheme:dark){body{background:#000;color:#fff}p{color:#999}}
+</style></head><body>${body}</body></html>`,
+      { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
+    )
+  if (!row) return html('<h1>Календарь отключён</h1><p>Подключите его заново в приложении: Ещё → Календарь на телефоне.</p>', 404)
+  const webcal = feedUrl(new URL(request.url).origin, token).replace(/^https?:/, 'webcal:')
+  return html(`<h1>📅 Расписание ${escapeHtmlText(row.grp)}</h1>
+<p>Сейчас откроется Календарь — нажмите «Подписаться».</p>
+<a class="btn" href="${webcal}">Подписаться в Календаре</a>
+<p>Если ничего не открылось — нажмите кнопку.</p>
+<script>location.href = ${JSON.stringify(webcal)}</script>`)
+}
+
+const escapeHtmlText = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
