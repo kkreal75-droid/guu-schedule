@@ -61,6 +61,18 @@ class UpdateError(Exception):
     pass
 
 
+def annotate(level: str, message: str) -> None:
+    """В GitHub Actions — ещё и аннотация: видна в сводке запуска, а не только в логе."""
+    if os.environ.get("GITHUB_ACTIONS"):
+        escaped = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::{level} title=update.py::{escaped}")
+
+
+def warn(message: str) -> None:
+    print(f"⚠ {message}")
+    annotate("warning", message)
+
+
 # ---------- сеть ----------
 
 def ssl_context() -> ssl.SSLContext:
@@ -147,7 +159,7 @@ def find_schedule_link(html: str) -> str:
             f"на {PAGE_URL} нет ссылки «{LINK_TEXT}». Похожие: {similar or 'нет'}"
         )
     if len(set(matches)) > 1:
-        print(f"⚠ ссылок «{LINK_TEXT}» несколько, беру первую: {[unquote(m) for m in matches]}")
+        warn(f"ссылок «{LINK_TEXT}» несколько, беру первую: {[unquote(m) for m in matches]}")
     return urljoin(PAGE_URL, matches[0])
 
 
@@ -227,8 +239,8 @@ def check_overrides(data: dict) -> None:
 
     for rule in overrides.get("remove", []):
         if not any(hits(rule, lesson) for lesson in lessons):
-            print(f"⚠ overrides.json: remove «{rule.get('subject', '')}» {rule['group']}, "
-                  f"{WEEKDAYS[rule['weekday']].lower()} {rule['start']} — такой пары в файле ГУУ больше нет")
+            warn(f"overrides.json: remove «{rule.get('subject', '')}» {rule['group']}, "
+                 f"{WEEKDAYS[rule['weekday']].lower()} {rule['start']} — такой пары в файле ГУУ больше нет")
         drop = override_weeks(rule["weeks"]) if "weeks" in rule else None
         for lesson in lessons:
             if hits(rule, lesson):
@@ -238,9 +250,9 @@ def check_overrides(data: dict) -> None:
         weeks = override_weeks(rule["weeks"])
         for lesson in lessons:
             if hits({**rule, "subject": None}, lesson) and weeks & set(lesson["weeks"]):
-                print(f"⚠ overrides.json: add «{rule['subject']}» {rule['group']}, "
-                      f"{WEEKDAYS[rule['weekday']].lower()} {rule['start']} пересекается с «{lesson['subject']}» "
-                      f"из файла ГУУ — возможно, правка уже не нужна")
+                warn(f"overrides.json: add «{rule['subject']}» {rule['group']}, "
+                     f"{WEEKDAYS[rule['weekday']].lower()} {rule['start']} пересекается с «{lesson['subject']}» "
+                     f"из файла ГУУ — возможно, правка уже не нужна")
                 break
 
 
@@ -347,6 +359,7 @@ def main() -> int:
         changed = update(args.force)
     except UpdateError as e:
         print(f"✖ {e}", file=sys.stderr)
+        annotate("error", str(e))
         github_output(changed="false")
         return 1
     state = load_json(STATE_FILE) or {}
