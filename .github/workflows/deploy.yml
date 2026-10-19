@@ -97,6 +97,8 @@ jobs:
 
   deploy:
     needs: build
+    # без always() GitHub пропустит деплой, раз выше по цепочке пропущен update
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       pages: write
