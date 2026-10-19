@@ -13,6 +13,20 @@ type WebhookInfo = {
 
 const ALLOWED_UPDATES = ['message', 'callback_query', 'inline_query', 'my_chat_member']
 
+// Строка о данных в описании бота (экран «Что умеет этот бот?») — дописываем, если её нет
+const PRIVACY_LINE = 'Бот считает визиты для статистики, данные никому не передаются.'
+const DESCRIPTION_LIMIT = 512
+
+async function ensurePrivacyLine(env: Env): Promise<{ updated: boolean; description: string }> {
+  const current = await tg<{ description?: string } | true>(env, 'getMyDescription', {})
+  const description = typeof current === 'object' && typeof current.description === 'string' ? current.description : ''
+  if (description.includes(PRIVACY_LINE)) return { updated: false, description }
+  const next = description ? `${description}\n\n${PRIVACY_LINE}` : PRIVACY_LINE
+  if (next.length > DESCRIPTION_LIMIT) throw new Error('Описание бота слишком длинное, строка о данных не помещается')
+  await tg(env, 'setMyDescription', { description: next })
+  return { updated: true, description: next }
+}
+
 const PUBLIC_COMMANDS = [
   { command: 'start', description: 'Открыть расписание' },
   { command: 'today', description: 'Пары на сегодня' },
@@ -51,6 +65,7 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
     info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
     changed = true
   }
+  const description = await ensurePrivacyLine(env)
   // имя бота нужно для ссылок t.me/<бот>/schedule — сверяем с настройкой BOT_USERNAME
   const me = await tg<{ username: string; supports_inline_queries?: boolean }>(env, 'getMe', {})
   return {
@@ -59,6 +74,9 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
     bot_username_matches: me.username === env.BOT_USERNAME,
     inline_mode: Boolean(me.supports_inline_queries),
     changed,
+    // описание бота (экран «Что умеет этот бот?») — публичное
+    description_updated: description.updated,
+    description: description.description,
     webhook: info.url,
     allowed_updates: info.allowed_updates ?? [],
     pending_update_count: info.pending_update_count ?? 0,
