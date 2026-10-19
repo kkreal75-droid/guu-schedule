@@ -28,6 +28,16 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener')
 }
 
+// Бот считает, сколько людей открывали приложение: отправляем ему подписанный Telegram
+// initData (bot/src/index.ts → POST /seen проверяет подпись). Режим no-cors и text/plain —
+// «простой» запрос без CORS-настроек; ответ не нужен, ошибки не мешают приложению.
+const SEEN_URL = 'https://guu-schedule-bot.guu-schedule-bot.workers.dev/seen'
+
+export function reportOpen() {
+  if (!inTelegram || import.meta.env.DEV) return
+  fetch(SEEN_URL, { method: 'POST', mode: 'no-cors', body: tg!.initData, keepalive: true }).catch(() => {})
+}
+
 export function telegramUser() {
   return inTelegram ? tg!.initDataUnsafe.user : undefined
 }

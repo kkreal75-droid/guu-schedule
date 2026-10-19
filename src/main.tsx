@@ -3,10 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
 import { loadSchedule } from './schedule'
-import { initTelegram } from './telegram'
+import { initTelegram, reportOpen } from './telegram'
 
 if (import.meta.env.DEV) installTelegramMock()
 initTelegram()
+reportOpen()
 
 const root = createRoot(document.getElementById('root')!)
 root.render(<p className="boot">Загружаю расписание…</p>)

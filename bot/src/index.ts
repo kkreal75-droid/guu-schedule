@@ -5,6 +5,8 @@
 //                   /stats — статистика из KV, только для владельца (OWNER_ID).
 //                   Если команда падает, бот отвечает «Что-то сломалось 🛠», а ошибка уходит в лог
 //                   (npx wrangler tail).
+//   POST /seen    — мини-приложение при открытии присылает сюда initData от Telegram;
+//                   проверяем подпись токеном бота и отмечаем человека в статистике.
 //   GET  /        — регистрирует вебхук на этот воркер и показывает getWebhookInfo
 //                   (адрес, очередь, last_error_message); ?force — перерегистрировать.
 //
@@ -50,10 +52,21 @@ type WebhookInfo = {
 
 // Статистика: по ключу на пользователя (user:<id>), данные — в metadata,
 // чтобы /stats собирал всё одним list() без чтения каждого ключа. Имён не храним.
-type UserStats = { first: number; last: number; starts: number }
+type UserStats = {
+  first: number // впервые замечен (любым способом)
+  last: number // последний раз замечен
+  starts: number // сколько раз нажимал /start
+  opens?: number // сколько раз открывал мини-приложение (не чаще раза в OPEN_THROTTLE_MS)
+  lastOpen?: number
+}
 
 const ERROR_REPLY = 'Что-то сломалось 🛠'
 const DAY_MS = 86_400_000
+// повторные открытия одного человека чаще этого в KV не пишем: на бесплатном тарифе
+// KV — 1000 записей в сутки
+const OPEN_THROTTLE_MS = 10 * 60_000
+// initData старше суток не принимаем — меньше простора для повторной отправки чужих данных
+const INIT_DATA_MAX_AGE_S = 24 * 60 * 60
 
 const GREETINGS: ((name: string) => string)[] = [
   (name) => `<b>${name}, здарова, брат!</b> 🤝
@@ -103,15 +116,66 @@ const reply = (env: Env, message: Message, text: string, extra: object = {}) =>
 
 // ---------- статистика ----------
 
+// Обновляет запись пользователя; change возвращает null, если писать в KV не нужно
+async function touchUser(kv: KV, userId: number, change: (s: UserStats, now: number) => UserStats | null) {
+  const key = `user:${userId}`
+  const now = Date.now()
+  const { metadata } = await kv.getWithMetadata<UserStats>(key)
+  const next = change(metadata ?? { first: now, last: now, starts: 0, opens: 0 }, now)
+  if (next) await kv.put(key, '', { metadata: { ...next, last: now } })
+}
+
 async function recordStart(message: Message, env: Env): Promise<void> {
   if (!env.STATS || !message.from) return
-  const key = `user:${message.from.id}`
-  const now = Date.now()
-  const { metadata } = await env.STATS.getWithMetadata<UserStats>(key)
-  const stats: UserStats = metadata
-    ? { ...metadata, last: now, starts: metadata.starts + 1 }
-    : { first: now, last: now, starts: 1 }
-  await env.STATS.put(key, '', { metadata: stats })
+  await touchUser(env.STATS, message.from.id, (s) => ({ ...s, starts: s.starts + 1 }))
+}
+
+async function recordOpen(userId: number, env: Env): Promise<void> {
+  if (!env.STATS) throw new Error('KV namespace STATS не подключён (wrangler.jsonc → kv_namespaces)')
+  await touchUser(env.STATS, userId, (s, now) =>
+    s.lastOpen && now - s.lastOpen < OPEN_THROTTLE_MS ? null : { ...s, opens: (s.opens ?? 0) + 1, lastOpen: now },
+  )
+}
+
+// ---------- подпись initData мини-приложения ----------
+// https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+
+async function hmac(key: BufferSource, data: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data))
+}
+
+const toHex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+
+// Возвращает Telegram ID, если initData подписан нашим ботом и не старше суток; иначе null
+async function verifyInitData(initData: string, env: Env): Promise<number | null> {
+  const params = new URLSearchParams(initData)
+  const hash = params.get('hash')
+  if (!hash) return null
+  const secret = await hmac(new TextEncoder().encode('WebAppData'), env.BOT_TOKEN)
+  const dataCheck = (skip: string[]) =>
+    [...params.entries()]
+      .filter(([key]) => !skip.includes(key))
+      .map(([key, value]) => `${key}=${value}`)
+      .sort()
+      .join('\n')
+  // поле signature (для сторонней проверки) клиенты присылают не всегда; в строку для hash
+  // по документации оно входит, но на случай расхождений проверяем оба варианта
+  const candidates = [dataCheck(['hash']), dataCheck(['hash', 'signature'])]
+  let valid = false
+  for (const candidate of candidates) {
+    if (toHex(await hmac(secret, candidate)) === hash) valid = true
+  }
+  if (!valid) return null
+
+  const authDate = Number(params.get('auth_date'))
+  if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_S) return null
+  try {
+    const user = JSON.parse(params.get('user') ?? '') as { id?: number }
+    return typeof user.id === 'number' ? user.id : null
+  } catch {
+    return null
+  }
 }
 
 async function allUsers(kv: KV): Promise<UserStats[]> {
@@ -151,17 +215,34 @@ async function handleStats(message: Message, env: Env): Promise<void> {
   const users = await allUsers(env.STATS)
   const now = Date.now()
   const count = (pred: (u: UserStats) => boolean) => users.filter(pred).length
-  const starts = users.reduce((sum, u) => sum + u.starts, 0)
+  const since = users.length ? Math.min(...users.map((u) => u.first)) : now
   await reply(
     env,
     message,
     `📊 <b>Статистика бота</b>
 
 👥 Пользователей: <b>${users.length}</b>
+📱 Открывали приложение: <b>${count((u) => (u.opens ?? 0) > 0)}</b>
+▶️ Нажимали /start: <b>${count((u) => u.starts > 0)}</b>
 🆕 Новых за 7 дней: <b>${count((u) => u.first >= now - 7 * DAY_MS)}</b>
-🔥 Заходили за сутки: <b>${count((u) => u.last >= now - DAY_MS)}</b>
-▶️ Всего /start: <b>${starts}</b>`,
+🔥 Были за сутки: <b>${count((u) => u.last >= now - DAY_MS)}</b>
+
+<i>Данные с ${formatMsk(since)} МСК: раньше бот ничего не записывал.</i>`,
   )
+}
+
+// «19.10 16:07» по Москве
+function formatMsk(ms: number): string {
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(ms))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('day')}.${get('month')} ${get('hour')}:${get('minute')}`
 }
 
 const COMMANDS: Record<string, (message: Message, env: Env) => Promise<void>> = {
@@ -222,6 +303,19 @@ export default {
       // Telegram отвечаем сразу, а сообщение отправляем в фоне — иначе он повторит запрос
       if (update) ctx.waitUntil(handleUpdate(update, env))
       return new Response('ok')
+    }
+
+    if (url.pathname === '/seen' && request.method === 'POST') {
+      // приложение шлёт text/plain в режиме no-cors — без CORS-заголовков и предзапросов
+      const userId = await verifyInitData(await request.text(), env)
+      if (userId === null) return new Response('forbidden', { status: 403 })
+      try {
+        await recordOpen(userId, env)
+        return new Response('ok')
+      } catch (err) {
+        console.error('Открытие приложения не записалось:', err)
+        return new Response('error', { status: 500 })
+      }
     }
 
     if (url.pathname === '/' && request.method === 'GET') {
