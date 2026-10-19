@@ -6,8 +6,6 @@ import { boardApi, errorText, type BoardId, type Entered, type EnterResult } fro
 import { BoardCanvas } from './BoardCanvas'
 import { BoardChat } from './BoardChat'
 
-const short = (group: string) => group.replace('МБ(МП) ', '')
-
 // «Ещё → Доска»: при первом входе — правила, дальше доски группы и общая, чат и рисовалка
 export function BoardPage({ group }: { group: string }) {
   const [state, setState] = useState<EnterResult | null>(null)
@@ -47,9 +45,6 @@ export function BoardPage({ group }: { group: string }) {
           </p>
           <p className="board-rules-text">Для других ты аноним.</p>
         </div>
-        <p className="section-footer">
-          Доска группы — {short(state.group)}, как в профиле. Поменять её потом сможет только админ.
-        </p>
         <button type="button" className="button-primary" disabled={accepting} onClick={accept}>
           Понятно
         </button>
