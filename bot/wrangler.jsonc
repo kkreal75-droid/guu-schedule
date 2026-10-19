@@ -6,6 +6,13 @@
   "vars": {
     "WEBAPP_URL": "https://kkreal75-droid.github.io/guu-schedule/"
   },
+  // статистика для /stats: по ключу user:<telegram id>, только ID и время
+  "kv_namespaces": [
+    {
+      "binding": "STATS",
+      "id": "bb0c6081b6c441e7ac3c52afeb245b45"
+    }
+  ],
   // логи воркера видны в панели Cloudflare и в `npx wrangler tail`
   "observability": { "enabled": true }
 }
