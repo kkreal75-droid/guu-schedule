@@ -111,7 +111,7 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
     const [{ banned }, board, extras] = await Promise.all([
       touchUser(env.DB, profile, 'open', group),
       // доска, правки и настройки не должны мешать открытию приложения
-      boardLatest(env, profile.id, admin, group).catch((err) => (console.error('Доска в /seen:', err), {})),
+      boardLatest(env).catch((err) => (console.error('Доска в /seen:', err), {})),
       appExtras(env, admin).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
     return json({ ok: true, banned: banned && !admin, admin, board, ...extras })

@@ -26,7 +26,6 @@ export type AdminUser = {
   banned: number
   ban_reason: string | null
   board_banned_until: number | null
-  board_grp?: string | null
 }
 
 export type BoardMessageRow = {
@@ -91,7 +90,6 @@ export const adminApi = {
   ban: (id: number, reason: string) => callBot<UserCard>('/admin/ban', { id, reason }),
   unban: (id: number) => callBot<UserCard>('/admin/unban', { id }),
   boardBan: (id: number, days: number | null) => callBot<UserCard>('/admin/board-ban', { id, days }),
-  boardGroup: (id: number, group: string) => callBot<UserCard>('/admin/board-group', { id, group }),
   exportCsv: () => callBot('/admin/export'),
   broadcastInfo: () => callBot<{ counts: Record<Audience, number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
   broadcast: (text: string, photo: string | null, audience: Audience | null) =>

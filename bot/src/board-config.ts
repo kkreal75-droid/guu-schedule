@@ -3,13 +3,15 @@
 
 // ---------- доски ----------
 
+// Одна общая доска для всех. Раньше были ещё доски групп (g11, g12): их старые записи
+// никому не показываются, а крон дочищает их по сроку вместе с остальными.
 export const BOARDS = {
-  g11: { title: '1-1', group: 'МБ(МП) 1-1' },
-  g12: { title: '1-2', group: 'МБ(МП) 1-2' },
-  all: { title: 'Общая', group: null },
+  all: { title: 'Общая' },
 } as const
 export type BoardId = keyof typeof BOARDS
 export const BOARD_IDS = Object.keys(BOARDS) as BoardId[]
+export const LEGACY_BOARDS = ['g11', 'g12']
+export const BOARD_TITLES: Record<string, string> = { all: 'Общая', g11: '1-1', g12: '1-2' }
 
 // ---------- лимиты ----------
 

@@ -84,9 +84,9 @@ async function dashboard({ env }: Call): Promise<Response> {
 
 async function users({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT u.id, u.username, u.name, u.grp, u.first_seen, u.last_seen, u.visits, u.starts, u.can_message,
-            u.blocked_bot, u.banned, u.ban_reason, u.board_banned_until, m.board_grp
-     FROM users u LEFT JOIN board_members m ON m.user_id = u.id ORDER BY u.last_seen DESC`,
+    `SELECT id, username, name, grp, first_seen, last_seen, visits, starts, can_message,
+            blocked_bot, banned, ban_reason, board_banned_until
+     FROM users ORDER BY last_seen DESC`,
   ).all()
   return json({ ok: true, users: results })
 }
@@ -150,20 +150,6 @@ async function boardBan({ env, req }: Call): Promise<Response> {
   }
   if (isOwner(env, id)) return fail(400, 'self')
   await setBoardBan(env, id, days === 0 ? null : days === null ? FOREVER : Date.now() + days * DAY_MS)
-  return userCard(env, id)
-}
-
-// группа доски закрепляется при первом входе — поменять её может только админ
-async function boardGroup({ env, req }: Call): Promise<Response> {
-  const id = asInt(req.body.id)
-  const group = req.body.group
-  if (id === null || !(GROUPS as readonly unknown[]).includes(group)) return fail(400, 'bad request')
-  await env.DB.prepare(
-    `INSERT INTO board_members (user_id, board_grp) VALUES (?1, ?2)
-     ON CONFLICT (user_id) DO UPDATE SET board_grp = ?2`,
-  )
-    .bind(id, group)
-    .run()
   return userCard(env, id)
 }
 
@@ -439,7 +425,6 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   ban,
   unban,
   'board-ban': boardBan,
-  'board-group': boardGroup,
   export: exportCsv,
   'broadcast-info': broadcastInfo,
   broadcast,

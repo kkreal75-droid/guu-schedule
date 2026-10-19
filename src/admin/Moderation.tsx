@@ -88,27 +88,26 @@ function Reports() {
   )
 }
 
+// лента общей доски (и старых сообщений бывших досок групп, пока их не удалит срок)
 function Feed() {
-  const [board, setBoard] = useState<BoardId | 'any'>('any')
   const [messages, setMessages] = useState<BoardMessageRow[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [flash, notice] = useFlash()
 
   useEffect(() => {
-    setMessages(null)
-    adminApi.feed(board === 'any' ? null : board).then(
+    adminApi.feed(null).then(
       (res) => {
         setMessages(res.messages)
         setHasMore(res.has_more)
       },
       (err) => flash(adminError(err)),
     )
-  }, [board, flash])
+  }, [flash])
 
   const more = async () => {
     if (!messages?.length) return
     try {
-      const res = await adminApi.feed(board === 'any' ? null : board, messages.at(-1)!.id)
+      const res = await adminApi.feed(null, messages.at(-1)!.id)
       setMessages([...messages, ...res.messages])
       setHasMore(res.has_more)
     } catch (err) {
@@ -122,17 +121,6 @@ function Feed() {
 
   return (
     <>
-      <Segmented
-        label="Доска"
-        value={board}
-        options={[
-          { value: 'any', label: 'Все' },
-          { value: 'g11', label: '1-1' },
-          { value: 'g12', label: '1-2' },
-          { value: 'all', label: 'Общая' },
-        ]}
-        onChange={setBoard}
-      />
       {notice}
       {!messages ? (
         <Loading />
@@ -167,7 +155,7 @@ function Canvases() {
   )
 
   const clear = async (board: BoardId) => {
-    if (!(await confirmAction(`Очистить холст «${BOARD_TITLES[board]}» для всех? Снимок сохранится в архиве.`))) return
+    if (!(await confirmAction('Очистить холст для всех? Снимок сохранится в архиве.'))) return
     setBusy(true)
     try {
       const { strokes } = await adminApi.strokes(board)
@@ -193,13 +181,9 @@ function Canvases() {
 
   return (
     <>
-      <div className="button-row">
-        {(['g11', 'g12', 'all'] as BoardId[]).map((b) => (
-          <button key={b} type="button" className="button-secondary button-danger" disabled={busy} onClick={() => clear(b)}>
-            Очистить «{BOARD_TITLES[b]}»
-          </button>
-        ))}
-      </div>
+      <button type="button" className="button-secondary button-danger" disabled={busy} onClick={() => clear('all')}>
+        Очистить холст
+      </button>
       {notice}
       <Section title="Архив снимков" footer="Снимок делается перед каждой очисткой и приходит вам в чат с ботом.">
         {!data && <div className="row row-text">Загружаю…</div>}

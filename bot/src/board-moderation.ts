@@ -1,7 +1,7 @@
 // Модерация доски: жалобы приходят владельцу с кнопками, /boardban, снимки холста, чистка старого.
 import { resolveTarget, targetLabel } from './admin'
 import { isOwner } from './auth'
-import { BOARDS, BOARD_IDS, LIMITS, type BoardId } from './board-config'
+import { BOARD_IDS, BOARD_TITLES, LEGACY_BOARDS, LIMITS } from './board-config'
 import { getUser, userLabel } from './db'
 import { answerCallback, sendMessage, tg, tgForm, type TgCallbackQuery } from './telegram'
 import { escapeHtml, formatMsk } from './util'
@@ -9,7 +9,7 @@ import { escapeHtml, formatMsk } from './util'
 const DAY_MS = 86_400_000
 export const FOREVER = 253_402_300_799_000 // 31.12.9999 — «навсегда» для бана на доске
 
-const boardTitle = (board: string) => BOARDS[board as BoardId]?.title ?? board
+const boardTitle = (board: string) => BOARD_TITLES[board] ?? board
 
 type ReportedMessage = { id: number; board: string; user_id: number; alias: string; text: string }
 
@@ -139,7 +139,8 @@ export async function sendSnapshot(env: Env, board: string, id: number, strokes:
 // Раз в час: сообщения старше 30 дней удаляются; стёртые штрихи — через 2 дня;
 // на холсте не больше LIMITS.canvasStrokes штрихов (лишние, самые старые, стираются)
 export async function cleanupBoard(env: Env, now: number): Promise<number> {
-  const boards = BOARD_IDS.map((b) => `'${b}'`).join(', ')
+  // и старые доски групп — их записи дочищаем по сроку
+  const boards = [...BOARD_IDS, ...LEGACY_BOARDS].map((b) => `'${b}'`).join(', ')
   const old = `SELECT id FROM board_messages WHERE board IN (${boards}) AND created_at < ?1`
   const cutoff = now - LIMITS.keepMessagesDays * DAY_MS
   await env.DB.batch([

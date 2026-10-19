@@ -1,4 +1,4 @@
-// Анонимная доска: API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
+// Анонимная доска (одна общая на всех): API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
 //
 //   enter / accept — вход и экран правил; poll — лента чата или штрихи холста (раз в 4 с);
 //   send, react, report, delete — чат; stroke, undo, erase, clear — рисовалка.
@@ -73,15 +73,8 @@ export function semesterOf(ms: number): string {
 
 const validGroup = (group: unknown) => (GROUPS as readonly unknown[]).includes(group) ? (group as string) : null
 
-const boardOfGroup = (group: string | null): BoardId | null =>
-  (BOARD_IDS.find((id) => BOARDS[id].group === group) as BoardId | undefined) ?? null
-
-// групповые доски видят только свои; админ — все
-export function visibleBoards(admin: boolean, group: string | null): BoardId[] {
-  if (admin) return BOARD_IDS
-  const own = boardOfGroup(group)
-  return own ? [own, 'all'] : ['all']
-}
+// все видят одни и те же доски — сейчас это одна общая
+export const visibleBoards = (): BoardId[] => BOARD_IDS
 
 const fail = (status: number, error: string, extra: object = {}) => json({ ok: false, error, ...extra }, status)
 
@@ -245,7 +238,7 @@ const cleanText = (text: unknown) =>
 
 async function enterPayload(call: Call) {
   const { env, req, member, now } = call
-  const boards = visibleBoards(req.admin, member!.board_grp)
+  const boards = visibleBoards()
   const aliases = await aliasesFor(env, req.profile.id, boards, now)
   return {
     ok: true,
@@ -429,7 +422,7 @@ async function visibleMessage(call: Call): Promise<TargetMessage | null> {
   )
     .bind(id)
     .first<TargetMessage>()
-  const boards = visibleBoards(call.req.admin, call.member!.board_grp) as string[]
+  const boards = visibleBoards() as string[]
   if (!row || row.deleted || (row.hidden && !call.req.admin) || !boards.includes(row.board)) return null
   return row
 }
@@ -646,7 +639,7 @@ export async function handleBoardApi(env: Env, ctx: ExecutionContext, request: R
   if (action === 'delete') return remove(call)
 
   const board = req.body.board as BoardId
-  if (WITH_BOARD.includes(action) && !visibleBoards(req.admin, member.board_grp).includes(board)) {
+  if (WITH_BOARD.includes(action) && !visibleBoards().includes(board)) {
     return fail(403, 'board')
   }
   switch (action) {
@@ -666,17 +659,12 @@ export async function handleBoardApi(env: Env, ctx: ExecutionContext, request: R
   return fail(404, 'not found')
 }
 
-// Для точки «есть новое»: время последнего сообщения на каждой видимой доске (для POST /seen)
-export async function boardLatest(env: Env, userId: number, admin: boolean, group: string | null) {
+// Для точки «есть новое»: время последнего сообщения на каждой доске (для POST /seen)
+export async function boardLatest(env: Env) {
   const latest = (board: BoardId) =>
     `(SELECT created_at FROM board_messages WHERE board = '${board}' AND deleted = 0 AND hidden = 0
       ORDER BY created_at DESC LIMIT 1) AS "${board}"`
-  const row = await env.DB.prepare(
-    `SELECT (SELECT board_grp FROM board_members WHERE user_id = ?1) AS grp, ${BOARD_IDS.map(latest).join(', ')}`,
-  )
-    .bind(userId)
-    .first<Record<string, number | string | null>>()
+  const row = await env.DB.prepare(`SELECT ${visibleBoards().map(latest).join(', ')}`).first<Record<string, number | null>>()
   if (!row) return {}
-  const boards = visibleBoards(admin, (row.grp as string | null) ?? validGroup(group))
-  return Object.fromEntries(boards.filter((board) => row[board]).map((board) => [board, row[board] as number]))
+  return Object.fromEntries(visibleBoards().filter((board) => row[board]).map((board) => [board, row[board] as number]))
 }

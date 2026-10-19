@@ -6,7 +6,6 @@ import { useBackButton } from '../useBackButton'
 import { BOARD_TITLES, adminApi, adminError, shortGroup, stamp, userName, type AdminUser, type UserCard } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
-const GROUPS = ['МБ(МП) 1-1', 'МБ(МП) 1-2']
 // бан «навсегда» бот хранит как 9999 год
 const isForever = (until: number) => until - Date.now() > 5 * 365 * 86_400_000
 
@@ -233,23 +232,6 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
                 Снять
               </button>
             )}
-          </div>
-          <div className="row">
-            <span>Группа доски</span>
-            <span className="row-chips">
-              {GROUPS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  className="chip"
-                  aria-pressed={card.board?.board_grp === g}
-                  disabled={busy || card.board?.board_grp === g}
-                  onClick={() => run(() => adminApi.boardGroup(id, g), 'Группа доски изменена')}
-                >
-                  {shortGroup(g)}
-                </button>
-              ))}
-            </span>
           </div>
         </Section>
       )}
