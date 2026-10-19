@@ -1,7 +1,11 @@
-// Бот в беседе группы: настройка (/setup), /today, /tomorrow, /off, сообщение при добавлении.
+// Бот в беседе группы: настройка (/setup), /today, /tomorrow, /here, /off, сообщение при добавлении.
 // Настройки всех бесед — один ключ KV «chats»: cron читает его раз в минуту (1 чтение),
 // а пишем только при изменении настроек — лимит KV в 1000 записей в сутки не задеваем.
+//
+// Супергруппы с темами (форумы): отвечаем в ту тему, откуда пришла команда; сводки и
+// «Изменение в расписании» — в тему, где сделали /setup (или /here). General — без темы.
 import { GROUPS, shortGroup } from './db'
+import { ERROR_REPLY, reportError } from './errors'
 import { formatDay, loadTimetable, todayMsk } from './schedule'
 import { TelegramError, answerCallback, sendMessage, tg, type TgCallbackQuery, type TgChat, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
@@ -10,6 +14,7 @@ export type ChatSettings = {
   title: string
   group: string | null // «МБ(МП) 1-1» / «МБ(МП) 1-2»; null — ещё не настроено
   time: DigestTime | null // время сводки по Москве; null — автосообщения выключены
+  thread?: number | null // тема форума для автосообщений; нет — General или беседа без тем
   added_at: number
 }
 export type DigestTime = '07:00' | '07:30' | '08:00'
@@ -30,6 +35,22 @@ async function updateChats(env: Env, change: (chats: Record<string, ChatSettings
 export const removeChat = (env: Env, chatId: number) => updateChats(env, (chats) => void delete chats[String(chatId)])
 
 const isGroupChat = (chat: TgChat) => chat.type === 'group' || chat.type === 'supergroup'
+
+// Тема, из которой пришло сообщение; null — General или беседа без тем
+export const threadOf = (message: TgMessage | undefined) =>
+  message?.is_topic_message && message.message_thread_id ? message.message_thread_id : null
+
+// Параметр для sendMessage: в General и в обычных беседах тему не передаём
+export const inThread = (thread: number | null | undefined) => (thread ? { message_thread_id: thread } : {})
+
+// Тему удалили или закрыли — в General не пишем, сообщаем владельцу
+export const isThreadError = (err: unknown) =>
+  err instanceof TelegramError &&
+  err.code === 400 &&
+  /thread not found|topic_(closed|deleted|id_invalid)|topic (is )?(closed|deleted)/i.test(err.description)
+
+export const chatLabel = (chatId: string | number, settings: ChatSettings | undefined, thread: number | null | undefined) =>
+  `беседа «${settings?.title || chatId}»${thread ? `, тема ${thread}` : ''}`
 
 async function isChatAdmin(env: Env, chatId: number, userId: number): Promise<boolean> {
   const member = await tg<{ status: string }>(env, 'getChatMember', { chat_id: chatId, user_id: userId })
@@ -75,39 +96,62 @@ export async function handleMembership(
   }
 }
 
-type GroupCommand = (env: Env, message: TgMessage, settings: ChatSettings | undefined) => Promise<void>
+// reply — ответ в ту же тему, откуда пришла команда
+type Reply = (text: string, extra?: object) => Promise<unknown>
+type GroupCommand = (env: Env, message: TgMessage, settings: ChatSettings | undefined, reply: Reply) => Promise<void>
 
-const today: GroupCommand = async (env, message, settings) =>
-  void (await sendMessage(env, message.chat.id, formatDay(await loadTimetable(env), todayMsk(), settings?.group ?? null)))
+const today: GroupCommand = async (env, _message, settings, reply) =>
+  void (await reply(formatDay(await loadTimetable(env), todayMsk(), settings?.group ?? null)))
 
-const tomorrow: GroupCommand = async (env, message, settings) =>
-  void (await sendMessage(env, message.chat.id, formatDay(await loadTimetable(env), todayMsk() + 1, settings?.group ?? null)))
+const tomorrow: GroupCommand = async (env, _message, settings, reply) =>
+  void (await reply(formatDay(await loadTimetable(env), todayMsk() + 1, settings?.group ?? null)))
 
-const setup: GroupCommand = async (env, message) => {
+const setup: GroupCommand = async (env, message, _settings, reply) => {
   if (!message.from || !(await isChatAdmin(env, message.chat.id, message.from.id))) {
-    await sendMessage(env, message.chat.id, 'Настроить бота могут только админы беседы.')
+    await reply('Настроить бота могут только админы беседы.')
     return
   }
-  await sendMessage(env, message.chat.id, '⚙️ <b>Настройка</b>\nКакая группа в этой беседе?', { reply_markup: groupKeyboard() })
+  await reply('⚙️ <b>Настройка</b>\nКакая группа в этой беседе?', { reply_markup: groupKeyboard() })
 }
 
-const off: GroupCommand = async (env, message) => {
+const HERE_DONE = 'Готово! Буду присылать расписание в эту тему 👍'
+
+// /here — автосообщения в эту тему (в беседе с темами)
+const here: GroupCommand = async (env, message, settings, reply) => {
   if (!message.from || !(await isChatAdmin(env, message.chat.id, message.from.id))) {
-    await sendMessage(env, message.chat.id, 'Выключить бота могут только админы беседы.')
+    await reply('Перепривязать рассылку могут только админы беседы.')
+    return
+  }
+  if (!settings?.group) {
+    await reply('Сначала настройте бота: /setup')
+    return
+  }
+  const thread = threadOf(message)
+  await updateChats(env, (chats) => {
+    const chat = chats[String(message.chat.id)]
+    if (chat) chat.thread = thread
+  })
+  await reply(message.chat.is_forum ? HERE_DONE : 'Готово! Буду присылать расписание сюда 👍')
+}
+
+const off: GroupCommand = async (env, message, _settings, reply) => {
+  if (!message.from || !(await isChatAdmin(env, message.chat.id, message.from.id))) {
+    await reply('Выключить бота могут только админы беседы.')
     return
   }
   await updateChats(env, (chats) => {
     const chat = chats[String(message.chat.id)]
     if (chat) chat.time = null
   })
-  await sendMessage(env, message.chat.id, '🔕 Автосообщения выключены. /today и /tomorrow работают как раньше, включить снова — /setup.')
+  await reply('🔕 Автосообщения выключены. /today и /tomorrow работают как раньше, включить снова — /setup.')
 }
 
 const GROUP_COMMANDS: Record<string, GroupCommand> = {
-  '/start': async (env, message) => void (await sendMessage(env, message.chat.id, INTRO)), // ссылка ?startgroup=setup
+  '/start': async (_env, _message, _settings, reply) => void (await reply(INTRO)), // ссылка ?startgroup=setup
   '/setup': setup,
   '/today': today,
   '/tomorrow': tomorrow,
+  '/here': here,
   '/off': off,
 }
 
@@ -130,13 +174,39 @@ export async function handleGroupMessage(env: Env, message: TgMessage): Promise<
   if (mention && mention !== env.BOT_USERNAME.toLowerCase()) return
   const handler = GROUP_COMMANDS[command]
   if (!handler) return
-  await handler(env, message, (await loadChats(env))[String(message.chat.id)])
+
+  const thread = threadOf(message)
+  const reply: Reply = (text, extra = {}) => sendMessage(env, message.chat.id, text, { ...inThread(thread), ...extra })
+  const settings = (await loadChats(env))[String(message.chat.id)]
+  try {
+    await handler(env, message, settings, reply)
+  } catch (err) {
+    // тема закрыта или удалена — в General не пишем, только владельцу
+    if (isThreadError(err)) {
+      await reportError(env, `Ответ на ${command} не ушёл в тему (удалена или закрыта?) — ${chatLabel(message.chat.id, settings, thread)}`, err)
+      return
+    }
+    await reply(ERROR_REPLY).catch(() => {})
+    await reportError(env, `Команда ${command} — ${chatLabel(message.chat.id, settings, thread)}`, err)
+  }
 }
 
-// Кнопки настройки: gs:grp:1-1, gs:time:0730, gs:time:off
+// Кнопки настройки: gs:grp:1-1, gs:time:0730, gs:time:off. Ошибка — всплывающим текстом на кнопке
+// (не сообщением в беседу: в форуме оно ушло бы в General) и владельцу.
 export async function onGroupSetupButton(env: Env, query: TgCallbackQuery): Promise<void> {
+  try {
+    await setupStep(env, query)
+  } catch (err) {
+    await answerCallback(env, query.id, ERROR_REPLY).catch(() => {})
+    throw err
+  }
+}
+
+async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
   const chat = query.message?.chat
   if (!chat || !isGroupChat(chat)) return void (await answerCallback(env, query.id))
+  // /setup вызвали в этой теме — сюда и будем присылать
+  const thread = threadOf(query.message)
   if (!(await isChatAdmin(env, chat.id, query.from.id))) {
     await answerCallback(env, query.id, 'Настроить бота могут только админы беседы')
     return
@@ -156,7 +226,13 @@ export async function onGroupSetupButton(env: Env, query: TgCallbackQuery): Prom
     if (!group) return void (await answerCallback(env, query.id))
     await updateChats(env, (chats) => {
       const current = chats[String(chat.id)]
-      chats[String(chat.id)] = { title: chat.title ?? current?.title ?? '', group, time: current?.time ?? null, added_at: current?.added_at ?? Date.now() }
+      chats[String(chat.id)] = {
+        title: chat.title ?? current?.title ?? '',
+        group,
+        time: current?.time ?? null,
+        thread,
+        added_at: current?.added_at ?? Date.now(),
+      }
     })
     await edit(`⚙️ <b>Настройка</b>\nГруппа: <b>${escapeHtml(group)}</b>.\nВо сколько присылать пары на день (по Москве)?`, timeKeyboard())
     await answerCallback(env, query.id)
@@ -169,12 +245,14 @@ export async function onGroupSetupButton(env: Env, query: TgCallbackQuery): Prom
     await updateChats(env, (chats) => {
       const current = chats[String(chat.id)]
       group = current?.group ?? null
-      chats[String(chat.id)] = { title: chat.title ?? current?.title ?? '', group, time, added_at: current?.added_at ?? Date.now() }
+      chats[String(chat.id)] = { title: chat.title ?? current?.title ?? '', group, time, thread, added_at: current?.added_at ?? Date.now() }
     })
     const done = time
       ? `Каждый учебный день в ${time.replace(/^0/, '')} пришлю пары${group ? ` <b>${escapeHtml(group)}</b>` : ''}, по субботам вечером — неделю вперёд, а если расписание поменяется — сразу напишу.`
       : 'По утрам присылать не буду. Пары можно посмотреть командами ниже.'
-    await edit(`✅ <b>Готово</b>\n${done}\n\n/today — пары на сегодня\n/tomorrow — на завтра\n/off — выключить автосообщения\n/setup — настроить заново`)
+    const title = time && chat.is_forum ? HERE_DONE : '✅ <b>Готово</b>'
+    const hereHint = chat.is_forum ? '\n/here — присылать в другую тему (написать в ней)' : ''
+    await edit(`${title}\n${done}\n\n/today — пары на сегодня\n/tomorrow — на завтра${hereHint}\n/off — выключить автосообщения\n/setup — настроить заново`)
     await answerCallback(env, query.id, 'Сохранено')
     return
   }

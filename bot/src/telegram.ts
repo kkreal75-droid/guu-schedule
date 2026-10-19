@@ -1,7 +1,7 @@
 // Обёртка над Telegram Bot API и нужные нам типы.
 
 export type TgUser = { id: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string }
-export type TgChat = { id: number; type: 'private' | 'group' | 'supergroup' | 'channel'; title?: string }
+export type TgChat = { id: number; type: 'private' | 'group' | 'supergroup' | 'channel'; title?: string; is_forum?: boolean }
 export type TgEntity = {
   type: string
   offset: number
@@ -13,6 +13,9 @@ export type TgEntity = {
 }
 export type TgMessage = {
   message_id: number
+  // супергруппа с темами: сообщение из темы (не из General) — is_topic_message и id темы
+  message_thread_id?: number
+  is_topic_message?: boolean
   chat: TgChat
   from?: TgUser
   date?: number

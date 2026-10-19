@@ -5,7 +5,7 @@
 // Расписание и настройки читаем только в те минуты, когда есть что делать.
 import { WEEKDAYS_FULL, formatDate } from '../../shared/format-core'
 import { isoFromDay, moscowNow, toMinutes, type Lesson, type Timetable } from '../../shared/schedule-core'
-import { DIGEST_TIMES, forgetIfGone, loadChats, type ChatSettings } from './chats'
+import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
 import { GROUPS, shortGroup } from './db'
 import { reportError } from './errors'
 import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
@@ -48,6 +48,20 @@ function dueSlots(day: number, minutes: number, weekday: number, chats: Record<s
   return slots
 }
 
+// Автосообщение в беседу — в её тему, если она задана. Тема удалена или закрыта — не пишем
+// в General, а сообщаем владельцу; бота выгнали — забываем беседу.
+async function deliver(env: Env, chatId: string, settings: ChatSettings, text: string, what: string): Promise<void> {
+  try {
+    await sendMessage(env, Number(chatId), text, inThread(settings.thread))
+  } catch (err) {
+    if (isThreadError(err)) {
+      await reportError(env, `${what} не ушла в тему (удалена или закрыта?) — ${chatLabel(chatId, settings, settings.thread)}. Админ беседы может написать /here в нужной теме`, err)
+    } else if (!(await forgetIfGone(env, Number(chatId), err))) {
+      await reportError(env, `${what} — ${chatLabel(chatId, settings, settings.thread)}`, err)
+    }
+  }
+}
+
 // Утренние сводки и субботняя неделя. Возвращает число отправленных сообщений.
 export async function runDigests(env: Env, now: number): Promise<number> {
   const { day, minutes } = moscowNow(new Date(now))
@@ -70,11 +84,7 @@ export async function runDigests(env: Env, now: number): Promise<number> {
       sent.add(chatId)
       if (!text) continue
       sends++
-      try {
-        await sendMessage(env, Number(chatId), text)
-      } catch (err) {
-        if (!(await forgetIfGone(env, Number(chatId), err))) await reportError(env, `Сводка в беседу ${chatId}`, err)
-      }
+      await deliver(env, chatId, settings, text, 'Сводка')
     }
     if (sent.size !== before) await env.KV.put(sentKey, JSON.stringify([...sent]), { expirationTtl: 3 * 86_400 })
   }
@@ -140,11 +150,7 @@ export async function detectChanges(env: Env, now: number): Promise<number> {
     for (const [chatId, settings] of Object.entries(chats)) {
       if (settings.group !== group || !settings.time || sends >= MAX_SENDS) continue
       sends++
-      try {
-        await sendMessage(env, Number(chatId), text)
-      } catch (err) {
-        if (!(await forgetIfGone(env, Number(chatId), err))) await reportError(env, `Изменение в беседу ${chatId}`, err)
-      }
+      await deliver(env, chatId, settings, text, '«Изменение в расписании»')
     }
   }
   return sends

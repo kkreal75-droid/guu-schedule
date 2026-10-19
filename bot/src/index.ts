@@ -38,7 +38,8 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
   if (update.message) {
     const message = update.message
     if (message.chat.type === 'private') await handlePrivateMessage(env, ctx, message)
-    else await safely(env, 'Сообщение в беседе', message.chat.id, () => handleGroupMessage(env, message))
+    // в беседе ответ об ошибке пишет сам handleGroupMessage — в ту же тему, а не в General
+    else await safely(env, 'Сообщение в беседе', null, () => handleGroupMessage(env, message))
     return
   }
   if (update.my_chat_member) {
@@ -54,7 +55,9 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
   }
   if (update.callback_query) {
     const query = update.callback_query
-    await safely(env, 'Кнопка', query.message?.chat.id ?? null, async () => {
+    // в беседах ошибку кнопки показывает всплывающий текст, в чат не пишем (в форуме — это General)
+    const chatId = query.message?.chat.type === 'private' ? query.message.chat.id : null
+    await safely(env, 'Кнопка', chatId, async () => {
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
