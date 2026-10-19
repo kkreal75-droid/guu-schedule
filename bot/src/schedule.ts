@@ -48,4 +48,22 @@ export function formatDay(tt: Timetable, day: number, group: string | null): str
   return lines.join('\n')
 }
 
+// Неделя одной группы: Пн–Сб по дням — HTML
+export function formatWeek(tt: Timetable, monday: number, group: string): string {
+  const week = tt.weekOf(monday)
+  const range = `${formatDate(monday)} – ${formatDate(monday + 5)}`
+  const header = `🗓 <b>Неделя ${range}</b>`
+  if (!tt.inSemester(week)) return `${header}\nВне учебного семестра.`
+  const lines = [`${header} · ${weekTitle(week).toLowerCase()}`, `<b>${escapeHtml(group)}</b>`]
+  for (let weekday = 0; weekday < 6; weekday++) {
+    const lessons = tt.lessonsOn(group, week, weekday)
+    lines.push('', `<b>${WEEKDAYS_FULL[weekday]}, ${formatDate(monday + weekday)}</b>`)
+    if (!lessons.length) lines.push('Пар нет 🎉')
+    else lines.push(...lessons.map((l) => `${tt.pairNumber(l.start)}. ${formatLesson(l)}`))
+  }
+  const text = lines.join('\n')
+  // Telegram не примет больше 4096 символов — режем по строке
+  return text.length <= 4096 ? text : `${text.slice(0, text.lastIndexOf('\n', 4080))}\n…`
+}
+
 export const todayMsk = () => moscowNow().day

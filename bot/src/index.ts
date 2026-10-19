@@ -1,6 +1,7 @@
 // Бот «Расписание ГУУ» на Cloudflare Workers.
 //
 //   POST /webhook — обновления Telegram (ключ вебхука в заголовке, чужие — 403):
+//                   inline-запросы — inline.ts,
 //                   личные сообщения и команды — commands.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
@@ -14,6 +15,7 @@ import { drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { touchUser } from './db'
 import { reportError, safely } from './errors'
+import { handleInlineQuery } from './inline'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
 
@@ -24,6 +26,12 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
   if (update.message) {
     const message = update.message
     if (message.chat.type === 'private') await handlePrivateMessage(env, ctx, message)
+    return
+  }
+  if (update.inline_query) {
+    const query = update.inline_query
+    // ответить «Что-то сломалось» в inline некуда — только сообщаем владельцу
+    await safely(env, 'Inline-запрос', null, () => handleInlineQuery(env, query))
     return
   }
   if (update.callback_query) {

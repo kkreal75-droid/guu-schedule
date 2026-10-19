@@ -27,6 +27,7 @@ export type TgUpdate = {
   update_id: number
   message?: TgMessage
   callback_query?: TgCallbackQuery
+  inline_query?: { id: string; from: TgUser; query: string; chat_type?: string }
 }
 
 export type InlineButton = { text: string; callback_data?: string; url?: string; web_app?: { url: string } }

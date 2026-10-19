@@ -42,8 +42,13 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
     info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
     changed = true
   }
+  // имя бота нужно для ссылок t.me/<бот>/schedule — сверяем с настройкой BOT_USERNAME
+  const me = await tg<{ username: string; supports_inline_queries?: boolean }>(env, 'getMe', {})
   return {
     ok: true,
+    bot: me.username,
+    bot_username_matches: me.username === env.BOT_USERNAME,
+    inline_mode: Boolean(me.supports_inline_queries),
     changed,
     webhook: info.url,
     allowed_updates: info.allowed_updates ?? [],

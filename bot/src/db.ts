@@ -25,20 +25,21 @@ export const VISIT_GAP_MS = 10 * 60_000
 export const GROUPS = ['МБ(МП) 1-1', 'МБ(МП) 1-2'] as const
 export const shortGroup = (group: string) => group.replace('МБ(МП) ', '') // «1-1»
 
-export type SeenKind = 'open' | 'start' | 'message'
+// open — открыл приложение, start — /start, message — написал боту в личку,
+// inline — пользуется inline-режимом в другом чате (бот ему писать не может)
+export type SeenKind = 'open' | 'start' | 'message' | 'inline'
 
-// Отмечает, что человек был: открыл приложение, нажал /start или просто написал боту.
-// Возвращает актуальное состояние бана.
+// Отмечает, что человек был. Возвращает бан и группу (её выбирают в приложении).
 export async function touchUser(
   db: D1Database,
   profile: Profile,
   kind: SeenKind,
   group: string | null = null,
-): Promise<{ banned: boolean }> {
+): Promise<{ banned: boolean; grp: string | null }> {
   const now = Date.now()
   const isOpen = kind === 'open' ? 1 : 0
   const isStart = kind === 'start' ? 1 : 0
-  const wrote = kind === 'open' ? 0 : 1 // писал боту сам — значит, бот может ему ответить
+  const wrote = kind === 'start' || kind === 'message' ? 1 : 0 // писал боту сам — значит, бот может ему ответить
   const grp = group && (GROUPS as readonly string[]).includes(group) ? group : null
   const [upsert] = await db.batch([
     db
@@ -55,7 +56,7 @@ export async function touchUser(
            starts = users.starts + ?7,
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END
-         RETURNING banned`,
+         RETURNING banned, grp`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
@@ -66,8 +67,8 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
   ])
-  const row = (upsert.results as { banned: number }[])[0]
-  return { banned: Boolean(row?.banned) }
+  const row = (upsert.results as { banned: number; grp: string | null }[])[0]
+  return { banned: Boolean(row?.banned), grp: row?.grp ?? null }
 }
 
 export const getUser = (db: D1Database, id: number) =>
