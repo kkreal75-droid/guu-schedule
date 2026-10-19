@@ -1,7 +1,7 @@
 import rawOverrides from '../overrides.json'
-import raw from '../schedule.json'
+import { readLocal, writeLocal } from './storage'
 
-// Формат schedule.json — см. parser.py
+// Формат schedule.json — см. parser.py и update.py
 export type Lesson = {
   group: string
   weekday: number // 0 = понедельник
@@ -15,6 +15,9 @@ export type Lesson = {
 }
 
 export type Schedule = {
+  updated_at?: string // когда update.py нашёл изменение, ISO по Москве
+  source_file?: string // имя файла ГУУ
+  source_sha256?: string
   semester_start: string // понедельник 1-й недели, YYYY-MM-DD
   groups: string[]
   lessons: Lesson[]
@@ -73,20 +76,50 @@ function applyOverrides(lessons: Lesson[], overrides: Overrides): Lesson[] {
   return [...out, ...added]
 }
 
-const base = raw as Schedule
-export const schedule: Schedule = {
-  ...base,
-  lessons: applyOverrides(base.lessons, rawOverrides as Overrides),
-}
-
 // Даты храним как номер дня от 1970-01-01 (UTC) — без часовых поясов и DST.
 export const DAY_MS = 86_400_000
 
-const [sy, sm, sd] = schedule.semester_start.split('-').map(Number)
-export const START_DAY = Date.UTC(sy, sm - 1, sd) / DAY_MS
-export const MAX_WEEK = Math.max(...schedule.lessons.flatMap((l) => l.weeks))
+// ---------- загрузка ----------
+// schedule.json лежит рядом с сайтом и скачивается при каждом запуске мимо кэша:
+// ?v=<время> — чтобы ни браузер, ни CDN GitHub Pages не отдали старую копию.
+// Последняя удачная копия сохраняется: без сети покажем её.
 
-const SLOT_STARTS = [...new Set(schedule.lessons.map((l) => l.start))].sort()
+const CACHE_KEY = 'schedule_cache'
+
+// заполняются в loadSchedule() до первой отрисовки приложения (см. main.tsx)
+export let schedule: Schedule
+export let START_DAY = 0
+export let MAX_WEEK = 1
+export let fromCache = false
+let SLOT_STARTS: string[] = []
+
+async function fetchSchedule(): Promise<Schedule> {
+  const url = new URL('schedule.json', document.baseURI)
+  url.searchParams.set('v', String(Date.now()))
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`schedule.json: HTTP ${res.status}`)
+  return (await res.json()) as Schedule
+}
+
+export async function loadSchedule(): Promise<void> {
+  let data: Schedule
+  try {
+    data = await fetchSchedule()
+    writeLocal(CACHE_KEY, JSON.stringify(data))
+  } catch (err) {
+    const cached = readLocal(CACHE_KEY)
+    if (!cached) throw err
+    console.warn('Не удалось скачать schedule.json — показываю сохранённую копию', err)
+    data = JSON.parse(cached) as Schedule
+    fromCache = true
+  }
+
+  schedule = { ...data, lessons: applyOverrides(data.lessons, rawOverrides as Overrides) }
+  const [sy, sm, sd] = schedule.semester_start.split('-').map(Number)
+  START_DAY = Date.UTC(sy, sm - 1, sd) / DAY_MS
+  MAX_WEEK = Math.max(...schedule.lessons.flatMap((l) => l.weeks))
+  SLOT_STARTS = [...new Set(schedule.lessons.map((l) => l.start))].sort()
+}
 
 export const weekOf = (day: number) => Math.floor((day - START_DAY) / 7) + 1
 export const weekdayOf = (day: number) => (((day - START_DAY) % 7) + 7) % 7

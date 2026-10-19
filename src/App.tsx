@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { formatStamp } from './format'
 import { CalendarIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
 import { usePrefs } from './prefs'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleScreen'
+import { fromCache, schedule } from './schedule'
 import { haptic } from './telegram'
 import { useTheme } from './theme'
 
@@ -26,6 +28,8 @@ export default function App() {
     window.scrollTo(0, 0)
   }
 
+  const updatedAt = schedule.updated_at ? formatStamp(schedule.updated_at) : null
+
   return (
     <div className="app">
       {tab === 'schedule' ? (
@@ -46,6 +50,13 @@ export default function App() {
             updatePrefs(patch)
           }}
         />
+      )}
+
+      {updatedAt && (
+        <p className="updated">
+          Обновлено: {updatedAt}
+          {fromCache && ' · нет сети, сохранённая копия'}
+        </p>
       )}
 
       <nav className="tabbar">

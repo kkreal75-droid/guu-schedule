@@ -1,8 +1,11 @@
 # Сборка и деплой на GitHub Pages + ежечасная проверка расписания на guu.ru.
 #
-#   push в main          → сборка и деплой
-#   каждый час (cron)    → update.py; если что-то поменялось — коммит, сборка и деплой
+#   push в main            → сборка и деплой
+#   каждый час (cron)      → update.py; если schedule.json изменился — коммит, сборка и деплой
 #   вручную (Run workflow) → update.py (можно с --force), затем сборка и деплой
+#
+# Если update.py падает (сайт недоступен, в файле < 30 пар у группы и т. п.), запуск красный,
+# schedule.json не трогается, а GitHub присылает письмо о сбое.
 
 name: Update & deploy
 
@@ -54,13 +57,14 @@ jobs:
           # текст из имени файла на guu.ru — только через env, не подставляем в скрипт напрямую
           MESSAGE: ${{ steps.update.outputs.message }}
         run: |
-          if [ -z "$(git status --porcelain -- schedule.json data)" ]; then
-            echo "Изменений нет."
+          # коммитим, только если сам schedule.json реально изменился
+          if git diff --quiet -- schedule.json; then
+            echo "schedule.json не изменился — коммитить нечего."
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add schedule.json data
+            git add schedule.json data/raw/k1.xlsx
             git commit -m "${MESSAGE:-Обновление расписания}"
             git pull --rebase origin "$GITHUB_REF_NAME"
             git push origin "HEAD:$GITHUB_REF_NAME"

@@ -7,15 +7,16 @@ export type Prefs = { group: string; theme: ThemeMode }
 
 const KEY = 'prefs'
 const THEMES: ThemeMode[] = ['light', 'system', 'dark']
-const DEFAULTS: Prefs = { group: schedule.groups[0], theme: 'system' }
+// функция, а не константа: schedule заполняется только после загрузки schedule.json
+const defaults = (): Prefs => ({ group: schedule.groups[0], theme: 'system' })
 
 function parse(value: string | null): Prefs | null {
   if (!value) return null
   try {
     const p = JSON.parse(value) as Partial<Prefs>
     return {
-      group: p.group && schedule.groups.includes(p.group) ? p.group : DEFAULTS.group,
-      theme: p.theme && THEMES.includes(p.theme) ? p.theme : DEFAULTS.theme,
+      group: p.group && schedule.groups.includes(p.group) ? p.group : defaults().group,
+      theme: p.theme && THEMES.includes(p.theme) ? p.theme : defaults().theme,
     }
   } catch {
     return null
@@ -24,7 +25,7 @@ function parse(value: string | null): Prefs | null {
 
 // Настройки: сразу берём локальную копию (без мигания темы), потом подтягиваем из CloudStorage.
 export function usePrefs() {
-  const [prefs, setPrefs] = useState<Prefs>(() => parse(readLocal(KEY)) ?? DEFAULTS)
+  const [prefs, setPrefs] = useState<Prefs>(() => parse(readLocal(KEY)) ?? defaults())
   const touched = useRef(false)
 
   useEffect(() => {

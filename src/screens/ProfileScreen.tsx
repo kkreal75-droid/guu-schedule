@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import source from '../../data/source.json'
 import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
 import { CheckIcon, ExternalIcon } from '../icons'
@@ -9,18 +8,6 @@ import { cloudAvailable } from '../storage'
 import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
 
 const SOURCE_URL = 'https://guu.ru/student/schedule/'
-
-// data/source.json пишет update.py: какой файл ГУУ сейчас в расписании и когда ГУУ его менял
-const sourceVersion = source.file.match(/-(\d+)\.xlsx$/)?.[1]
-const sourceChanged = source.last_modified
-  ? new Intl.DateTimeFormat('ru-RU', {
-      timeZone: 'Europe/Moscow',
-      day: 'numeric',
-      month: 'long',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(source.last_modified))
-  : null
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'light', label: 'Светлая' },
@@ -75,6 +62,8 @@ type Props = {
 
 export function ProfileScreen({ prefs, onChange, noteCount }: Props) {
   const week = weekOf(moscowNow().day)
+  // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
+  const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
 
   return (
     <div className="screen profile">
@@ -146,10 +135,10 @@ export function ProfileScreen({ prefs, onChange, noteCount }: Props) {
           <span>Недель в расписании</span>
           <span className="row-value">{MAX_WEEK}</span>
         </div>
-        {sourceChanged && (
+        {schedule.source_file && (
           <div className="row">
-            <span>Файл ГУУ{sourceVersion ? ` №${sourceVersion}` : ''}</span>
-            <span className="row-value">от {sourceChanged}</span>
+            <span>Файл ГУУ</span>
+            <span className="row-value">{sourceVersion ? `№${sourceVersion}` : schedule.source_file}</span>
           </div>
         )}
         <button type="button" className="row row-btn row-link" onClick={() => openLink(SOURCE_URL)}>

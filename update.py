@@ -2,21 +2,26 @@
 Следит за расписанием 1 курса на guu.ru и пересобирает schedule.json через parser.py.
 
 Запуск:
-  python update.py           → проверить ссылку; если файл новый — скачать и пересобрать
-  python update.py --force   → скачать и пересобрать в любом случае
+  python update.py           → скачать файл; если его содержимое изменилось — пересобрать
+  python update.py --force   → пересобрать, даже если SHA-256 файла тот же
 
 Как работает:
   1. открывает https://guu.ru/student/schedule/ и ищет ссылку «1 курс бакалавриат ОФО»;
-  2. сравнивает её с data/source.json: адрес ссылки, ETag/Last-Modified и sha256 файла
-     (ГУУ обычно выкладывает новую версию под новым адресом «...-142.xlsx», но на случай
-     замены файла по старому адресу проверяем и заголовки);
-  3. если файл новый — запускает parser.py во временной папке, проверяет результат
-     и только тогда кладёт файл в data/raw/k1.xlsx и обновляет schedule.json;
-  4. проверяет, что ручные правки из overrides.json всё ещё к чему-то относятся.
+  2. скачивает файл и сравнивает его SHA-256 с source_sha256 из schedule.json — так видно
+     и новую ссылку («...-142.xlsx»), и замену файла под тем же именем;
+  3. если файл другой — запускает parser.py во временной папке и проверяет результат:
+     у каждой группы (МБ(МП) 1-1 и 1-2) не меньше MIN_LESSONS занятий. Если нет — ошибка,
+     schedule.json не трогаем (в GitHub Actions это красный запуск и письмо);
+  4. записывает schedule.json и data/raw/k1.xlsx, только если пары реально изменились.
+     В schedule.json кроме данных parser.py кладёт:
+       updated_at    — время проверки, которая нашла изменение (по Москве),
+       source_file   — имя файла ГУУ,
+       source_sha256 — его SHA-256, с ним сравниваем при следующем запуске;
+  5. проверяет, что ручные правки из overrides.json всё ещё к чему-то относятся.
 
 Код выхода: 0 — всё в порядке (обновилось или нет), 1 — ошибка: сайт недоступен, ссылка
-не найдена, вместо xlsx пришло что-то другое, парсер не справился. В GitHub Actions пишет
-changed=true|false и message=... в $GITHUB_OUTPUT.
+не найдена, вместо xlsx пришло что-то другое, парсер не справился или занятий слишком мало.
+В GitHub Actions пишет changed=true|false и message=... в $GITHUB_OUTPUT.
 """
 
 from __future__ import annotations
@@ -41,16 +46,19 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urljoin
 from urllib.request import Request, urlopen
 
-from parser import WEEKDAYS, parse_weeks
+from parser import GROUPS, WEEKDAYS, parse_weeks
 
 ROOT = Path(__file__).resolve().parent
 PAGE_URL = "https://guu.ru/student/schedule/"
 LINK_TEXT = "1 курс бакалавриат ОФО"
 
 RAW_FILE = ROOT / "data" / "raw" / "k1.xlsx"
-STATE_FILE = ROOT / "data" / "source.json"
 SCHEDULE_FILE = ROOT / "schedule.json"
 OVERRIDES_FILE = ROOT / "overrides.json"
+
+# защита от поломки: меньше — значит, структура таблицы поменялась и парсер не нашёл пары
+MIN_LESSONS = 30
+DATA_KEYS = ("semester_start", "groups", "lessons")  # то, что пишет parser.py
 
 # без слова «bot»: guu.ru отвечает 403 на такие User-Agent
 USER_AGENT = "guu-schedule-updater/1.0 (+https://github.com)"
@@ -165,9 +173,8 @@ def find_schedule_link(html: str) -> str:
 
 # ---------- разбор и проверка ----------
 
-def run_parser(xlsx: Path) -> tuple[dict, str]:
-    """parser.py пишет schedule.json в текущую папку — запускаем его во временной.
-    Возвращает разобранные данные и сам текст файла (его кладём как есть, байт в байт)."""
+def run_parser(xlsx: Path) -> dict:
+    """parser.py пишет schedule.json в текущую папку — запускаем его во временной."""
     with tempfile.TemporaryDirectory() as tmp:
         proc = subprocess.run(
             [sys.executable, str(ROOT / "parser.py"), str(xlsx)],
@@ -177,15 +184,19 @@ def run_parser(xlsx: Path) -> tuple[dict, str]:
             print(proc.stdout.rstrip())
         if proc.returncode != 0:
             raise UpdateError(f"parser.py упал:\n{proc.stderr.strip()}")
-        text = (Path(tmp) / "schedule.json").read_text(encoding="utf-8")
-    data = json.loads(text)
+        return json.loads((Path(tmp) / "schedule.json").read_text(encoding="utf-8"))
 
+
+def validate(data: dict) -> None:
+    """Обе группы на месте и у каждой достаточно занятий — иначе старое расписание не трогаем."""
     counts = Counter(lesson["group"] for lesson in data["lessons"])
-    empty = [g for g in data["groups"] if not counts[g]]
-    if empty:
-        # скорее всего, в файле поменялась структура — старое расписание лучше не трогать
-        raise UpdateError(f"в новом файле не нашлось пар для групп {empty} — schedule.json не трогаю")
-    return data, text
+    print("Занятий по группам: " + ", ".join(f"{g} — {counts[g]}" for g in GROUPS))
+    short = [f"{g}: {counts[g]}" for g in GROUPS if counts[g] < MIN_LESSONS]
+    if short:
+        raise UpdateError(
+            f"в новом файле слишком мало занятий ({'; '.join(short)}; нужно не меньше {MIN_LESSONS}) — "
+            "похоже, поменялась структура таблицы. schedule.json не перезаписан"
+        )
 
 
 def lesson_key(lesson: dict) -> tuple:
@@ -256,26 +267,22 @@ def check_overrides(data: dict) -> None:
                 break
 
 
-# ---------- состояние ----------
+# ---------- файлы ----------
 
 def load_json(path: Path) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
-def write_json(path: Path, data: dict) -> None:
+def write_atomic(path: Path, content: bytes) -> None:
+    """Сначала во временный файл, потом подмена: оборванная запись не оставит битый файл."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(content)
+    os.replace(tmp, path)
 
 
-def same_remote_file(state: dict, headers: dict[str, str]) -> bool:
-    """По заголовкам HEAD: тот же ли файл лежит по ссылке. Нет заголовков — считаем, что не знаем."""
-    compared = False
-    for header, field in (("etag", "etag"), ("last-modified", "last_modified"), ("content-length", "size")):
-        if headers.get(header) and state.get(field):
-            compared = True
-            if str(headers[header]) != str(state[field]):
-                return False
-    return compared
+def lessons_data(schedule: dict | None) -> dict | None:
+    return {key: schedule.get(key) for key in DATA_KEYS} if schedule else None
 
 
 def github_output(**values: str) -> None:
@@ -291,79 +298,65 @@ def github_output(**values: str) -> None:
 
 # ---------- главное ----------
 
-def update(force: bool) -> bool:
-    state = load_json(STATE_FILE) or {}
+def update(force: bool) -> tuple[bool, str]:
+    """Возвращает (изменился ли schedule.json, имя файла ГУУ)."""
+    current = load_json(SCHEDULE_FILE)
 
     _, page = fetch(PAGE_URL)
     url = find_schedule_link(page.decode("utf-8", errors="replace"))
+    source_file = unquote(url.rsplit("/", 1)[-1])
     print(f"Ссылка «{LINK_TEXT}»: {unquote(url)}")
-
-    if not force and state.get("url") == url and RAW_FILE.exists() and SCHEDULE_FILE.exists():
-        headers, _ = fetch(url, method="HEAD")
-        if same_remote_file(state, headers):
-            print("Ссылка и файл не изменились — ничего не делаю.")
-            return False
-        print("Ссылка та же, но файл по ней поменялся — скачиваю.")
-    elif state.get("url") and state.get("url") != url:
-        print(f"Ссылка изменилась (было: {unquote(state['url'])}) — скачиваю.")
 
     headers, content = fetch(url)
     if not content.startswith(b"PK"):  # xlsx — это zip
         raise UpdateError(f"по ссылке пришёл не xlsx ({headers.get('content-type')}, {len(content)} байт)")
     sha = hashlib.sha256(content).hexdigest()
+    old_sha = (current or {}).get("source_sha256")
+    print(f"SHA-256 файла: {sha[:16]}…  в schedule.json: {old_sha[:16] + '…' if old_sha else 'нет'}")
 
-    new_state = {
-        "page": PAGE_URL,
-        "link_text": LINK_TEXT,
-        "url": url,
-        "file": unquote(url.rsplit("/", 1)[-1]),
-        "etag": headers.get("etag"),
-        "last_modified": headers.get("last-modified"),
-        "size": len(content),
-        "sha256": sha,
-        "updated_at": state.get("updated_at"),
-    }
-
-    if not force and sha == state.get("sha256") and RAW_FILE.exists() and SCHEDULE_FILE.exists():
-        print("Содержимое файла то же самое — расписание не меняется.")
-        write_json(STATE_FILE, new_state)
-        return False
+    if sha == old_sha and not force:
+        print("Содержимое файла не изменилось — расписание то же.")
+        return False, source_file
 
     with tempfile.TemporaryDirectory() as tmp:
         xlsx = Path(tmp) / "k1.xlsx"
         xlsx.write_bytes(content)
-        data, text = run_parser(xlsx)
+        data = run_parser(xlsx)
+    validate(data)
     check_overrides(data)
 
-    old = load_json(SCHEDULE_FILE)
-    RAW_FILE.parent.mkdir(parents=True, exist_ok=True)
-    RAW_FILE.write_bytes(content)
+    if old_sha and lessons_data(current) == lessons_data(data):
+        # пары наших групп те же (поменялось что-то у других направлений) — не коммитим зря;
+        # в следующий час файл просто разберём заново, это пара секунд
+        reason = "Пересобрал по --force" if sha == old_sha else "Файл ГУУ изменился"
+        print(f"{reason}, но пары МБ(МП) те же — schedule.json не трогаю.")
+        return False, source_file
 
-    changed = old != data
-    if changed:
-        added, removed = describe_changes(old, data)
-        SCHEDULE_FILE.write_text(text, encoding="utf-8")
-        new_state["updated_at"] = datetime.now(MSK).isoformat(timespec="seconds")
-        print(f"schedule.json обновлён: +{added} / −{removed} записей, всего {len(data['lessons'])}.")
-    else:
-        print("Файл новый, но расписание в нём то же — schedule.json не меняется.")
-    write_json(STATE_FILE, new_state)
-    return changed
+    added, removed = describe_changes(current, data)
+    schedule = {
+        "updated_at": datetime.now(MSK).isoformat(timespec="seconds"),
+        "source_file": source_file,
+        "source_sha256": sha,
+        **lessons_data(data),
+    }
+    write_atomic(SCHEDULE_FILE, (json.dumps(schedule, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+    write_atomic(RAW_FILE, content)
+    print(f"schedule.json обновлён: +{added} / −{removed} записей, всего {len(data['lessons'])}.")
+    return True, source_file
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--force", action="store_true", help="скачать и пересобрать, даже если ничего не изменилось")
+    ap.add_argument("--force", action="store_true", help="пересобрать, даже если SHA-256 файла не изменился")
     args = ap.parse_args()
     try:
-        changed = update(args.force)
+        changed, source_file = update(args.force)
     except UpdateError as e:
         print(f"✖ {e}", file=sys.stderr)
         annotate("error", str(e))
         github_output(changed="false")
         return 1
-    state = load_json(STATE_FILE) or {}
-    github_output(changed=str(changed).lower(), message=f"Расписание: {state.get('file', 'обновление')}")
+    github_output(changed=str(changed).lower(), message=f"Расписание: {source_file}")
     return 0
 
 
