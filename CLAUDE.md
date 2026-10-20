@@ -125,7 +125,8 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 `123456:LOCAL-TEST-TOKEN`, `TELEGRAM_API`/`GITHUB_API` на поддельные сервера, `WEBAPP_URL=http://localhost:5173/`
 — данные с локального Vite) и `.env.development.local` (`VITE_BOT_URL=http://127.0.0.1:8787`) — оба в
 .gitignore, в git не класть. Локальный cron: `/cdn-cgi/handler/scheduled?cron=*+*+*+*+*&time=<мс>`.
-Автотестов в репозитории нет.
+Автотесты воркера: `cd bot && npm test` (vitest в рантайме Workers, `bot/test/`; в CI — `.github/workflows/tests.yml`).
+Бэкапы D1 и восстановление — `docs/backup.md`.
 
 ## Секреты (Cloudflare, `npx wrangler secret put <ИМЯ>` в `bot/`)
 

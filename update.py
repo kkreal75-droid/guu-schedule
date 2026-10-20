@@ -129,13 +129,57 @@ def to_ascii_url(url: str) -> str:
     return quote(url, safe=":/?#[]@!$&'()*+,;=%")
 
 
+# Пределы для файлов с guu.ru: расписание — десятки-сотни КБ, графики — единицы МБ. Больше — что-то не то
+# (подменённый файл, «бомба»), не тратим на него память раннера.
+MAX_DOWNLOAD = 50 * 1024 * 1024  # байт по сети
+MAX_UNPACKED = 200 * 1024 * 1024  # после gzip / внутри xlsx-docx (zip)
+MAX_ZIP_RATIO = 200  # сжатие одного файла внутри zip сильнее — похоже на «zip-бомбу»
+ALLOWED_HOSTS = ("guu.ru",)  # файлы скачиваем только с guu.ru и его поддоменов
+
+
 def decompress(body: bytes, encoding: str | None) -> bytes:
     # guu.ru присылает gzip, даже если клиент об этом не просил, а urllib сам не распаковывает
-    if encoding == "gzip":
-        return gzip.decompress(body)
-    if encoding == "deflate":
-        return zlib.decompress(body)
+    if encoding not in ("gzip", "deflate"):
+        return body
+    unpacker = zlib.decompressobj(16 + zlib.MAX_WBITS if encoding == "gzip" else zlib.MAX_WBITS)
+    data = unpacker.decompress(body, MAX_UNPACKED + 1)
+    if len(data) > MAX_UNPACKED or unpacker.unconsumed_tail:
+        raise UpdateError(f"распакованный ответ больше {MAX_UNPACKED // 1048576} МБ")
+    return data
+
+
+def read_limited(resp) -> bytes:
+    declared = int(resp.headers.get("Content-Length") or 0)
+    if declared > MAX_DOWNLOAD:
+        raise UpdateError(f"файл {declared // 1048576} МБ — больше лимита {MAX_DOWNLOAD // 1048576} МБ")
+    body = resp.read(MAX_DOWNLOAD + 1)
+    if len(body) > MAX_DOWNLOAD:
+        raise UpdateError(f"файл больше {MAX_DOWNLOAD // 1048576} МБ")
     return body
+
+
+def check_zip(path: Path) -> None:
+    """xlsx и docx — это zip: до разбора проверяем, что он не раздувается в гигабайты."""
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as z:
+            infos = z.infolist()
+    except zipfile.BadZipFile as e:
+        raise UpdateError(f"повреждённый файл: {e}") from e
+    if len(infos) > 5000:
+        raise UpdateError("в файле слишком много частей")
+    if sum(i.file_size for i in infos) > MAX_UNPACKED:
+        raise UpdateError(f"файл распаковывается больше чем в {MAX_UNPACKED // 1048576} МБ")
+    for i in infos:
+        if i.compress_size and i.file_size / i.compress_size > MAX_ZIP_RATIO and i.file_size > 10 * 1024 * 1024:
+            raise UpdateError(f"подозрительно сильное сжатие внутри файла ({i.filename})")
+
+
+def allowed_host(url: str) -> bool:
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    return parts.scheme == "https" and any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS)
 
 
 def fetch(url: str, method: str = "GET", attempts: int = 3) -> tuple[dict[str, str], bytes]:
@@ -147,7 +191,7 @@ def fetch(url: str, method: str = "GET", attempts: int = 3) -> tuple[dict[str, s
                 headers = {k.lower(): v for k, v in resp.headers.items()}
                 if method != "GET":
                     return headers, b""
-                return headers, decompress(resp.read(), headers.get("content-encoding"))
+                return headers, decompress(read_limited(resp), headers.get("content-encoding"))
         except HTTPError as e:
             if e.code < 500:
                 raise UpdateError(f"{method} {unquote(url)}: HTTP {e.code}") from e
@@ -317,6 +361,9 @@ def find_sources() -> list[Source]:
             if not href or not href.lower().endswith(FILE_TYPES):
                 continue
             url = urljoin(page, href)
+            if not allowed_host(url):
+                warn(f"ссылка не на guu.ru — пропускаю: {url}")
+                continue
             if url in seen:
                 continue  # одна ссылка дважды (картинка + текст)
             seen.add(url)
@@ -663,6 +710,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                 elif not content.startswith(b"PK"):
                     raise UpdateError(f"по ссылке не {suffix} ({len(content)} байт)")
                 else:
+                    check_zip(path)
                     try:
                         import openpyxl
                         if suffix == ".xlsx":
