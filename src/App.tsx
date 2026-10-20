@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AddGroupSheet } from './components/AddGroupSheet'
 import { loadTeachers } from './data'
 import type { Choice } from './onboarding/Onboarding'
@@ -34,6 +34,18 @@ type Props = {
   onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
+// Мини-приложение открыли кнопкой из рассылки бота: «?open=session» — сразу экран сессии
+// (параметр убираем из адреса после первого показа, чтобы не открывать его при каждой перерисовке)
+function openedFrom(): MoreRequest | null {
+  return new URLSearchParams(window.location.search).get('open') === 'session' ? { item: 'session' } : null
+}
+function forgetOpened() {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('open')) return
+  url.searchParams.delete('open')
+  window.history.replaceState(window.history.state, '', url)
+}
+
 export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile, onSaveChoice, onShowIntro }: Props) {
   const [prefs, updatePrefs] = usePrefs()
   // правки и подгруппы; староста меняет их — обновляем сразу, без перезапуска
@@ -50,7 +62,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
 
   // своё расписание: преподавателю — его пары, студенту — его группа
   const home = prefs.role === 'teacher' && prefs.teacher ? teacherKey(prefs.teacher) : prefs.group
-  const [tab, setTab] = useState<Tab>(startTab ?? 'schedule')
+  const [tab, setTab] = useState<Tab>(() => startTab ?? (openedFrom() ? 'more' : 'schedule'))
   // группа, выбранная переключателем на экране расписания; null — своя
   const [viewGroup, setViewGroup] = useState<string | null>(null)
   const shownGroup = viewGroup && schedule.groups.includes(viewGroup) ? viewGroup : home
@@ -78,7 +90,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
   const updatedAt = schedule.updated_at ? formatStamp(schedule.updated_at) : null
 
   // нажатие на преподавателя в паре — его карточка в «Другое → Рейтинг преподавателей»; «Назад» — сюда
-  const [moreRequest, setMoreRequest] = useState<MoreRequest | null>(null)
+  const [moreRequest, setMoreRequest] = useState<MoreRequest | null>(() => (startTab ? null : openedFrom()))
+  useEffect(forgetOpened, [])
   const openTeacher = useCallback(async (name: string) => {
     haptic()
     const list = await loadTeachers().then((d) => d.teachers, () => null)

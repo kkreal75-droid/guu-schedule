@@ -63,7 +63,8 @@ type Props = {
   onRequestBack?: () => void
 }
 
-export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget)
+// session — кнопка «Открыть расписание сессии» из рассылки бота (?open=session)
+export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget) | { item: 'session' }
 
 export function MoreScreen({
   admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,

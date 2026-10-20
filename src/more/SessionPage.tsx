@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Section } from '../components/Section'
-import { loadSession, type SessionFile, type SessionItem } from '../data'
+import { loadSession, loadSessionStatus, type SessionFile, type SessionItem } from '../data'
 import { WEEKDAYS_SHORT, formatDate } from '../format'
 import { dayFromIso, groupName, moscowNow } from '../schedule'
 
@@ -39,15 +39,24 @@ function Item({ item, past }: { item: SessionItem; past: boolean }) {
   )
 }
 
-// Сессия своей группы — из data/session/<id>.json (update.py кладёт только текущий учебный год)
+// какую сессию ждём: осенний семестр (август–январь) — зимнюю, весенний — летнюю
+const upcoming = (day: number) => {
+  const month = new Date(day * 86_400_000).getUTCMonth() + 1
+  return month >= 8 || month === 1 ? { name: 'зимней', when: 'ближе к декабрю' } : { name: 'летней', when: 'ближе к маю' }
+}
+
+// Сессия своей группы — из data/session/<id>.json: update.py кладёт только текущий учебный год (даты не раньше
+// начала семестра). Прошлогодние файлы guu.ru — архив другого потока, группам не показываются.
 export function SessionPage({ group }: { group: string }) {
   const [state, setState] = useState<{ file: SessionFile | null } | 'loading' | 'error'>('loading')
+  const [page, setPage] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
     loadSession(group).then(
       (file) => alive && setState({ file }),
       () => alive && setState('error'),
     )
+    loadSessionStatus().then((s) => alive && setPage(s.page), () => {})
     return () => {
       alive = false
     }
@@ -56,12 +65,23 @@ export function SessionPage({ group }: { group: string }) {
   if (state === 'loading') return <p className="lead">Загружаю…</p>
   if (state === 'error') return <p className="lead">Не получилось загрузить расписание сессии. Проверьте интернет.</p>
   if (!state.file) {
+    const next = upcoming(moscowNow().day)
     return (
       <>
-        <p className="lead">
-          Расписание сессии {groupName(group)} ещё не опубликовано на guu.ru. Как только его выложат — оно появится здесь
-          само.
-        </p>
+        <div className="session-wait">
+          <span className="session-wait-emoji" aria-hidden>
+            📚
+          </span>
+          <p className="lead">
+            Расписание {next.name} сессии ещё не опубликовано. Обычно ГУУ выкладывает его {next.when} — как только появится,
+            оно будет здесь, а я пришлю уведомление.
+          </p>
+        </div>
+        {page && page.includes('прошлого года') && (
+          <p className="section-footer">
+            Сейчас на странице сессии guu.ru — {page}. Её группы уже на следующем курсе, поэтому здесь она не показывается.
+          </p>
+        )}
         <p className="section-footer">Источник: {SESSION_PAGE}</p>
       </>
     )

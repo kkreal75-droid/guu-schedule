@@ -18,6 +18,7 @@
   public/data/teachers/<id>.json        — пары преподавателя (с группами)
   public/data/rooms.json                — аудитория → когда занята
   public/data/session/<id>.json         — сессия группы (только текущего учебного года)
+  public/data/session_status.json        — что на странице сессии guu.ru, у каких групп сессия (рассылка ботом)
   public/data/parse_report.json         — что разобрано по каждому файлу и листу, где парсер не уверен
   public/data/alerts.json               — тревоги для владельца (бот присылает их в личку)
   public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
@@ -577,6 +578,30 @@ ROOM_PREFIX = re.compile(r"^([А-ЯЁ]{1,3})-")
 
 # ---------- главное ----------
 
+def session_season(dates: list[str]) -> str | None:
+    """«зимняя» — декабрь–февраль, иначе «весенняя» (ГУУ пишет и «весенне-летняя», и «летняя»)."""
+    if not dates:
+        return None
+    return "зимняя" if {int(d[5:7]) for d in dates} & {12, 1, 2} else "весенняя"
+
+
+def session_page_label(files: list[dict], current_year: str) -> str | None:
+    """Что сейчас на странице сессии: «весенняя сессия прошлого года» / «зимняя сессия 2026/27»."""
+    fresh = [f for f in files if not f["archive"]]
+    if fresh:
+        seasons = sorted({f["season"] for f in fresh if f["season"]})
+        y1, y2 = current_year.split("/")
+        return f"{' и '.join(seasons) or 'текущая'} сессия {y1}/{y2[-2:]}"
+    old = [f for f in files if f["year"]]
+    if not old:
+        return None
+    year = Counter(f["year"] for f in old).most_common(1)[0][0]
+    seasons = sorted({f["season"] for f in old if f["year"] == year and f["season"]})
+    prev = f"{int(current_year[:4]) - 1}/{current_year[:4]}"
+    when = "прошлого года" if year == prev else year
+    return f"{' и '.join(seasons) or ''} сессия {when}".strip()
+
+
 def academic_year_now() -> str:
     y = SEMESTER_START.year if SEMESTER_START.month >= 8 else SEMESTER_START.year - 1
     return f"{y}/{y + 1}"
@@ -748,14 +773,24 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
     entries.sort(key=lambda e: (e["level"] != "bachelor", e["level"], e["form"], e["course"], e["institute"], e["name"]))
     names = {e["id"]: e["name"] for e in entries}
 
-    # 5. сессия — только текущего учебного года (прошлогодняя относится к другому потоку)
+    # 5. сессия — только текущего учебного года: все даты экзаменов и зачётов не раньше начала семестра.
+    #    Прошлогодние файлы ГУУ держит на странице до новых — это архив: их группы уже на следующем курсе,
+    #    а по совпадению имени («МБ(МП) 1-1») новая группа получила бы сессию чужого потока.
     current_year = academic_year_now()
+    semester_start = SEMESTER_START.isoformat()
     by_key = {group_key(entry_info(e)): e["id"] for e in entries}
     session_out: dict[str, dict] = {}
     session_skipped = Counter()
+    file_info: dict[str, dict] = {}
     for src_key, sgs in sessions.items():
+        dates = sorted(i["date"] for sg in sgs for i in sg.items)
+        years = Counter(sg.academic_year for sg in sgs)
+        info = file_info[src_key] = {"year": years.most_common(1)[0][0] if years else None,
+                                     "dates": [dates[0], dates[-1]] if dates else None,
+                                     "season": session_season(dates), "published": 0}
         for sg in sgs:
-            if sg.academic_year != current_year:
+            first = min((i["date"] for i in sg.items), default=None)
+            if sg.academic_year != current_year or not first or first < semester_start:
                 session_skipped[sg.academic_year] += 1
                 continue
             gid = by_key.get(group_key(sg.info))
@@ -764,12 +799,18 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                 continue
             current = session_out.setdefault(gid, {"id": gid, "name": names[gid], "title": sg.title, "items": []})
             current["items"] += sg.items
+            info["published"] += 1
     if session_skipped:
         report["warnings"].append(
-            "сессия прошлого учебного года не опубликована (её группы уже на следующем курсе): "
+            "сессия прошлого учебного года — архив, группам не показывается (её группы уже на следующем курсе): "
             + ", ".join(f"{y} — {n} групп" for y, n in sorted(session_skipped.items())))
     for e in entries:
         e["session"] = e["id"] in session_out
+    for entry in report["files"]:
+        if entry["key"] in file_info:
+            info = file_info[entry["key"]]
+            entry.update({"year": info["year"], "dates": info["dates"], "season": info["season"],
+                          "archive": info["published"] == 0})
 
     # 6. файлы групп: updated_at меняется, только если пары группы поменялись
     changed_groups = []
@@ -864,6 +905,15 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                    "groups": entries}
     # updated_at в groups.json меняется только вместе с данными — иначе коммит каждый час
     writer.write(OUT / "groups.json", dump(stable(OUT / "groups.json", groups_json)))
+
+    # что сейчас на странице сессии guu.ru — подпись в «Документах» и рассылка ботом (session.ts)
+    session_files = [{"name": e["name"], "url": e["url"], "year": e.get("year"), "season": e.get("season"),
+                      "dates": e.get("dates"), "archive": e.get("archive", True)}
+                     for e in report["files"] if e["kind"] == "session" and e["status"] == "ok"]
+    session_status = {"updated_at": now, "current_year": current_year, "semester_start": semester_start,
+                      "groups": sorted(session_out), "files": session_files,
+                      "page": session_page_label(session_files, current_year)}
+    writer.write(OUT / "session_status.json", dump(stable(OUT / "session_status.json", session_status)))
 
     summary = Counter((e["level"], e["form"], e["course"]) for e in entries)
     level_names = {"bachelor": "бакалавриат", "master": "магистратура", "postgrad": "аспирантура"}

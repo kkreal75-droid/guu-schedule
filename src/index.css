@@ -4421,3 +4421,32 @@ select.account-select:disabled {
   font-size: 14px;
   color: var(--accent-ink);
 }
+
+/* ---------- сессия (этап 8.2) ---------- */
+
+.session-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.session-wait-emoji {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.session-wait .lead {
+  margin: 0;
+}
+
+.badge-archive {
+  margin-left: 6px;
+  --k: 120 126 138;
+  vertical-align: 1px;
+}

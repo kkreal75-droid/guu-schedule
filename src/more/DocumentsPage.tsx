@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Section } from '../components/Section'
-import { groupInfo } from '../data'
+import { groupInfo, loadSessionStatus } from '../data'
 import { ExternalIcon } from '../icons'
 import { dataUrl } from '../schedule'
 import { openLink } from '../telegram'
 
 // «Другое → Документы»: исходные таблицы ГУУ, из которых собрано расписание (parse_report.json, update.py)
 
-type FileRow = { kind: string; name: string; text: string; section: string | null; url: string; groups?: number; status?: string }
+type FileRow = {
+  kind: string
+  name: string
+  text: string
+  section: string | null
+  url: string
+  groups?: number
+  status?: string
+  year?: string | null // сессия: учебный год по датам в файле
+  archive?: boolean // сессия прошлого учебного года — группам не показывается
+}
+
+const shortYear = (year: string) => year.replace(/^(\d{4})\/\d{2}(\d{2})$/, '$1/$2')
 
 const SECTIONS: [string, string][] = [
   ['бакалавриат', 'Бакалавриат'],
@@ -24,12 +36,14 @@ export function DocumentsPage({ group }: { group: string }) {
   const [files, setFiles] = useState<FileRow[] | null>(null)
   const [error, setError] = useState(false)
   const [mineFile, setMineFile] = useState<string | null>(null)
+  const [sessionPage, setSessionPage] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(dataUrl('parse_report.json'), { cache: 'no-store' })
       .then((r) => (r.ok ? (r.json() as Promise<{ files: FileRow[] }>) : Promise.reject(new Error(String(r.status)))))
       .then((d) => setFiles(d.files), () => setError(true))
     if (!group.startsWith('t-')) groupInfo(group).then((g) => setMineFile(g?.source_file ?? null), () => {})
+    loadSessionStatus().then((s) => setSessionPage(s.page), () => {})
   }, [group])
 
   if (error) return <p className="lead">Не получилось загрузить список. Проверь интернет.</p>
@@ -41,6 +55,7 @@ export function DocumentsPage({ group }: { group: string }) {
         <span className="kug-title">
           {label(f)}
           {f.name === mineFile && <span className="badge badge-mine">твоя группа</span>}
+          {f.kind === 'session' && f.archive && f.year && <span className="badge badge-archive">архив {shortYear(f.year)}</span>}
         </span>
         <span className="kug-sub">
           {f.name}
@@ -62,14 +77,28 @@ export function DocumentsPage({ group }: { group: string }) {
           </Section>
         ) : null
       })}
-      {files.some((f) => f.kind === 'session') && <Section title="Сессия">{files.filter((f) => f.kind === 'session').map(row)}</Section>}
+      {files.some((f) => f.kind === 'session') && (
+        <Section
+          title="Сессия"
+          footer={
+            files.filter((f) => f.kind === 'session').every((f) => f.archive)
+              ? 'Это сессия прошлого учебного года: её группы уже на следующем курсе, в приложении она не показывается.'
+              : undefined
+          }
+        >
+          {files.filter((f) => f.kind === 'session').map(row)}
+        </Section>
+      )}
       <Section>
         <button type="button" className="row row-btn row-link" onClick={() => openLink('https://guu.ru/student/schedule/')}>
           <span>Страница расписания на guu.ru</span>
           <ExternalIcon className="row-check" />
         </button>
-        <button type="button" className="row row-btn row-link" onClick={() => openLink('https://guu.ru/student/session/')}>
-          <span>Страница сессии на guu.ru</span>
+        <button type="button" className="row row-btn row-link kug-row" onClick={() => openLink('https://guu.ru/student/session/')}>
+          <span className="kug-row-text">
+            <span>Страница сессии на guu.ru</span>
+            {sessionPage && <span className="kug-sub">сейчас там {sessionPage}</span>}
+          </span>
           <ExternalIcon className="row-check" />
         </button>
       </Section>

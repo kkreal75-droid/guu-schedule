@@ -15,7 +15,7 @@
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
-//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка Подслушано.
+//   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка Подслушано.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
@@ -25,6 +25,7 @@ import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { sendAlerts } from './alerts'
+import { notifySessions } from './session'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { handlePlacesGet } from './places'
@@ -237,6 +238,9 @@ export default {
       if (new Date(now).getUTCMinutes() % 10 === 5) {
         used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
         used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
+      }
+      if (new Date(now).getUTCMinutes() % 10 === 7) {
+        used += await notifySessions(env).catch((err) => (reportError(env, 'Рассылка о сессии', err), 0))
       }
       if (new Date(now).getUTCMinutes() === 35) {
         used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))

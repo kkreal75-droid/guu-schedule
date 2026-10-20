@@ -110,7 +110,8 @@ export const originLabel = (g: Pick<GroupInfo, 'level' | 'course' | 'institute'>
 
 // ---------- рассылка: кому ----------
 
-export type AudienceFilter = { level?: Level; form?: Form; course?: number; institute?: string; group?: string }
+// groups — список id (рассылка о новой сессии только тем группам, у кого она появилась)
+export type AudienceFilter = { level?: Level; form?: Form; course?: number; institute?: string; group?: string; groups?: string[] }
 
 export function matchGroups(groups: GroupInfo[], f: AudienceFilter): string[] {
   return groups
@@ -120,13 +121,15 @@ export function matchGroups(groups: GroupInfo[], f: AudienceFilter): string[] {
         (!f.form || g.form === f.form) &&
         (!f.course || g.course === f.course) &&
         (!f.institute || g.institute === f.institute) &&
-        (!f.group || g.id === f.group),
+        (!f.group || g.id === f.group) &&
+        (!f.groups || f.groups.includes(g.id)),
     )
     .map((g) => g.id)
 }
 
 export function describeAudience(f: AudienceFilter, groups: GroupInfo[] = []): string {
   if (f.group) return groups.find((g) => g.id === f.group)?.name ?? f.group
+  if (f.groups) return f.groups.length === 1 ? (groups.find((g) => g.id === f.groups![0])?.name ?? f.groups[0]) : `групп: ${f.groups.length}`
   const parts = [
     f.level ? LEVEL_TITLES[f.level].toLowerCase() : null,
     f.form ? (f.form === 'ozfo' ? 'ОЗФО' : 'ОФО') : null,

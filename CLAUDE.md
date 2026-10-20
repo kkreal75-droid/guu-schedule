@@ -22,7 +22,9 @@
 **Данные (`public/data/`, Vite кладёт на сайт как есть).** `groups.json` — все группы (id, имя, уровень,
 форма, курс, институт, программа); `schedule/<id>.json` — пары группы + сетка времени по дням (номер
 пары — по ней: у вечерних 18:50 — 1-я); `teachers.json` + `teachers/<id>.json`; `rooms.json` (аудитория →
-занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года;
+занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года (все даты не
+раньше начала семестра; прошлогодние файлы guu.ru — архив, по совпадению имени их группам НЕ показывать);
+`session_status.json` — что на странице сессии guu.ru («весенняя сессия прошлого года»), у каких групп сессия;
 `parse_report.json` — что разобрано по файлам/листам и где парсер не уверен (и «Другое → Документы»);
 `kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `places.json` —
 места кампуса для «Корпусов ГУУ» (ведётся руками, update.py не трогает; `todo` — что не проверено) и `campus.json` —
@@ -91,9 +93,11 @@ LibreOffice ставится, только если изменился .doc (н�
 - `GET /` — setWebhook + меню команд (`?force` — заново) + строка о данных в описании бота;
 - cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
-  в :35 — чистка чата, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
+  в :x7 — рассылка «📚 Опубликовано расписание сессии» группам, у которых она появилась (`session.ts`, KV
+  `session-notified`, кнопка мини-приложения `?open=session`), в :35 — чистка чата, остаток лимита — досылка
+  рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0015`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0016`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`

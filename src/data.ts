@@ -72,6 +72,15 @@ export type SessionItem = {
 }
 export type SessionFile = { id: string; name: string; title: string; items: SessionItem[] }
 
+// Что сейчас на странице сессии guu.ru (update.py): page — «весенняя сессия прошлого года» / «зимняя сессия 2026/27»
+export type SessionStatus = {
+  current_year: string
+  groups: string[] // у кого опубликована сессия текущего учебного года
+  files: { name: string; url: string; year: string | null; season: string | null; dates: [string, string] | null; archive: boolean }[]
+  page: string | null
+}
+export const loadSessionStatus = cachedList<SessionStatus>('session_status.json', 'session_status')
+
 // Сессия группы; не опубликована — null
 export async function loadSession(id: string): Promise<SessionFile | null> {
   try {

@@ -39,6 +39,7 @@ async function audienceGroups(env: Env, audience: Audience): Promise<{ groups: s
     course: audience.course,
     institute: audience.institute,
     group: audience.group,
+    groups: Array.isArray(audience.groups) ? audience.groups.filter((g) => typeof g === 'string').slice(0, 1000) : undefined,
   }
   return { groups: matchGroups(index.groups, filter), stored: JSON.stringify({ t: describeAudience(filter, index.groups), f: filter }) }
 }
@@ -60,6 +61,7 @@ export type BroadcastRow = {
   text: string
   photo: string | null
   audience: string | null // 'all' | '1-1' | '1-2' | JSON {t, f}
+  button: string | null // JSON {text, url} — кнопка мини-приложения под сообщением
   status: 'draft' | 'sending' | 'done' | 'cancelled'
   preview_chat: number | null
   preview_message: number | null
@@ -103,7 +105,11 @@ const audienceKeyboard = (id: number, counts: Record<ButtonAudience, number>): K
 })
 
 // Отправка одного сообщения рассылки (и предпросмотра — тем же способом)
-function deliver(env: Env, chatId: number, row: Pick<BroadcastRow, 'text' | 'photo'>, extra: object = {}) {
+function deliver(env: Env, chatId: number, row: Pick<BroadcastRow, 'text' | 'photo'> & { button?: string | null }, extra: object = {}) {
+  if (row.button) {
+    const b = JSON.parse(row.button) as { text: string; url: string }
+    extra = { reply_markup: { inline_keyboard: [[{ text: b.text, web_app: { url: b.url } }]] }, ...extra }
+  }
   return row.photo
     ? tg<TgMessage>(env, 'sendPhoto', { chat_id: chatId, photo: row.photo, caption: row.text, parse_mode: 'HTML', ...extra })
     : tg<TgMessage>(env, 'sendMessage', { chat_id: chatId, text: row.text, parse_mode: 'HTML', ...extra })
@@ -255,6 +261,20 @@ export async function panelBroadcast(
   return { id, total }
 }
 
+// Рассылка от самого бота (например, «Опубликовано расписание сессии»): без предпросмотра владельцу, с кнопкой.
+export async function systemBroadcast(
+  env: Env,
+  { text, button, audience }: { text: string; button: { text: string; url: string } | null; audience: Audience },
+): Promise<{ id: number; total: number }> {
+  const row = await env.DB.prepare(
+    `INSERT INTO broadcasts (created_at, text, photo, status, button) VALUES (?, ?, NULL, 'draft', ?) RETURNING id`,
+  )
+    .bind(Date.now(), text, button ? JSON.stringify(button) : null)
+    .first<{ id: number }>()
+  const id = row!.id
+  return { id, total: await enqueue(env, id, audience) }
+}
+
 export async function broadcastHistory(env: Env, limit = 20): Promise<BroadcastRow[]> {
   return (await env.DB.prepare('SELECT * FROM broadcasts ORDER BY id DESC LIMIT ?').bind(limit).all<BroadcastRow>()).results
 }
@@ -270,13 +290,13 @@ export async function drainBroadcasts(env: Env, batch = BATCH): Promise<number> 
        WHERE status = 'pending' AND user_id IN (SELECT id FROM users WHERE banned = 1)`,
     ),
     env.DB.prepare(
-      `SELECT q.broadcast_id, q.user_id, b.text, b.photo
+      `SELECT q.broadcast_id, q.user_id, b.text, b.photo, b.button
        FROM broadcast_queue q JOIN broadcasts b ON b.id = q.broadcast_id
        WHERE q.status = 'pending' AND b.status = 'sending'
        ORDER BY q.broadcast_id LIMIT ?`,
     ).bind(batch),
   ])
-  const pending = picked.results as { broadcast_id: number; user_id: number; text: string; photo: string | null }[]
+  const pending = picked.results as { broadcast_id: number; user_id: number; text: string; photo: string | null; button: string | null }[]
   if (!pending.length) {
     await finishCompleted(env) // вдруг вся очередь отпала из-за банов
     return 0
