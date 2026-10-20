@@ -1,4 +1,6 @@
 import { useCallback, useState } from 'react'
+import { AddGroupSheet } from './components/AddGroupSheet'
+import { loadTeachers } from './data'
 import { teacherKey } from '../shared/schedule-core'
 import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
@@ -6,12 +8,12 @@ import type { Extras } from './edits'
 import { formatStamp } from './format'
 import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
-import { usePrefs } from './prefs'
-import { MoreScreen } from './screens/MoreScreen'
+import { MAX_FAVORITES, usePrefs } from './prefs'
+import { MoreScreen, type MoreRequest } from './screens/MoreScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleScreen'
 import { fromCache, schedule } from './schedule'
-import { haptic, type CheckIn } from './telegram'
+import { haptic, showAlert, type CheckIn } from './telegram'
 import { useTheme } from './theme'
 
 export type Tab = 'schedule' | 'more' | 'profile'
@@ -65,11 +67,39 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     if (next === tab) return
     haptic()
     if (next === 'schedule' && favoritesChanged) return void onReload('schedule')
+    setMoreRequest(null)
     setTab(next)
     window.scrollTo(0, 0)
   }
 
   const updatedAt = schedule.updated_at ? formatStamp(schedule.updated_at) : null
+
+  // нажатие на преподавателя в паре — его карточка в «Другое → Рейтинг преподавателей»; «Назад» — сюда
+  const [moreRequest, setMoreRequest] = useState<MoreRequest | null>(null)
+  const openTeacher = useCallback(async (name: string) => {
+    haptic()
+    const list = await loadTeachers().then((d) => d.teachers, () => null)
+    const teacher = list?.find((t) => t.name === name)
+    if (!teacher) return showAlert(list ? `${name} нет в списке преподавателей ГУУ.` : 'Нет связи. Попробуй ещё раз.')
+    setMoreRequest({ item: 'teachers', teacher })
+    setTab('more')
+    window.scrollTo(0, 0)
+  }, [])
+  const backToSchedule = useCallback(() => {
+    setMoreRequest(null)
+    setTab('schedule')
+    window.scrollTo(0, 0)
+  }, [])
+
+  // «+» у чипов групп: добавить в избранное и перегрузить расписание с ней
+  const [addingGroup, setAddingGroup] = useState(false)
+  const closeAdding = useCallback(() => setAddingGroup(false), [])
+  const addFavorite = (id: string) => {
+    setAddingGroup(false)
+    if (prefs.favorites.includes(id) || prefs.favorites.length >= MAX_FAVORITES) return
+    updatePrefs({ favorites: [...prefs.favorites, id] })
+    void onReload('schedule')
+  }
 
   return (
     <div className="app">
@@ -80,7 +110,10 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           mine={shownGroup === prefs.group ? prefs.subgroups : null}
           group={shownGroup}
           groups={schedule.groups}
+          home={home}
           onGroupChange={setViewGroup}
+          onAddGroup={() => (haptic(), setAddingGroup(true))}
+          onTeacher={shownGroup.startsWith('t-') ? undefined : openTeacher}
           cursor={cursor}
           onCursorChange={setCursor}
           notes={notes}
@@ -97,6 +130,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           extras={extras}
           starosta={status?.me?.starosta ?? null}
           onGroupExtras={onGroupExtras}
+          request={moreRequest}
+          onRequestBack={backToSchedule}
           onPrefsChange={(patch) => {
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)
@@ -115,6 +150,15 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           }}
           onChangeProfile={onChangeProfile}
           onShowIntro={onShowIntro}
+        />
+      )}
+
+      {addingGroup && (
+        <AddGroupSheet
+          exclude={schedule.groups}
+          full={prefs.favorites.length >= MAX_FAVORITES}
+          onPick={(g) => addFavorite(g.id)}
+          onClose={closeAdding}
         />
       )}
 

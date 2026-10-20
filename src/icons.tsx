@@ -182,3 +182,18 @@ export const EditIcon = (p: P) => (
     <path d="m13.5 6.5 4 4" />
   </svg>
 )
+
+// часы: таймер идущей пары
+export const ClockIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="13" r="7.5" />
+    <path d="M12 9.5V13l2.5 2M9.5 3h5" />
+  </svg>
+)
+
+// звёздочка «своя группа» (заливка)
+export const StarFillIcon = (p: P) => (
+  <svg {...base} fill="currentColor" stroke="none" {...p}>
+    <path d="m12 3.2 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.6l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8L12 3.2Z" />
+  </svg>
+)

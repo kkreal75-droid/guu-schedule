@@ -22,7 +22,30 @@ const cloudPrefs = fromCloud('prefs')
 const cloudIntro = fromCloud('intro')
 
 const root = createRoot(document.getElementById('root')!)
-root.render(<p className="boot">Загружаю расписание…</p>)
+
+// Пока грузится расписание — каркас главного экрана (скелетон), а не пустой экран с надписью
+function Skeleton() {
+  return (
+    <div className="app skeleton" aria-busy="true" aria-label="Загружаю расписание">
+      <div className="screen-head">
+        <span className="sk sk-title" />
+        <span className="sk-row">
+          <span className="sk sk-round" />
+          <span className="sk sk-round" />
+        </span>
+      </div>
+      <div className="sk-body">
+        <span className="sk sk-chips" />
+        <span className="sk sk-week" />
+        <span className="sk sk-days" />
+        <span className="sk sk-card" />
+        <span className="sk sk-card" />
+        <span className="sk sk-card" />
+      </div>
+    </div>
+  )
+}
+root.render(<Skeleton />)
 
 // Следы старой версии на этом устройстве: заметки, сохранённое расписание — значит, человек не новый
 const hasLocalTraces = () =>

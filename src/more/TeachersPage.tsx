@@ -28,13 +28,14 @@ const RULES = 'Оценивай преподавание, а не личност
 
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n)
 
-export function TeachersPage() {
+// initial — сразу открыть карточку (нажали преподавателя в паре); onClose — «Назад» из неё (на расписание)
+export function TeachersPage({ initial, onClose }: { initial?: TeacherInfo; onClose?: () => void } = {}) {
   const [list, setList] = useState<TeacherInfo[] | null>(null)
   const [rated, setRated] = useState<Map<string, Rated>>(new Map())
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('rating')
-  const [open, setOpen] = useState<TeacherInfo | null>(null)
+  const [open, setOpen] = useState<TeacherInfo | null>(initial ?? null)
 
   const loadRated = useCallback(() => {
     if (!botAvailable()) return
@@ -48,11 +49,12 @@ export function TeachersPage() {
   useEffect(load, [load])
 
   const close = useCallback(() => {
+    if (initial && onClose) return onClose()
     setOpen(null)
     loadRated() // мог оставить отзыв — обновим числа в списке
     window.scrollTo(0, 0)
-  }, [loadRated])
-  useBackButton(open ? close : null)
+  }, [loadRated, initial, onClose])
+  useBackButton(open && !(initial && onClose) ? close : null)
 
   const shown = useMemo(() => {
     if (!list) return []
@@ -67,7 +69,8 @@ export function TeachersPage() {
     )
   }, [list, query, rated, sort])
 
-  if (open) return <TeacherView teacher={open} onBack={close} />
+  // открыли из расписания — «Назад» в шапке страницы и так ведёт туда
+  if (open) return <TeacherView teacher={open} onBack={close} backLabel={initial && onClose ? null : 'Все преподаватели'} />
   if (error) {
     return (
       <div className="ob-hero">
@@ -134,7 +137,7 @@ export function TeachersPage() {
 
 // ---------- карточка преподавателя ----------
 
-function TeacherView({ teacher, onBack }: { teacher: TeacherInfo; onBack: () => void }) {
+function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onBack: () => void; backLabel: string | null }) {
   const [card, setCard] = useState<TeacherCard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'card' | 'form' | 'schedule'>('card')
@@ -151,11 +154,12 @@ function TeacherView({ teacher, onBack }: { teacher: TeacherInfo; onBack: () => 
   }, [])
   useBackButton(mode !== 'card' ? toCard : null)
 
-  const back = (
-    <button type="button" className="page-back admin-sub-back" onClick={mode === 'card' ? onBack : toCard}>
-      <ChevronLeft /> {mode === 'card' ? 'Все преподаватели' : teacher.name}
-    </button>
-  )
+  const back =
+    mode === 'card' && !backLabel ? null : (
+      <button type="button" className="page-back admin-sub-back" onClick={mode === 'card' ? onBack : toCard}>
+        <ChevronLeft /> {mode === 'card' ? backLabel : teacher.name}
+      </button>
+    )
 
   if (mode === 'schedule') {
     return (

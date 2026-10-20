@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { GroupChips } from '../components/GroupChips'
 import { LessonCard } from '../components/LessonCard'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
-import { GroupSwitch } from '../components/GroupSwitch'
-import {
-  WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, formatRange, pluralPairs, weekTitle,
-} from '../format'
-import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
+import { WeekCard } from '../components/WeekCard'
+import { WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, pluralPairs } from '../format'
+import { CalendarIcon, NoteIcon } from '../icons'
 import { dayLessons } from '../../shared/edits-core'
 import type { Extras } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
-import { getTimetable, moscowNow, toMinutes } from '../schedule'
+import { dayFromIso, getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
 import type { Timetable } from '../../shared/schedule-core'
 import { haptic } from '../telegram'
 
@@ -37,25 +36,30 @@ function useNow() {
   return now
 }
 
-const GAP_MIN = 60 // показываем «окно», если между парами час и больше
+const GAP_MIN = 60 // меньше часа между парами — «Перерыв», больше — «Окно»
 
 type Props = {
   extras: Extras // правки (владелец, старосты), подгруппы
   mine?: number[] | null // выбранные подгруппы: чужие пары подгрупп не показываем
   group: string
-  groups: string[] // своя группа и избранные — для переключателя
+  groups: string[] // своя группа и избранные — чипы над расписанием
+  home?: string // своя группа (★)
   onGroupChange: (group: string) => void
+  onAddGroup?: () => void // «+» у чипов — добавить группу в избранное
   cursor: Cursor
   onCursorChange: (cursor: Cursor) => void
   notes: Notes
   onSaveNote: (key: string, text: string) => void
-  // чужое расписание (группа из поиска, преподаватель): своё расписание, без заметок
+  onTeacher?: (name: string) => void // нажатие на преподавателя в паре
+  onRoom?: (room: string) => void // нажатие на аудиторию в паре
+  // чужое расписание (группа из поиска, преподаватель): своё расписание, без заметок и шапки
   tt?: Timetable
   readOnly?: boolean
 }
 
 export function ScheduleScreen({
-  extras, mine = null, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote, tt, readOnly,
+  extras, mine = null, group, groups, home, onGroupChange, onAddGroup, cursor, onCursorChange, notes, onSaveNote,
+  onTeacher, onRoom, tt, readOnly,
 }: Props) {
   const T = tt ?? getTimetable()
   const { dayOf, weekOf, weekdayOf, inSemester } = T
@@ -64,6 +68,7 @@ export function ScheduleScreen({
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
   const touch = useRef<{ x: number; y: number } | null>(null)
+  const datePicker = useRef<HTMLInputElement>(null)
 
   const { week, weekday } = cursor
   const day = dayOf(week, weekday)
@@ -87,10 +92,7 @@ export function ScheduleScreen({
     haptic()
     onCursorChange(next)
   }
-  const shiftDay = (delta: number) => {
-    const d = day + delta
-    go({ week: weekOf(d), weekday: weekdayOf(d) })
-  }
+  const goDay = (d: number) => go({ week: weekOf(d), weekday: weekdayOf(d) })
 
   const onTouchStart = (e: TouchEvent) => {
     const t = e.touches[0]
@@ -102,125 +104,137 @@ export function ScheduleScreen({
     const dx = t.clientX - touch.current.x
     const dy = t.clientY - touch.current.y
     touch.current = null
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftDay(dx < 0 ? 1 : -1)
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) goDay(day + (dx < 0 ? 1 : -1))
+  }
+
+  // «Календарь»: выбор даты системным календарём
+  const firstDay = dayOf(1, 0)
+  const lastDay = dayOf(MAX_WEEK, 6)
+  const openPicker = () => {
+    haptic()
+    const input = datePicker.current
+    if (!input) return
+    try {
+      input.showPicker()
+    } catch {
+      input.focus()
+      input.click()
+    }
   }
 
   const nowMinutes = isToday ? now.minutes : null
   const nextIndex =
-    nowMinutes === null
-      ? -1
-      : lessons.findIndex((l) => !l.cancel && !l.movedTo && toMinutes(l.start) > nowMinutes)
-
-  const dayHint = [
-    day === now.day + 1 ? 'Завтра' : day === now.day - 1 ? 'Вчера' : null,
-    lessons.length ? `${pluralPairs(lessons.length)} · ${lessons[0].start}–${lessons[lessons.length - 1].end}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+    nowMinutes === null ? -1 : lessons.findIndex((l) => !l.cancel && !l.movedTo && toMinutes(l.start) > nowMinutes)
 
   const dayKey = dayNoteKey(day)
   const dayNote = notes[dayKey]
-  const editDayNote = () =>
+  const editDayNote = () => {
+    haptic()
     setEditing({ key: dayKey, title: 'Заметка к дню', subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}` })
+  }
+
+  const summary = lessons.length ? `${pluralPairs(lessons.length)} · ${lessons[0].start}–${lessons[lessons.length - 1].end}` : null
+  const dayLabel = `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}`
 
   return (
-    <div className="screen">
-      <header className="top">
-        {!readOnly && <GroupSwitch value={group} groups={groups} onChange={onGroupChange} />}
-
-        <div className="weeknav">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Предыдущая неделя"
-            disabled={week <= 1}
-            onClick={() => go({ week: week - 1, weekday })}
-          >
-            <ChevronLeft />
-          </button>
-          <div className="weeknav-title">
-            <div className="weeknav-main">{weekTitle(week)}</div>
-            <div className="weeknav-sub">{formatRange(monday, monday + 6)}</div>
-          </div>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Следующая неделя"
-            disabled={week >= MAX_WEEK}
-            onClick={() => go({ week: week + 1, weekday })}
-          >
-            <ChevronRight />
-          </button>
-        </div>
-
-        <div className="days" role="tablist" aria-label="Дни недели">
-          {WEEKDAYS_SHORT.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              role="tab"
-              className="day"
-              aria-selected={i === weekday}
-              aria-label={`${WEEKDAYS_FULL[i]}, ${formatDate(monday + i)}`}
-              data-today={monday + i === now.day || undefined}
-              onClick={() => go({ week, weekday: i })}
-            >
-              <span className="day-wd">{label}</span>
-              <span className="day-num">{dateOf(monday + i).date}</span>
-              <span className="day-dots">
-                <span className="day-dot" data-on={busyDays[i] || undefined} />
-                {!readOnly && dayHasNotes(notes, monday + i, group) && <span className="day-dot day-dot-note" />}
-              </span>
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <main className="content" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div className="day-head">
-          <div>
-            <h2>
-              {WEEKDAYS_FULL[weekday]}, {formatDate(day)}
-            </h2>
-            {dayHint && <p className="day-hint">{dayHint}</p>}
-          </div>
-          {isToday ? (
-            <span className="pill">Сегодня</span>
-          ) : (
-            inSemester(todayWeek) && (
+    <div className="screen sched">
+      {!readOnly && (
+        <>
+          <header className="screen-head">
+            <h1 className="screen-title">Расписание</h1>
+            <div className="screen-actions">
               <button
                 type="button"
-                className="pill pill-btn"
-                onClick={() => go({ week: todayWeek, weekday: weekdayOf(now.day) })}
+                className="round-btn round-btn-note"
+                aria-label={dayNote ? 'Заметка к дню' : 'Добавить заметку к дню'}
+                data-has-note={dayNote ? true : undefined}
+                onClick={editDayNote}
               >
-                К сегодня
+                <NoteIcon />
               </button>
-            )
-          )}
-        </div>
+              <button type="button" className="round-btn" aria-label="Выбрать дату" onClick={openPicker}>
+                <CalendarIcon />
+              </button>
+              <input
+                ref={datePicker}
+                className="visually-hidden"
+                type="date"
+                tabIndex={-1}
+                aria-hidden="true"
+                min={isoFromDay(firstDay)}
+                max={isoFromDay(lastDay)}
+                value={isoFromDay(day)}
+                onChange={(e) => e.target.value && goDay(dayFromIso(e.target.value))}
+              />
+            </div>
+          </header>
+          <GroupChips value={group} groups={groups} home={home} onChange={onGroupChange} onAdd={onAddGroup} />
+        </>
+      )}
 
+      <WeekCard
+        week={week}
+        day={day}
+        monday={monday}
+        prevDisabled={week <= 1}
+        nextDisabled={week >= MAX_WEEK}
+        onPrev={() => go({ week: week - 1, weekday })}
+        onNext={() => go({ week: week + 1, weekday })}
+      />
+
+      <div className="day-strip" role="tablist" aria-label="Дни недели">
+        {WEEKDAYS_SHORT.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            role="tab"
+            className="day"
+            aria-selected={i === weekday}
+            aria-label={`${WEEKDAYS_FULL[i]}, ${formatDate(monday + i)}`}
+            data-today={monday + i === now.day || undefined}
+            onClick={() => go({ week, weekday: i })}
+          >
+            <span className="day-wd">{label}</span>
+            <span className="day-num">{dateOf(monday + i).date}</span>
+            <span className="day-dots">
+              <span className="day-dot" data-on={busyDays[i] || undefined} />
+              {!readOnly && dayHasNotes(notes, monday + i, group) && <span className="day-dot day-dot-note" />}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="day-sub">
+        <span className="day-sub-text">
+          {isToday ? 'Сегодня' : dayLabel}
+          {summary && ` · ${summary}`}
+        </span>
+        {!isToday && inSemester(todayWeek) && (
+          <button type="button" className="pill pill-btn" onClick={() => goDay(now.day)}>
+            Сегодня
+          </button>
+        )}
+      </div>
+
+      <main className="content" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div key={`${group}|${day}`} className={`day-list${direction ? ` slide-${direction}` : ''}`}>
           {view.notes.map((text, i) => (
             <div key={i} className="edit-note">
               📌 {text}
             </div>
           ))}
-          {readOnly ? null : dayNote ? (
+          {!readOnly && dayNote && (
             <button type="button" className="day-note" onClick={editDayNote}>
               <NoteIcon className="day-note-icon" />
               <span className="note-text">{dayNote}</span>
-            </button>
-          ) : (
-            <button type="button" className="note-add" onClick={editDayNote}>
-              <PlusIcon /> Заметка к дню
             </button>
           )}
 
           {lessons.length === 0 ? (
             <div className="empty">
-              <div className="empty-emoji">{weekday === 6 ? '🌿' : '☕️'}</div>
+              <div className="empty-emoji">{weekday === 6 ? '🌿' : '🎉'}</div>
               <div className="empty-title">{weekday === 6 ? 'Выходной' : 'Пар нет'}</div>
-              <div className="empty-text">В этот день занятий нет</div>
+              <div className="empty-text">{inSemester(week) ? 'В этот день занятий нет' : 'Этот день вне семестра'}</div>
             </div>
           ) : (
             lessons.map((lesson, i) => {
@@ -228,19 +242,30 @@ export function ScheduleScreen({
               const noteKey = lessonNoteKey(day, group, lesson)
               return (
                 <div key={`${lesson.start}|${lesson.subject}|${lesson.kind}`} className="day-item">
-                  {gap >= GAP_MIN && <div className="gap">Окно · {formatDuration(gap)}</div>}
+                  {gap > 0 && (
+                    <div className="gap" data-window={gap >= GAP_MIN || undefined}>
+                      {gap >= GAP_MIN ? 'Окно' : 'Перерыв'} {formatDuration(gap)}
+                    </div>
+                  )}
                   <LessonCard
                     lesson={lesson}
                     nowMinutes={nowMinutes}
                     isNext={i === nextIndex}
                     pair={lesson.pair ?? (lesson.added || lesson.movedFrom ? null : T.pairNumber(lesson))}
                     note={readOnly ? undefined : notes[noteKey]}
-                    onEditNote={readOnly ? undefined : () =>
-                      setEditing({
-                        key: noteKey,
-                        title: lesson.subject,
-                        subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
-                      })
+                    onTeacher={onTeacher}
+                    onRoom={onRoom}
+                    onEditNote={
+                      readOnly
+                        ? undefined
+                        : () => {
+                            haptic()
+                            setEditing({
+                              key: noteKey,
+                              title: lesson.subject,
+                              subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
+                            })
+                          }
                     }
                   />
                 </div>

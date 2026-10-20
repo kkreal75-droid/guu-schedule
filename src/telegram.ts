@@ -41,6 +41,12 @@ export function confirmAction(message: string): Promise<boolean> {
   return Promise.resolve(window.confirm(message))
 }
 
+// Короткое сообщение в стиле Telegram (вне Telegram — обычный alert)
+export function showAlert(message: string) {
+  if (supports('6.2')) tg!.showAlert(message)
+  else window.alert(message)
+}
+
 // Ссылки t.me открываем внутри Telegram (выбор беседы, бот и т. п.)
 export function openTelegramLink(url: string) {
   if (supports('6.1')) tg!.openTelegramLink(url)

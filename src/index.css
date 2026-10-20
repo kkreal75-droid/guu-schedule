@@ -193,38 +193,52 @@ p {
   font-weight: 600;
 }
 
-/* ---------- расписание: шапка ---------- */
+/* ---------- экран: крупный заголовок и круглые кнопки ---------- */
 
-.top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--bg);
-  padding: 12px 16px 8px;
-}
-
-.weeknav {
+.screen-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 4px;
 }
 
-.weeknav-title {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
+.screen-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
-.weeknav-main {
-  font-size: 16px;
-  font-weight: 600;
+.screen-actions {
+  position: relative;
+  display: flex;
+  gap: 10px;
 }
 
-.weeknav-sub {
-  margin-top: 1px;
-  font-size: 13px;
-  color: var(--hint);
+.screen-actions .round-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--accent-ink);
+}
+
+.round-btn-note[data-has-note] {
+  color: rgb(var(--note));
+}
+
+.visually-hidden {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .icon-btn {
@@ -249,11 +263,80 @@ p {
   cursor: default;
 }
 
-.days {
+/* ---------- главный экран: чипы групп, неделя, дни ---------- */
+
+.sched {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sched > .week-card,
+.sched > .day-strip {
+  margin: 0 16px;
+}
+
+.chips-bar {
+  display: flex;
+  padding: 0 16px;
+}
+
+.chips-scroll {
+  display: flex;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.chips-scroll .group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.chips-scroll .group-chip[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.group-chip-star {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.chips-scroll .group-chip-add {
+  padding: 0 12px;
+  color: var(--hint);
+}
+
+.group-chip-add svg {
+  width: 18px;
+  height: 18px;
+}
+
+.day-strip {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  margin-top: 12px;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .day {
@@ -261,38 +344,41 @@ p {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 6px 0 5px;
-  border-radius: 12px;
+  padding: 8px 0 6px;
+  border-radius: 16px;
   transition: background-color 0.15s;
 }
 
 .day-wd {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--hint);
 }
 
 .day-num {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .day-dots {
   display: flex;
   gap: 3px;
-  height: 4px;
-  margin-top: 2px;
+  height: 5px;
+  margin-top: 3px;
 }
 
 .day-dot {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
 }
 
 .day-dot[data-on] {
   background: var(--hint);
+  opacity: 0.6;
 }
 
 .day-dot.day-dot-note {
@@ -306,6 +392,7 @@ p {
 
 .day[aria-selected='true'] {
   background: var(--accent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .day[aria-selected='true'] .day-wd,
@@ -315,6 +402,7 @@ p {
 
 .day[aria-selected='true'] .day-dot[data-on] {
   background: var(--accent-text);
+  opacity: 0.8;
 }
 
 @media (hover: hover) {
@@ -324,32 +412,30 @@ p {
   }
 }
 
+.day-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0 20px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.day-sub-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* ---------- расписание: день ---------- */
 
 .content {
-  padding: 4px 16px 16px;
-  min-height: 60vh;
+  padding: 0 16px 16px;
+  min-height: 50vh;
   overflow-x: clip;
-}
-
-.day-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 8px 4px 12px;
-}
-
-.day-head h2 {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.day-hint {
-  margin-top: 2px;
-  font-size: 13px;
-  color: var(--hint);
 }
 
 .pill {
@@ -364,14 +450,15 @@ p {
 }
 
 .pill-btn {
-  background: var(--fill);
+  background: var(--surface);
+  box-shadow: var(--shadow);
   color: var(--accent-ink);
 }
 
 .day-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .slide-fwd {
@@ -403,11 +490,27 @@ p {
   }
 }
 
+/* между парами: «Перерыв 10 мин» / «Окно 1 ч 35 мин» */
 .gap {
-  padding: 2px 0 10px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 8px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--hint);
+}
+
+.gap::before,
+.gap::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--separator);
+}
+
+.gap[data-window] {
+  color: var(--accent-ink);
 }
 
 /* ---------- карточка пары ---------- */
@@ -416,9 +519,10 @@ p {
   --k: var(--k-other);
   position: relative;
   display: flex;
-  gap: 12px;
-  padding: 12px 14px 12px 14px;
-  border-radius: 16px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 14px 18px;
+  border-radius: 22px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -427,10 +531,10 @@ p {
   content: '';
   position: absolute;
   left: 0;
-  top: 14px;
-  bottom: 14px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
+  top: 18px;
+  bottom: 18px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
   background: rgb(var(--k));
 }
 
@@ -446,34 +550,38 @@ p {
   --k: var(--k-lab);
 }
 
-.lesson-time {
-  flex: none;
+.lesson-head {
   display: flex;
-  flex-direction: column;
-  width: 44px;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
   font-variant-numeric: tabular-nums;
 }
 
 .lesson-start {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .lesson-end {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--hint);
+}
+
+.lesson-pair {
+  margin-left: 4px;
   font-size: 13px;
   color: var(--hint);
 }
 
-.lesson-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.lesson-top {
+.lesson-tags {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .badge {
@@ -485,15 +593,10 @@ p {
   background: rgb(var(--k) / 0.13);
 }
 
-.lesson-pair {
-  font-size: 12px;
-  color: var(--hint);
-}
-
 .lesson-subject {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -501,56 +604,87 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 2px;
+  font-size: 14px;
   color: var(--hint);
 }
 
-.lesson-meta span {
+.lesson-meta > span,
+.lesson-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
+.lesson-link {
+  padding: 2px 0;
+  color: var(--accent-ink);
+  font-weight: 500;
+  text-align: left;
+}
+
 .lesson-meta svg {
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 .lesson.is-past {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .lesson.is-live {
-  box-shadow: inset 0 0 0 1.5px var(--accent), var(--shadow);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--accent), 0 8px 24px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-.lesson-status {
-  margin-top: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-ink);
-}
-
-.lesson-status.is-soon {
+.lesson-live {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-top: 8px;
-  font-weight: 500;
-  color: var(--hint);
+  padding-top: 10px;
+  border-top: 1px solid var(--separator);
 }
 
 .progress {
-  height: 4px;
-  margin-top: 6px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--fill);
   overflow: hidden;
 }
 
+.lesson-live .progress {
+  flex: 1;
+}
+
 .progress > div {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--accent);
+}
+
+.lesson-timer {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lesson-timer svg {
+  width: 17px;
+  height: 17px;
+}
+
+.lesson-soon {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
 }
 
 /* ---------- заметки ---------- */
@@ -602,7 +736,9 @@ p {
 }
 
 .lesson-note {
-  margin-top: 10px;
+  width: 100%;
+  margin-top: 6px;
+  text-align: left;
   padding: 8px 10px;
   border-radius: 10px;
   background: rgb(var(--note) / 0.13);
@@ -610,29 +746,20 @@ p {
   -webkit-line-clamp: 4;
 }
 
-.lesson {
-  cursor: pointer;
-  transition: transform 0.12s;
-}
-
-.lesson:active {
-  transform: scale(0.985);
-}
-
 .lesson-note-btn {
   display: grid;
+  flex: none;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  margin: -6px -8px -6px auto;
+  width: 34px;
+  height: 34px;
+  margin: -4px -6px -4px auto;
   border-radius: 50%;
   color: var(--hint);
-  opacity: 0.7;
 }
 
 .lesson-note-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
 }
 
 .lesson-note-btn[data-has-note] {
@@ -2351,29 +2478,7 @@ select.input {
   color: var(--hint);
 }
 
-/* ---------- над расписанием: своя группа и избранные ---------- */
-
-.group-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.group-chips {
-  display: flex;
-  gap: 6px;
-  margin: 0 -16px;
-  padding: 0 16px 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.group-chips::-webkit-scrollbar {
-  display: none;
-}
+/* ---------- чипы-переключатели (свободные аудитории и т. п.) ---------- */
 
 .group-chip {
   flex: none;
@@ -2482,12 +2587,6 @@ select.input {
 .chip[data-on] {
   background: rgb(var(--note) / 0.18);
   color: var(--text);
-}
-
-.more .top {
-  /* в «Ещё» шапка недели не липнет к самому верху — над ней заголовок страницы */
-  position: static;
-  padding: 12px 0 8px;
 }
 
 .rooms-note {
@@ -3011,4 +3110,101 @@ select.input {
 .ob-foot .button-secondary {
   min-height: 52px;
   border-radius: 16px;
+}
+
+.sheet-tall {
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.sheet-tall .gsearch {
+  margin-top: 12px;
+}
+
+.sheet-text {
+  margin: 14px 2px 8px;
+  font-size: 15px;
+  color: var(--hint);
+}
+
+/* ---------- скелетон при запуске ---------- */
+
+.skeleton .screen-head {
+  padding-top: 20px;
+}
+
+.sk-row {
+  display: flex;
+  gap: 10px;
+}
+
+.sk-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 16px;
+}
+
+.sk {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--fill), transparent);
+  transform: translateX(-100%);
+  animation: sk-shine 1.3s ease-in-out infinite;
+}
+
+@keyframes sk-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+  }
+}
+
+.sk-title {
+  width: 190px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--fill);
+  box-shadow: none;
+}
+
+.sk-round {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.sk-chips {
+  width: 230px;
+  height: 44px;
+  border-radius: 999px;
+}
+
+.sk-week {
+  height: 78px;
+  border-radius: 22px;
+}
+
+.sk-days {
+  height: 74px;
+  border-radius: 22px;
+}
+
+.sk-card {
+  height: 128px;
+  border-radius: 22px;
 }

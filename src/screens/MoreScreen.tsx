@@ -15,6 +15,7 @@ import { SessionPage } from '../more/SessionPage'
 import { StarostaPage } from '../more/StarostaPage'
 import { TeacherSchedulePage } from '../more/TeacherSchedulePage'
 import { TeachersPage } from '../more/TeachersPage'
+import type { TeacherInfo } from '../data'
 import type { Prefs } from '../prefs'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -43,9 +44,16 @@ type Props = {
   extras: Extras
   starosta: string | null // староста этой группы — «Правки группы»
   onGroupExtras: (group: string, extras: Extras) => void
+  // открыть пункт сразу (нажали преподавателя в паре): «Назад» вернёт на расписание
+  request?: MoreRequest | null
+  onRequestBack?: () => void
 }
 
-export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras }: Props) {
+export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo }
+
+export function MoreScreen({
+  admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras, request, onRequestBack,
+}: Props) {
   const items: Item[] = [
     ...(starosta
       ? [{ id: 'starosta', title: 'Правки группы', icon: EditIcon, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
@@ -58,7 +66,12 @@ export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, p
     },
     { id: 'teacher-schedule', title: 'Расписание преподавателя', icon: TeacherIcon, render: () => <TeacherSchedulePage /> },
     { id: 'rooms', title: 'Свободные аудитории', icon: DoorIcon, render: () => <FreeRoomsPage /> },
-    { id: 'teachers', title: 'Преподаватели', icon: StarIcon, render: () => <TeachersPage /> },
+    {
+      id: 'teachers',
+      title: 'Преподаватели',
+      icon: StarIcon,
+      render: () => <TeachersPage initial={request?.teacher} onClose={request ? onRequestBack : undefined} />,
+    },
     { id: 'board', title: 'Чат', icon: ChatIcon, render: () => <BoardPage />, dot: boardNew },
     ...(teacherMode
       ? []
@@ -68,11 +81,12 @@ export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, p
         ]),
     { id: 'groupbot', title: 'Бот в беседе группы', icon: GroupChatIcon, render: () => <GroupBotPage /> },
   ]
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(request?.item ?? null)
   const close = useCallback(() => {
+    if (request && onRequestBack) return onRequestBack()
     setOpenId(null)
     window.scrollTo(0, 0)
-  }, [])
+  }, [request, onRequestBack])
   // только у владельца: у остальных ни пункта, ни намёка (права всё равно проверяет бот)
   if (admin) items.push({ id: 'admin', title: 'Админ-панель', icon: ShieldIcon, render: () => <AdminPage onExit={close} />, bare: true })
   useBackButton(openId ? close : null)
@@ -84,7 +98,7 @@ export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, p
       <div className="screen more">
         <header className="page-head">
           <button type="button" className="page-back" onClick={close} aria-label="Назад">
-            <ChevronLeft /> Ещё
+            <ChevronLeft /> {request ? 'Расписание' : 'Ещё'}
           </button>
           <h2 className="page-title">{open.title}</h2>
         </header>
