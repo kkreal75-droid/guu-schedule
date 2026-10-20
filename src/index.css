@@ -2569,3 +2569,194 @@ select.input {
 .section-body .form .row-chips {
   justify-content: flex-start;
 }
+
+/* ---------- «Ещё → Преподаватели»: оценки и отзывы ---------- */
+
+.teacher-score {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.rating-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.rating-value {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-star,
+.review-stars,
+.star-btn.is-on {
+  color: rgb(var(--note));
+}
+
+.rating-few {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.rating-count {
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.rating-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rating-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-bar-label {
+  width: 30px;
+}
+
+.rating-bar-track {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--fill);
+}
+
+.rating-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: rgb(var(--note));
+}
+
+.rating-bar-count {
+  width: 24px;
+  text-align: right;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.review + .review {
+  border-top: 0.5px solid var(--separator);
+}
+
+.review.is-hidden {
+  opacity: 0.6;
+}
+
+.review-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.review-stars {
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.review-date,
+.review-discipline,
+.review-admin {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.review-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-report {
+  align-self: flex-start;
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.review-own-actions {
+  padding: 0 14px 12px;
+  justify-content: flex-start !important;
+}
+
+.review-rules {
+  margin: 12px 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+.review-reason,
+.review-contact {
+  margin: 0 4px 12px;
+}
+
+.review-contact .link-btn {
+  font-size: inherit;
+}
+
+.star-picker {
+  display: flex;
+  gap: 4px;
+}
+
+.star-btn {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--hint);
+  opacity: 0.35;
+}
+
+.star-btn.is-on {
+  opacity: 1;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.field .chip {
+  color: var(--text);
+  text-align: left;
+}

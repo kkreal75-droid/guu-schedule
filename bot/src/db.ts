@@ -26,6 +26,7 @@ export type UserRow = {
   starosta_of: string | null // староста этой группы (назначает владелец)
   subgroups: string | null // JSON: выбранные подгруппы
   board_origin: number // «Чат»: показывать у псевдонима курс и институт
+  review_banned_until: number | null // бан в отзывах о преподавателях
 }
 
 export type Access = 'free_forever' | 'standard'

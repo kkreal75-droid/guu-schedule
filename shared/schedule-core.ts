@@ -49,6 +49,7 @@ export type TeacherFile = {
   name: string
   semester_start: string
   lessons: (Omit<Lesson, 'group' | 'teacher' | 'teachers'> & { groups: string[]; group_names: string[] })[]
+  past_groups?: string[] // у каких групп вёл пары в прошлом семестре (отзывы о преподавателе)
 }
 
 export const teacherKey = (id: string) => `t-${id}` // «группа» в расписании преподавателя

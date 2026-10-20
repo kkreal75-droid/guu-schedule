@@ -9,6 +9,7 @@
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимный чат «Чат» (board.ts), жалобы и баны — board-moderation.ts.
+//   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
@@ -23,6 +24,7 @@ import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { sendAlerts } from './alerts'
 import { cleanupBoard, onBoardButton } from './board-moderation'
+import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
@@ -67,6 +69,7 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
       else if (query.data?.startsWith('bd:')) await onBoardButton(env, query)
+      else if (query.data?.startsWith('rv:')) await onReviewButton(env, query)
       else await answerCallback(env, query.id)
     })
   }
@@ -195,6 +198,12 @@ export default {
     if (board && request.method === 'POST' && isBoardAction(board[1])) {
       const action = board[1]
       return guarded(env, `Чат: ${action}`, () => handleBoardApi(env, request, action))
+    }
+
+    const reviews = url.pathname.match(/^\/reviews\/([a-z]+)$/)
+    if (reviews && request.method === 'POST' && isReviewAction(reviews[1])) {
+      const action = reviews[1]
+      return guarded(env, `Отзывы: ${action}`, () => handleReviewsApi(env, request, action))
     }
 
     if (url.pathname === '/' && request.method === 'GET') {

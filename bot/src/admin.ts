@@ -1,6 +1,7 @@
 // Админские команды бота про пользователей: /stats, /export, /ban, /unban, /bans.
 import { isOwner } from './auth'
 import { boardBanTerm } from './board-moderation'
+import { reviewBanTerm, reviewStats } from './reviews'
 import { mbName, normalizeGroup } from '../../shared/groups'
 import { allUsers, findUserByUsername, getUser, userLabel, type UserRow } from './db'
 import { sendMessage, tgForm } from './telegram'
@@ -11,7 +12,7 @@ const DAY_MS = 86_400_000
 // ---------- /stats ----------
 
 export async function sendStats(env: Env, chatId: number): Promise<void> {
-  const users = await allUsers(env.DB) // уже по убыванию последнего захода
+  const [users, reviews] = await Promise.all([allUsers(env.DB), reviewStats(env)]) // users — по убыванию последнего захода
   const now = Date.now()
   const count = (pred: (u: UserRow) => boolean) => users.filter(pred).length
   const totalOpens = users.reduce((sum, u) => sum + u.visits, 0)
@@ -23,7 +24,8 @@ export async function sendStats(env: Env, chatId: number): Promise<void> {
 📱 Открытий приложения: <b>${totalOpens}</b> (людей: <b>${count((u) => u.visits > 0)}</b>)
 ▶️ Нажимали /start: <b>${count((u) => u.starts > 0)}</b>
 🆕 Новых за 7 дней: <b>${count((u) => u.first_seen >= now - 7 * DAY_MS)}</b>
-🔥 Были за сутки: <b>${count((u) => u.last_seen >= now - DAY_MS)}</b>`
+🔥 Были за сутки: <b>${count((u) => u.last_seen >= now - DAY_MS)}</b>
+⭐ Отзывов о преподавателях: <b>${reviews.reviews}</b> (преподавателей с отзывами: <b>${reviews.teachers}</b>)`
   const footer = `\n\n<i>Данные с ${formatMsk(since)} МСК: раньше бот ничего не записывал. Открытия одного человека в течение 10 минут считаются за одно.</i>`
 
   // список «кто заходил»; Telegram не примет сообщение длиннее 4096 символов
@@ -126,13 +128,15 @@ export async function unbanCommand(env: Env, chatId: number, args: string): Prom
 }
 
 export async function listBans(env: Env, chatId: number): Promise<void> {
-  const [banned, boardBanned] = await env.DB.batch([
+  const [banned, boardBanned, reviewBanned] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM users WHERE banned = 1 ORDER BY banned_at DESC'),
     env.DB.prepare('SELECT * FROM users WHERE board_banned_until > ? ORDER BY board_banned_until DESC').bind(Date.now()),
+    env.DB.prepare('SELECT * FROM users WHERE review_banned_until > ? ORDER BY review_banned_until DESC').bind(Date.now()),
   ])
   const bans = banned.results as UserRow[]
   const boardBans = boardBanned.results as UserRow[]
-  if (!bans.length && !boardBans.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
+  const reviewBans = reviewBanned.results as UserRow[]
+  if (!bans.length && !boardBans.length && !reviewBans.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
   const parts: string[] = []
   if (bans.length) {
     const lines = bans.map(
@@ -144,6 +148,10 @@ export async function listBans(env: Env, chatId: number): Promise<void> {
   if (boardBans.length) {
     const lines = boardBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${boardBanTerm(u.board_banned_until!)}`)
     parts.push(`🔇 <b>Бан в чате (${boardBans.length})</b>\n\n${lines.join('\n')}`)
+  }
+  if (reviewBans.length) {
+    const lines = reviewBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${reviewBanTerm(u.review_banned_until!)}`)
+    parts.push(`⭐ <b>Бан в отзывах (${reviewBans.length})</b>\n\n${lines.join('\n')}`)
   }
   await sendMessage(env, chatId, parts.join('\n\n'))
 }

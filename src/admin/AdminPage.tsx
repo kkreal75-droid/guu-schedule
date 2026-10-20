@@ -1,18 +1,19 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { CalendarIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, UserIcon, ChatIcon } from '../icons'
+import { CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, StarIcon, UserIcon } from '../icons'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { adminApi, adminError } from './api'
 import { useFlash } from './common'
 import { Dashboard } from './Dashboard'
 import { Moderation } from './Moderation'
+import { ReviewsAdmin } from './ReviewsAdmin'
 import { ScheduleAdmin } from './ScheduleAdmin'
 import { SettingsAdmin } from './SettingsAdmin'
 import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
-type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'schedule' | 'settings'
+type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'settings'
 type Item = { id: SectionId; title: string; icon: ComponentType<SVGProps<SVGSVGElement>>; render: () => ReactNode }
 
 const ITEMS: Item[] = [
@@ -20,6 +21,7 @@ const ITEMS: Item[] = [
   { id: 'users', title: 'Пользователи', icon: UserIcon, render: () => <Users /> },
   { id: 'broadcast', title: 'Рассылка', icon: SendIcon, render: () => <BroadcastAdmin /> },
   { id: 'moderation', title: 'Модерация чата', icon: ChatIcon, render: () => <Moderation /> },
+  { id: 'reviews', title: 'Отзывы', icon: StarIcon, render: () => <ReviewsAdmin /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
   { id: 'settings', title: 'Настройки', icon: NoteIcon, render: () => <SettingsAdmin /> },
 ]

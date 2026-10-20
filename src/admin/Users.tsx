@@ -14,7 +14,12 @@ const isForever = (until: number) => until - Date.now() > 5 * 365 * 86_400_000
 
 function flags(u: AdminUser) {
   const now = Date.now()
-  return [u.banned ? '🚫' : '', u.board_banned_until && u.board_banned_until > now ? '🔇' : '', u.blocked_bot ? '⛔' : '']
+  return [
+    u.banned ? '🚫' : '',
+    u.board_banned_until && u.board_banned_until > now ? '🔇' : '',
+    u.review_banned_until && u.review_banned_until > now ? '⭐' : '',
+    u.blocked_bot ? '⛔' : '',
+  ]
     .filter(Boolean)
     .join(' ')
 }
@@ -80,7 +85,7 @@ export function Users() {
         ))}
       </div>
       <p className="section-footer">
-        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в чате · ⛔ заблокировал бота
+        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в чате · ⭐ бан в отзывах · ⛔ заблокировал бота
       </p>
     </div>
   )
@@ -120,6 +125,7 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
   const u = card.user
   const now = Date.now()
   const boardBanned = u.board_banned_until && u.board_banned_until > now ? u.board_banned_until : null
+  const reviewBanned = u.review_banned_until && u.review_banned_until > now ? u.review_banned_until : null
 
   const deleteMessage = async (messageId: number) => {
     if (!(await confirmAction('Удалить сообщение из чата?'))) return
@@ -273,6 +279,51 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
               </button>
             )}
           </div>
+        </Section>
+      )}
+
+      {!u.owner && (
+        <Section
+          title={`Отзывы о преподавателях (${card.reviews.filter((r) => !r.deleted).length})`}
+          footer="Забаненный в отзывах может читать, но не писать и не жаловаться. Удалять отзывы — «Админ-панель → Отзывы»."
+        >
+          <div className="row">
+            <span>Бан в отзывах</span>
+            <span className="row-value">{reviewBanned ? (isForever(reviewBanned) ? 'навсегда' : `до ${stamp(reviewBanned)}`) : 'нет'}</span>
+          </div>
+          <div className="row row-chips">
+            {[
+              { label: '7 дней', days: 7 },
+              { label: '30 дней', days: 30 },
+              { label: 'Навсегда', days: null },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                className="chip"
+                disabled={busy}
+                onClick={() => run(() => adminApi.reviewBan(id, o.days), 'Бан в отзывах выдан')}
+              >
+                {o.label}
+              </button>
+            ))}
+            {reviewBanned && (
+              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.reviewBan(id, 0), 'Бан в отзывах снят')}>
+                Снять
+              </button>
+            )}
+          </div>
+          {card.reviews.map((r) => (
+            <div key={r.id} className="row admin-msg">
+              <div className="admin-msg-body">
+                <div className="admin-msg-meta">
+                  {'★'.repeat(r.rating)} · {r.teacher_id} · {stamp(r.created_at)}
+                  {r.deleted ? ' · удалён' : r.hidden ? ' · скрыт' : ''}
+                </div>
+                <div className={`admin-msg-text${r.deleted ? ' is-deleted' : ''}`}>{r.text}</div>
+              </div>
+            </div>
+          ))}
         </Section>
       )}
 

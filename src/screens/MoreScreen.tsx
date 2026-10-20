@@ -5,7 +5,7 @@ import { BoardPage } from '../board/BoardPage'
 import type { Extras } from '../edits'
 import {
   ChevronLeft, ChevronRight, DoorIcon, EditIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon,
-  ShieldIcon, TeacherIcon, ChatIcon,
+  ShieldIcon, StarIcon, TeacherIcon, ChatIcon,
 } from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
 import { FreeRoomsPage } from '../more/FreeRoomsPage'
@@ -14,6 +14,7 @@ import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { SessionPage } from '../more/SessionPage'
 import { StarostaPage } from '../more/StarostaPage'
 import { TeacherSchedulePage } from '../more/TeacherSchedulePage'
+import { TeachersPage } from '../more/TeachersPage'
 import type { Prefs } from '../prefs'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -57,6 +58,7 @@ export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, p
     },
     { id: 'teacher-schedule', title: 'Расписание преподавателя', icon: TeacherIcon, render: () => <TeacherSchedulePage /> },
     { id: 'rooms', title: 'Свободные аудитории', icon: DoorIcon, render: () => <FreeRoomsPage /> },
+    { id: 'teachers', title: 'Преподаватели', icon: StarIcon, render: () => <TeachersPage /> },
     { id: 'board', title: 'Чат', icon: ChatIcon, render: () => <BoardPage />, dot: boardNew },
     ...(teacherMode
       ? []

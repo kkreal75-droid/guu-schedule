@@ -84,6 +84,15 @@ export async function loadGroupsIndex(env: Env): Promise<GroupsIndex> {
   return index
 }
 
+// Все преподаватели (data/teachers.json) — имена для админки «Отзывы»; кэш 10 минут
+let teachersCache: { at: number; index: { teachers: { id: string; name: string }[] } } | null = null
+export async function loadTeachersIndex(env: Env): Promise<{ teachers: { id: string; name: string }[] }> {
+  if (teachersCache && Date.now() - teachersCache.at < INDEX_TTL_MS) return teachersCache.index
+  const index = await fetchJson<{ teachers: { id: string; name: string }[] }>(env, 'data/teachers.json')
+  teachersCache = { at: Date.now(), index }
+  return index
+}
+
 // Чьё расписание показывать человеку: преподавателю — его, студенту — его группы
 export const personalKey = (user: { role?: string | null; teacher_id?: string | null; grp?: string | null } | null) =>
   user?.role === 'teacher' && user.teacher_id ? teacherKey(user.teacher_id) : normalizeGroup(user?.grp)

@@ -22,6 +22,7 @@ export type Dashboard = {
   chats: { total: number; g11: number; g12: number; digests: number }
   calendar: { total: number; active: number }
   board: { members: number; messages_day: number; messages_week: number; reports: number }
+  reviews: { reviews: number; teachers: number; week: number; reports: number }
 }
 
 export type AdminUser = {
@@ -38,6 +39,7 @@ export type AdminUser = {
   banned: number
   ban_reason: string | null
   board_banned_until: number | null
+  review_banned_until: number | null
   role: 'student' | 'teacher' | null
   teacher_id: string | null
   access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
@@ -66,6 +68,25 @@ export type UserCard = {
   board: { rules_accepted_at: number | null } | null
   messages: BoardMessageRow[]
   calendar: { grp: string; created_at: number; last_fetch_at: number | null; fetch_count: number } | null
+  reviews: { id: number; teacher_id: string; rating: number; text: string; discipline: string | null; created_at: number; deleted: number; hidden: number }[]
+}
+
+// отзыв о преподавателе в админке: с автором и открытыми жалобами
+export type ReviewRow = {
+  id: number
+  teacher_id: string
+  teacher_name: string
+  user_id: number
+  grp: string | null
+  rating: number
+  text: string
+  discipline: string | null
+  created_at: number
+  updated_at: number
+  hidden: number
+  name: string | null
+  username: string | null
+  reports: number
 }
 
 export type Audience = 'all' | '1-1' | '1-2' | AudienceFilter
@@ -111,6 +132,10 @@ export const adminApi = {
   ban: (id: number, reason: string) => callBot<UserCard>('/admin/ban', { id, reason }),
   unban: (id: number) => callBot<UserCard>('/admin/unban', { id }),
   boardBan: (id: number, days: number | null) => callBot<UserCard>('/admin/board-ban', { id, days }),
+  reviewBan: (id: number, days: number | null) => callBot<UserCard>('/admin/review-ban', { id, days }),
+  reviews: (reports: boolean, before?: number) =>
+    callBot<{ reviews: ReviewRow[]; has_more: boolean }>('/admin/reviews', { reports, before }),
+  reviewModerate: (id: number, action: 'del' | 'ban' | 'keep') => callBot<{ result: string }>('/admin/review-moderate', { id, action }),
   exportCsv: () => callBot('/admin/export'),
   broadcastInfo: () => callBot<{ counts: Record<'all' | '1-1' | '1-2', number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
   broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),

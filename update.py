@@ -22,6 +22,8 @@
   public/data/alerts.json               — тревоги для владельца (бот присылает их в личку)
   schedule.json                         — как раньше: только МБ(МП) 1-1 и 1-2 (для старых версий приложения)
   data/state.json, data/group_ids.json  — SHA файлов, число групп; реестр id групп (id не меняются)
+  data/teacher_history.json             — у каких групп вёл пары преподаватель: текущий и прошлый семестр
+                                          (отзыв о преподавателе — только если он ведёт / вёл у твоей группы)
 
 Защита: если в файле групп стало на 10% меньше, чем в прошлый раз, или у МБ(МП) 1-1/1-2 меньше
 MIN_LESSONS пар — файл не публикуем (остаются прошлые данные его групп), владельцу — тревога.
@@ -67,6 +69,7 @@ FILE_TYPES = (".xlsx", ".doc", ".docx")
 OUT = ROOT / "public" / "data"
 STATE_FILE = ROOT / "data" / "state.json"
 IDS_FILE = ROOT / "data" / "group_ids.json"
+HISTORY_FILE = ROOT / "data" / "teacher_history.json"
 DOC_CACHE = ROOT / "data" / "doc-cache"
 LEGACY_FILE = ROOT / "schedule.json"
 OVERRIDES_FILE = ROOT / "overrides.json"
@@ -704,6 +707,16 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                                        "group_name": e["name"], "pair": pair})
             if l.get("room"):
                 rooms[l["room"]].append((l["weekday"], l["start"], l["end"], weeks_mask(l["weeks"])))
+    # история по семестрам (ключ — начало семестра): кто у каких групп вёл пары. Хранятся текущий и прошлый;
+    # преподаватель только прошлого семестра остаётся в списке (без пар) — о нём тоже можно оставить отзыв
+    history = load_json(HISTORY_FILE, {})
+    current_key = SEMESTER_START.isoformat()
+    history[current_key] = {tid: {"name": rec["name"], "subjects": sorted(rec["subjects"]), "groups": sorted(rec["groups"])}
+                            for tid, rec in sorted(teachers.items())}
+    history = {k: history[k] for k in sorted(history)[-2:]}
+    past = next((history[k] for k in sorted(history, reverse=True) if k < current_key), {})
+    for tid, old in past.items():
+        teachers.setdefault(tid, {"id": tid, "name": old["name"], "subjects": set(old["subjects"]), "groups": set(), "lessons": []})
     index = []
     for tid, rec in sorted(teachers.items(), key=lambda kv: kv[1]["name"]):
         # одна и та же пара у потока из нескольких групп — одной строкой со списком групп
@@ -718,10 +731,14 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                 merged[key]["groups"] = [l["group"]]
                 merged[key]["group_names"] = [l["group_name"]]
         lessons = sorted(merged.values(), key=lambda l: (l["weekday"], l["start"]))
-        writer.write(OUT / "teachers" / f"{tid}.json",
-                     dump({"id": tid, "name": rec["name"], "semester_start": SEMESTER_START.isoformat(), "lessons": lessons}))
-        index.append({"id": tid, "name": rec["name"], "subjects": sorted(rec["subjects"]),
-                      "groups": sorted(rec["groups"]), "lessons": len(lessons)})
+        body = {"id": tid, "name": rec["name"], "semester_start": SEMESTER_START.isoformat(), "lessons": lessons}
+        item = {"id": tid, "name": rec["name"], "subjects": sorted(rec["subjects"]),
+                "groups": sorted(rec["groups"]), "lessons": len(lessons)}
+        past_groups = past.get(tid, {}).get("groups")
+        if past_groups:
+            body["past_groups"] = item["past_groups"] = past_groups
+        writer.write(OUT / "teachers" / f"{tid}.json", dump(body))
+        index.append(item)
     writer.prune(OUT / "teachers")
     writer.write(OUT / "teachers.json", dump(stable(OUT / "teachers.json", {"updated_at": now, "teachers": index})))
 
@@ -793,6 +810,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
     # служебное: реестр id, SHA файлов, кэш .docx только для текущих .doc
     IDS_FILE.parent.mkdir(parents=True, exist_ok=True)
     writer.write(IDS_FILE, dump_pretty(dict(sorted(registry.items()))))
+    writer.write(HISTORY_FILE, dump_pretty(history))
     writer.write(STATE_FILE, dump_pretty(new_state))
     live = {f["sha256"] for f in report["files"] if f.get("sha256")}
     if DOC_CACHE.exists():
