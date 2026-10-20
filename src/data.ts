@@ -18,7 +18,7 @@ async function fetchData<T>(path: string): Promise<T> {
 }
 
 // Список с кэшем: в памяти на время сессии + копия в localStorage, если сеть недоступна
-function cachedList<T>(path: string, key: string) {
+export function cachedList<T>(path: string, key: string) {
   let promise: Promise<T> | null = null
   return () =>
     (promise ??= fetchData<T>(path)

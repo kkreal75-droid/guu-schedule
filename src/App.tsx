@@ -86,11 +86,19 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     setTab('more')
     window.scrollTo(0, 0)
   }, [])
-  const backToSchedule = useCallback(() => {
-    setMoreRequest(null)
-    setTab('schedule')
+  // нажатие на аудиторию в паре — карточка корпуса в «Другое → Корпуса ГУУ»; из «Спорта» — место секции
+  const openPlace = useCallback((target: { room?: string; place?: string }, from?: 'sport') => {
+    haptic()
+    setMoreRequest({ item: 'places', ...target, from })
+    setTab('more')
     window.scrollTo(0, 0)
   }, [])
+  const openRoom = useCallback((room: string) => openPlace({ room }), [openPlace])
+  const backToSchedule = useCallback(() => {
+    setTab(moreRequest?.from === 'sport' ? 'sport' : 'schedule')
+    setMoreRequest(null)
+    window.scrollTo(0, 0)
+  }, [moreRequest])
 
   // «+» у чипов групп: добавить в избранное и перегрузить расписание с ней
   const [addingGroup, setAddingGroup] = useState(false)
@@ -115,13 +123,14 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           onGroupChange={setViewGroup}
           onAddGroup={() => (haptic(), setAddingGroup(true))}
           onTeacher={shownGroup.startsWith('t-') ? undefined : openTeacher}
+          onRoom={openRoom}
           cursor={cursor}
           onCursorChange={setCursor}
           notes={notes}
           onSaveNote={setNote}
         />
       ) : tab === 'sport' ? (
-        <SportScreen />
+        <SportScreen onPlace={(place) => openPlace({ place }, 'sport')} />
       ) : tab === 'more' ? (
         <MoreScreen
           admin={Boolean(status?.admin)}

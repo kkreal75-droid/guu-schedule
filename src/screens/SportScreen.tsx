@@ -5,6 +5,7 @@ import { Segmented } from '../components/Segmented'
 import { WeekCard } from '../components/WeekCard'
 import { WEEKDAYS_FULL, WEEKDAYS_SHORT } from '../format'
 import { ChevronLeft, ChevronRight, PersonIcon, PinIcon } from '../icons'
+import { guessPlace, loadPlaces } from '../places'
 import { getTimetable, moscowNow } from '../schedule'
 import { cachedSport, loadSport } from '../sport/api'
 import { haptic } from '../telegram'
@@ -43,7 +44,8 @@ function placeOf(section: SportSection, sessions: SportSession[]): string | null
 const teacherOf = (section: SportSection, sessions: SportSession[]) =>
   section.teacher ?? sessions.find((s) => s.section_id === section.id && s.teacher)?.teacher ?? null
 
-export function SportScreen() {
+// onPlace — нажали «Где»: карточка места в «Другое → Корпуса ГУУ»
+export function SportScreen({ onPlace }: { onPlace?: (place: string) => void }) {
   const [data, setData] = useState<SportData | null>(cachedSport)
   const [error, setError] = useState(false)
   const [mode, setMode] = useState<Mode>('time')
@@ -85,7 +87,8 @@ export function SportScreen() {
   }
 
   const section = open !== null ? sections.get(open) : null
-  if (section) return <SectionPage section={section} sessions={sessions.filter((s) => s.section_id === section.id)} onBack={close} />
+  if (section)
+    return <SectionPage section={section} sessions={sessions.filter((s) => s.section_id === section.id)} onBack={close} onPlace={onPlace} />
 
   const empty = !data?.sections.length
   return (
@@ -233,11 +236,19 @@ function TimeBlocks({
 }
 
 // Экран секции: кто ведёт, где, когда (по дням недели)
-function SectionPage({ section, sessions, onBack }: { section: SportSection; sessions: SportSession[]; onBack: () => void }) {
+type SectionProps = { section: SportSection; sessions: SportSession[]; onBack: () => void; onPlace?: (place: string) => void }
+
+function SectionPage({ section, sessions, onBack, onPlace }: SectionProps) {
   const T = getTimetable()
   const count = sessionsInSemester(sessions, T.maxWeek)
   const teacher = teacherOf(section, sessions)
   const place = placeOf(section, sessions)
+  // место на карте: выбранное в админке или угаданное по тексту
+  const [mapPlace, setMapPlace] = useState<string | null>(section.place_id)
+  useEffect(() => {
+    if (section.place_id || !place) return
+    loadPlaces().then((list) => setMapPlace(guessPlace(list, place)?.id ?? null), () => {})
+  }, [section.place_id, place])
   const byDay = WEEKDAYS_FULL.map((name, i) => ({ name, items: sessions.filter((s) => s.weekday === i) })).filter((d) => d.items.length)
   return (
     <div className="screen more">
@@ -259,12 +270,19 @@ function SectionPage({ section, sessions, onBack }: { section: SportSection; ses
               <span className="row-value">{teacher}</span>
             </div>
           )}
-          {place && (
-            <div className="row">
-              <span>Где</span>
-              <span className="row-value">{place}</span>
-            </div>
-          )}
+          {place &&
+            (mapPlace && onPlace ? (
+              <button type="button" className="row row-btn row-nav" onClick={() => onPlace(mapPlace)}>
+                <span>Где</span>
+                <span className="row-value">{place}</span>
+                <ChevronRight className="row-chevron" />
+              </button>
+            ) : (
+              <div className="row">
+                <span>Где</span>
+                <span className="row-value">{place}</span>
+              </div>
+            ))}
           {section.about && <p className="sport-about">{section.about}</p>}
         </div>
       )}

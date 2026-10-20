@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { normalizeWeeks, sectionEmoji, weeksProblem, type SportData, type SportSection, type SportSession } from '../../shared/sport-core'
 import { Section } from '../components/Section'
 import { WEEKDAYS_SHORT } from '../format'
 import { ChevronLeft, ChevronRight } from '../icons'
+import { guessPlace, loadPlaces, type Place } from '../places'
 import { confirmAction, haptic } from '../telegram'
 import { adminApi, adminError } from './api'
 import { Loading, useFlash, useLoad } from './common'
@@ -158,12 +159,16 @@ function SectionEditor({ section, sessions, onBack, onSaved, onDeleted }: Props)
     emoji: section?.emoji ?? '',
     teacher: section?.teacher ?? '',
     place: section?.place ?? '',
+    place_id: section?.place_id ?? '',
     about: section?.about ?? '',
     sort: String(section?.sort ?? 0),
   })
   const [busy, setBusy] = useState(false)
   const [flash, notice] = useFlash()
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
+  const [places, setPlaces] = useState<Place[]>([])
+  useEffect(() => void loadPlaces().then(setPlaces, () => {}), [])
+  const guessed = form.place_id ? null : guessPlace(places, form.place)
 
   const run = async (action: () => Promise<SportData>, done: (d: SportData) => void, ok: string) => {
     setBusy(true)
@@ -212,6 +217,17 @@ function SectionEditor({ section, sessions, onBack, onSaved, onDeleted }: Props)
           <label className="field">
             <span>Место</span>
             <input className="input" value={form.place} maxLength={80} onChange={(e) => set({ place: e.target.value })} placeholder="Спортивный комплекс, зал №2" />
+          </label>
+          <label className="field">
+            <span>Место на карте («Корпуса ГУУ»)</span>
+            <select className="input" value={form.place_id} onChange={(e) => set({ place_id: e.target.value })}>
+              <option value="">{guessed ? `По названию: ${guessed.name}` : 'Нет'}</option>
+              {places.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.icon} {p.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>О секции</span>

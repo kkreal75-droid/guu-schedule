@@ -24,7 +24,9 @@
 пары — по ней: у вечерних 18:50 — 1-я); `teachers.json` + `teachers/<id>.json`; `rooms.json` (аудитория →
 занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года;
 `parse_report.json` — что разобрано по файлам/листам и где парсер не уверен (и «Другое → Документы»);
-`kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `alerts.json` — тревоги,
+`kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `places.json` —
+места кампуса для «Корпусов ГУУ» (ведётся руками, update.py не трогает; `todo` — что не проверено) и `campus.json` —
+схема кампуса из OpenStreetMap (`scripts/campus_map.py`, запускать вручную); `alerts.json` — тревоги,
 бот присылает их владельцу (cron раз в 10 мин, отправленные — KV `alerts-sent`).
 
 **Группы.** id стабильный (`b1-mb-mp-1`: b — бакалавриат ОФО, z — ОЗФО, m — магистратура, a — аспирантура;
@@ -80,6 +82,7 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /cal/status|connect|disconnect`, `GET /cal/<токен>.ics`, `GET /cal/<токен>/apple` (страница webcal для iPhone);
 - `POST /board/<enter|accept|poll|send|react|report|delete|origin>` — анонимный чат (`origin` — подпись «курс, институт»);
 - `POST /reviews/<top|teacher|save|delete|report|vote>` — рейтинг преподавателей (`reviews.ts`);
+- `GET /places` — правки мест «Корпусов ГУУ» поверх `data/places.json` (`places.ts`, D1 `place_edits`), кэш 60 с;
 - `GET /sport` — секции и занятия «Спорта» (`sport.ts`, публично, кэш 60 с); правка — `/admin/sport-*`;
 - `POST /support {text}` — «Написать в поддержку»: владельцу в бот с кнопкой «Ответить» (`sp:reply:N`), ответ
   владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки);
@@ -89,9 +92,9 @@ LibreOffice ставится, только если изменился .doc (н�
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
   в :35 — чистка чата, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0014`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`, 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0015`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`, 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
-`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`. Группа (`users.grp` и т. п.) — id.
+`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
@@ -170,6 +173,12 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   Бан в отзывах — `users.review_banned_until`. Внизу карточки — «Напишите @ник владельца» (ник из D1).
   С 7.6: три критерия (понятность, компетентность, коммуникация) + «Рекомендую / Не рекомендую», общая — среднее
   (`score`, `rating` — округлённое); старые отзывы с одной оценкой остаются; «Полезно / не полезно» — `review_votes`.
+- «Корпуса ГУУ» («Другое → Информация», `src/more/PlacesPage.tsx`, `CampusMap.tsx`, `src/places.ts`): места —
+  `public/data/places.json` + правки владельца (D1 `place_edits`, «Админ-панель → Места», приложение накладывает
+  их само). Схема кампуса — своя SVG из `campus.json` (© OpenStreetMap — подпись на карте обязательна), без
+  чужих тайлов. Аудитория в паре → корпус по префиксу (`rooms` места: «ЛК» → ЛК-405, «Актовый зал» целиком);
+  «Спорт → Где» → `sport_sections.place_id` или угадывание по тексту. «Открыть в…»: Apple / Google / Яндекс /
+  2ГИС через `openLink` (на iOS первой — Apple). Тексты «Как пройти» — черновики, правит владелец.
 - Беседы-форумы: ответ в ту же тему (`message_thread_id`, если `is_topic_message`; General — без темы);
   тема рассылки — из `/setup` или `/here`; тема удалена/закрыта — в General не писать, владельцу ошибку.
 - Telegram открывает из приложения только http(s): `webcal://` — через `/cal/<токен>/apple`.

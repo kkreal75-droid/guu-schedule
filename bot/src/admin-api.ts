@@ -6,6 +6,7 @@ import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-m
 import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
 import { moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
+import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { loadSport, sportImport, sportSectionDelete, sportSectionSave, sportSessionDelete, sportSessionSave } from './sport'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
@@ -530,6 +531,9 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   'sport-session-save': ({ env, req }) => sportSessionSave(env, req.body as Record<string, unknown>),
   'sport-session-delete': ({ env, req }) => sportSessionDelete(env, req.body as Record<string, unknown>),
   'sport-import': ({ env, req }) => sportImport(env, req.body as Record<string, unknown>),
+  places: async ({ env }) => json({ ok: true, edits: await loadPlaceEdits(env) }),
+  'place-save': ({ env, req }) => placeSave(env, req.body as Record<string, unknown>),
+  'place-reset': ({ env, req }) => placeReset(env, req.body as Record<string, unknown>),
   access,
   starosta,
   export: exportCsv,

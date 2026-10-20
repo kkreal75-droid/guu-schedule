@@ -4120,3 +4120,337 @@ select.input {
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+
+/* ---------- «Корпуса ГУУ» (этап 7.7): места, схема кампуса ---------- */
+
+:root {
+  /* схема рисуется из цветов темы (и темы Telegram): фон чуть темнее карточки, корпуса ГУУ — в акцент */
+  --map-bg: #eceef1;
+  --map-bg: color-mix(in srgb, var(--text) 6%, var(--surface));
+  --map-campus: #e2ebe0;
+  --map-campus: color-mix(in srgb, rgb(56 160 96) 10%, var(--map-bg));
+  --map-green: #cfe5c9;
+  --map-green: color-mix(in srgb, rgb(56 160 96) 24%, var(--surface));
+  --map-road: #ffffff;
+  --map-road: var(--surface);
+  --map-path: #fbfbfc;
+  --map-path: color-mix(in srgb, var(--surface) 80%, var(--map-bg));
+  --map-rail: #a3a8b2;
+  --map-building: #d5d8de;
+  --map-building: color-mix(in srgb, var(--text) 15%, var(--surface));
+  --map-uni: #c5d4ee;
+  --map-uni: color-mix(in srgb, var(--accent) 24%, var(--surface));
+  --map-pin: var(--destructive);
+}
+
+:root[data-theme='dark'] {
+  --map-bg: #1f2228;
+  --map-bg: color-mix(in srgb, var(--text) 5%, var(--surface));
+  --map-road: #393e48;
+  --map-road: color-mix(in srgb, var(--text) 16%, var(--surface));
+  --map-path: #30343c;
+  --map-path: color-mix(in srgb, var(--text) 11%, var(--surface));
+  --map-rail: #5c626e;
+  --map-building: #343842;
+  --map-building: color-mix(in srgb, var(--text) 17%, var(--surface));
+  --map-uni: #2f4266;
+  --map-uni: color-mix(in srgb, var(--accent) 34%, var(--surface));
+  --map-green: #24392b;
+  --map-green: color-mix(in srgb, rgb(60 200 122) 16%, var(--surface));
+  --map-campus: #222a25;
+  --map-campus: color-mix(in srgb, rgb(60 200 122) 5%, var(--map-bg));
+}
+
+.places-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.places-room {
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.places-overview {
+  padding: 8px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.places-overview-hint {
+  margin: 0;
+  padding: 8px 8px 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+.places-group .other-row + .other-row::after,
+.place-card + .place-card .other-row::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 70px;
+  right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+
+.place-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.place-chevron {
+  transition: transform 0.2s ease;
+}
+
+.place-card[data-open] .place-chevron {
+  transform: rotate(90deg);
+}
+
+.place-card {
+  scroll-margin-top: 12px;
+}
+
+.place-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 10px 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--bg);
+  animation: place-open 0.2s ease;
+}
+
+@keyframes place-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.place-room-line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.place-howto h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.place-howto ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.place-howto li + li {
+  margin-top: 3px;
+}
+
+.place-howto li::marker {
+  color: var(--hint);
+}
+
+.place-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+.place-address svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.place-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+.place-open {
+  border-radius: 14px;
+}
+
+.place-apps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.place-app {
+  min-height: 40px;
+  padding: 6px 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.place-app:active,
+.cm-credit:active {
+  opacity: 0.7;
+}
+
+.places-footer {
+  margin: 2px 12px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--hint);
+}
+
+.campus-map {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--map-bg);
+}
+
+.campus-map svg {
+  display: block;
+  width: 100%;
+}
+
+.campus-map-full svg {
+  aspect-ratio: 11 / 10;
+}
+
+.campus-map-focus svg {
+  aspect-ratio: 16 / 10;
+}
+
+.cm-bg {
+  fill: var(--map-bg);
+}
+
+.cm-campus {
+  fill: var(--map-campus);
+}
+
+.cm-green {
+  fill: var(--map-green);
+}
+
+.cm-road,
+.cm-path,
+.cm-rail {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cm-road {
+  stroke: var(--map-road);
+}
+
+.cm-path {
+  stroke: var(--map-path);
+  stroke-width: 1.4px;
+}
+
+.cm-rail {
+  stroke: var(--map-rail);
+  stroke-width: 1.6px;
+  stroke-dasharray: 6 4;
+}
+
+.cm-building {
+  fill: var(--map-building);
+  stroke: var(--map-bg);
+  stroke-width: 0.6px;
+}
+
+.cm-uni {
+  fill: var(--map-uni);
+}
+
+.cm-focus {
+  fill: var(--accent);
+  fill-opacity: 0.85;
+}
+
+.cm-tap {
+  cursor: pointer;
+}
+
+.cm-tap:active {
+  fill-opacity: 0.7;
+}
+
+.cm-label {
+  fill: var(--text);
+  stroke: var(--map-bg);
+  paint-order: stroke;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
+}
+
+.cm-label-focus {
+  fill: var(--accent-text);
+  stroke: var(--accent);
+}
+
+.cm-emoji {
+  fill: var(--destructive);
+  font-weight: 800;
+}
+
+.cm-pin path {
+  fill: var(--map-pin);
+  stroke: #fff;
+  stroke-width: 1.6;
+}
+
+.cm-pin circle {
+  fill: #fff;
+}
+
+.cm-credit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 2px 7px;
+  border-top-left-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--hint);
+  font-size: 10px;
+}
+
+/* админка → «Места» */
+.form-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.badge-todo {
+  margin-left: 6px;
+  font-size: 11px;
+  vertical-align: 1px;
+}

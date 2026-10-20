@@ -1,6 +1,6 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, DumbbellIcon, MoreIcon, NoteIcon, SendIcon, StarIcon, UserIcon } from '../icons'
+import { BuildingIcon, CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, DumbbellIcon, MoreIcon, NoteIcon, SendIcon, StarIcon, UserIcon } from '../icons'
 import { resetIntro } from '../intro'
 import { confirmAction, haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -9,13 +9,14 @@ import { useFlash } from './common'
 import { Dashboard } from './Dashboard'
 import { Moderation } from './Moderation'
 import { ReviewsAdmin } from './ReviewsAdmin'
+import { PlacesAdmin } from './PlacesAdmin'
 import { SportAdmin } from './SportAdmin'
 import { ScheduleAdmin } from './ScheduleAdmin'
 import { SettingsAdmin } from './SettingsAdmin'
 import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
-type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'sport' | 'settings'
+type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'sport' | 'places' | 'settings'
 type Item = { id: SectionId; title: string; icon: ComponentType<SVGProps<SVGSVGElement>>; render: () => ReactNode }
 
 const ITEMS: Item[] = [
@@ -26,6 +27,7 @@ const ITEMS: Item[] = [
   { id: 'reviews', title: 'Отзывы', icon: StarIcon, render: () => <ReviewsAdmin /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
   { id: 'sport', title: 'Спорт', icon: DumbbellIcon, render: () => <SportAdmin /> },
+  { id: 'places', title: 'Места', icon: BuildingIcon, render: () => <PlacesAdmin /> },
   { id: 'settings', title: 'Настройки', icon: NoteIcon, render: () => <SettingsAdmin /> },
 ]
 

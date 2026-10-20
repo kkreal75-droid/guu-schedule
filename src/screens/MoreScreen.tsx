@@ -4,7 +4,7 @@ import { BoardPage } from '../board/BoardPage'
 import type { TeacherInfo } from '../data'
 import type { Extras } from '../edits'
 import {
-  ChatIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GroupChatIcon,
+  BuildingIcon, ChatIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GroupChatIcon,
   MegaphoneIcon, MessageIcon, PeopleIcon, PhoneCalendarIcon, PlanIcon, QuestionIcon, ShieldIcon, StarIcon, TableIcon,
   TeacherIcon,
 } from '../icons'
@@ -16,6 +16,7 @@ import { GroupBotPage } from '../more/GroupBotPage'
 import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { InstallPage } from '../more/InstallPage'
 import { KugPage } from '../more/KugPage'
+import { PlacesPage, type PlacesTarget } from '../more/PlacesPage'
 import { SessionPage } from '../more/SessionPage'
 import { StarostaPage } from '../more/StarostaPage'
 import { SupportPage } from '../more/SupportPage'
@@ -62,7 +63,8 @@ type Props = {
   onRequestBack?: () => void
 }
 
-export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo }
+// откуда пришли: «Назад» ведёт на расписание (pair) или в «Спорт» (sport)
+export type MoreRequest = ({ item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget)) & { from?: 'sport' }
 
 export function MoreScreen({
   admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,
@@ -108,7 +110,13 @@ export function MoreScreen({
           sub: 'Отзывы и оценки',
           icon: StarIcon,
           color: 'yellow',
-          render: () => <TeachersPage initial={request?.teacher} onClose={request ? onRequestBack : undefined} group={teacherMode ? undefined : group} />,
+          render: () => (
+            <TeachersPage
+              initial={request?.item === 'teachers' ? request.teacher : undefined}
+              onClose={request ? onRequestBack : undefined}
+              group={teacherMode ? undefined : group}
+            />
+          ),
         },
         { id: 'board', title: 'Подслушано', sub: 'Анонимный чат ГУУ', icon: ChatIcon, color: 'pink', render: () => <BoardPage />, dot: boardNew },
         { id: 'groupbot', title: 'Бот в беседе группы', sub: 'Расписание в чат каждое утро', icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
@@ -117,6 +125,14 @@ export function MoreScreen({
     {
       title: 'Информация',
       items: [
+        {
+          id: 'places',
+          title: 'Корпуса ГУУ',
+          sub: 'Адреса и карта',
+          icon: BuildingIcon,
+          color: 'green',
+          render: () => <PlacesPage target={request?.item === 'places' ? request : undefined} />,
+        },
         { id: 'faq', title: 'Частые вопросы', icon: QuestionIcon, color: 'blue', render: () => <FaqPage /> },
         { id: 'install', title: 'Установить приложение', sub: 'На домашний экран', icon: DownloadIcon, color: 'sky', render: () => <InstallPage /> },
       ],
@@ -150,7 +166,7 @@ export function MoreScreen({
       <div className="screen more">
         <header className="page-head">
           <button type="button" className="page-back" onClick={close} aria-label="Назад">
-            <ChevronLeft /> {request ? 'Расписание' : 'Другое'}
+            <ChevronLeft /> {request ? (request.from === 'sport' ? 'Спорт' : 'Расписание') : 'Другое'}
           </button>
           <h2 className="page-title">{open.title}</h2>
         </header>

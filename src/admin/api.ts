@@ -2,6 +2,7 @@
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot } from '../api'
 import type { SportData, SportSection, SportSession } from '../../shared/sport-core'
+import type { PlaceEdit } from '../places'
 import type { ScheduleEdit } from '../../shared/edits-core'
 
 export type Dashboard = {
@@ -144,6 +145,9 @@ export const adminApi = {
   sportSessionSave: (session: Partial<SportSession>) => callBot<SportData>('/admin/sport-session-save', session),
   sportSessionDelete: (id: number) => callBot<SportData>('/admin/sport-session-delete', { id }),
   sportImport: (rows: object[]) => callBot<SportData & { imported: number }>('/admin/sport-import', { rows }),
+  places: () => callBot<{ edits: PlaceEdit[] }>('/admin/places'),
+  placeSave: (id: string | null, place: object) => callBot<{ id: string; edits: PlaceEdit[] }>('/admin/place-save', { id, place }),
+  placeReset: (id: string) => callBot<{ edits: PlaceEdit[] }>('/admin/place-reset', { id }),
   exportCsv: () => callBot('/admin/export'),
   broadcastInfo: () => callBot<{ counts: Record<'all' | '1-1' | '1-2', number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
   broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),
