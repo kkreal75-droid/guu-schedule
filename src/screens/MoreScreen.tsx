@@ -84,7 +84,7 @@ export function MoreScreen({
         ...(teacherMode
           ? []
           : [{ id: 'session', title: 'Расписание сессии', sub: 'Экзамены и зачёты', icon: ExamIcon, color: 'red' as Color, render: () => <SessionPage group={group} /> }]),
-        { id: 'kug', title: 'Календарный учебный график', sub: 'Учебный план семестра', icon: PlanIcon, color: 'orange', render: () => <KugPage group={group} /> },
+        { id: 'kug', title: 'Календарный учебный график', sub: 'Сессии, каникулы, праздники', icon: PlanIcon, color: 'orange', render: () => <KugPage group={group} /> },
         { id: 'teacher-schedule', title: 'Расписание преподавателя', sub: 'Поиск по фамилии', icon: TeacherIcon, color: 'purple', render: () => <TeacherSchedulePage /> },
         {
           id: 'group-schedule',

@@ -1,6 +1,7 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot } from '../api'
+import type { CalendarEdit, PeriodDraft } from '../../shared/calendar-core'
 import type { PlaceEdit } from '../places'
 import type { ScheduleEdit } from '../../shared/edits-core'
 
@@ -139,6 +140,10 @@ export const adminApi = {
     callBot<{ reviews: ReviewRow[]; has_more: boolean }>('/admin/reviews', { reports, before }),
   reviewModerate: (id: number, action: 'del' | 'ban' | 'keep') => callBot<{ result: string }>('/admin/review-moderate', { id, action }),
   places: () => callBot<{ edits: PlaceEdit[] }>('/admin/places'),
+  academic: () => callBot<{ edits: CalendarEdit[] }>('/admin/academic'),
+  academicSave: (scope: string, periods: PeriodDraft[], doc: boolean) =>
+    callBot<{ edits: CalendarEdit[] }>('/admin/academic-save', { scope, periods, doc }),
+  academicReset: (scope: string) => callBot<{ edits: CalendarEdit[] }>('/admin/academic-reset', { scope }),
   placeSave: (id: string | null, place: object) => callBot<{ id: string; edits: PlaceEdit[] }>('/admin/place-save', { id, place }),
   placeReset: (id: string) => callBot<{ edits: PlaceEdit[] }>('/admin/place-reset', { id }),
   exportCsv: () => callBot('/admin/export'),

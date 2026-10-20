@@ -1,6 +1,7 @@
 // Расписание в боте: те же файлы групп data/schedule/<id>.json, overrides.json и overrides/*.json,
 // что у мини-приложения (берём с сайта), и та же логика недель — shared/schedule-core.ts.
 // Плюс ручные правки из админ-панели (edits.ts).
+import type { ComputedCalendar } from '../../shared/calendar-core'
 import { WEEKDAYS_FULL, formatDate, weekTitle } from '../../shared/format-core'
 import { MB_IDS, normalizeGroup, type GroupsIndex } from '../../shared/groups'
 import {
@@ -82,6 +83,20 @@ export async function loadGroupsIndex(env: Env): Promise<GroupsIndex> {
   const index = await fetchJson<GroupsIndex>(env, 'data/groups.json')
   indexCache = { at: Date.now(), index }
   return index
+}
+
+// Первая и последняя пара курса (data/calendar.json, update.py) — учебный график; кэш 10 минут, нет файла — null
+let calendarCache: { at: number; data: ComputedCalendar | null } | null = null
+export async function loadComputedCalendar(env: Env): Promise<ComputedCalendar | null> {
+  if (calendarCache && Date.now() - calendarCache.at < INDEX_TTL_MS) return calendarCache.data
+  let data: ComputedCalendar | null = null
+  try {
+    data = await fetchJson<ComputedCalendar>(env, 'data/calendar.json')
+  } catch (err) {
+    if (!(err instanceof NotFound)) throw err
+  }
+  calendarCache = { at: Date.now(), data }
+  return data
 }
 
 // Все преподаватели (data/teachers.json) — имена для админки «Отзывы»; кэш 10 минут

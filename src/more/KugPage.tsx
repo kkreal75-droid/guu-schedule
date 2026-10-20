@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { groupCalendar, type GroupCalendar } from '../academic'
 import { LEVEL_TITLES, type GroupInfo, type Level } from '../../shared/groups'
 import { isEvenWeek } from '../../shared/format-core'
 import { Section } from '../components/Section'
@@ -7,9 +8,11 @@ import { formatShortRange } from '../format'
 import { ChevronRight, ExternalIcon } from '../icons'
 import { dataUrl, getTimetable, moscowNow } from '../schedule'
 import { openLink } from '../telegram'
+import { AcademicCalendar } from './AcademicCalendar'
 
-// «Другое → Календарный учебный график»: недели семестра (номер, даты, чётность) по расписанию ГУУ и
-// официальные графики программ — PDF со страницы «Сведения → Образование» (kug.json, собирает update.py)
+// «Другое → Календарный учебный график»: учебный год визуально (AcademicCalendar — учёба, сессии, каникулы,
+// практика, праздники; данные — src/academic.ts), недели семестра по расписанию ГУУ и официальные графики
+// программ — PDF со страницы «Сведения → Образование» (kug.json, собирает update.py)
 
 type Kug = { level: Level | null; code: string | null; title: string; form: string | null; url: string }
 
@@ -42,8 +45,10 @@ export function KugPage({ group }: { group: string }) {
   const [error, setError] = useState(false)
   const [mine, setMine] = useState<GroupInfo | null>(null)
   const [query, setQuery] = useState('')
+  const [calendar, setCalendar] = useState<GroupCalendar | null>(null)
 
   useEffect(() => {
+    groupCalendar(group).then(setCalendar, () => setCalendar(null))
     fetch(dataUrl('kug.json'), { cache: 'no-store' })
       .then((r) => (r.ok ? (r.json() as Promise<{ programs: Kug[] }>) : Promise.reject(new Error(String(r.status)))))
       .then((d) => setKug(d.programs), () => setError(true))
@@ -75,6 +80,16 @@ export function KugPage({ group }: { group: string }) {
 
   return (
     <>
+      {calendar ? (
+        <AcademicCalendar
+          periods={calendar.periods}
+          typical={calendar.typical}
+          title={calendar.info ? `${calendar.info.name} · ${calendar.info.course} курс` : 'типовой график'}
+        />
+      ) : (
+        <p className="lead">Загружаю график…</p>
+      )}
+
       <Section
         title="Семестр по расписанию ГУУ"
         footer="Номера недель и чётность — как в файлах расписания. Сессия и каникулы — в графике своей программы ниже."

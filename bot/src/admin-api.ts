@@ -6,6 +6,7 @@ import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-m
 import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
 import { moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
+import { academicReset, academicSave, loadCalendarEdits } from './academic'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
@@ -525,6 +526,9 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   'review-ban': reviewBan,
   'reset-intro': resetIntro,
   places: async ({ env }) => json({ ok: true, edits: await loadPlaceEdits(env) }),
+  academic: async ({ env }) => json({ ok: true, edits: await loadCalendarEdits(env) }),
+  'academic-save': ({ env, req }) => academicSave(env, req.body as Record<string, unknown>),
+  'academic-reset': ({ env, req }) => academicReset(env, req.body as Record<string, unknown>),
   'place-save': ({ env, req }) => placeSave(env, req.body as Record<string, unknown>),
   'place-reset': ({ env, req }) => placeReset(env, req.body as Record<string, unknown>),
   access,

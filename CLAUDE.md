@@ -25,6 +25,7 @@
 занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года (все даты не
 раньше начала семестра; прошлогодние файлы guu.ru — архив, по совпадению имени их группам НЕ показывать);
 `session_status.json` — что на странице сессии guu.ru («весенняя сессия прошлого года»), у каких групп сессия;
+`calendar.json` — первая и последняя пара каждого курса (учебный график, см. ниже);
 `parse_report.json` — что разобрано по файлам/листам и где парсер не уверен (и «Другое → Документы»);
 `kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `places.json` —
 места кампуса для «Корпусов ГУУ» (ведётся руками, update.py не трогает; `todo` — что не проверено) и `campus.json` —
@@ -87,6 +88,7 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /board/<enter|accept|poll|send|react|report|delete|origin>` — анонимный чат (`origin` — подпись «курс, институт»);
 - `POST /reviews/<top|teacher|save|delete|report|vote>` — рейтинг преподавателей (`reviews.ts`);
 - `GET /places` — правки мест «Корпусов ГУУ» поверх `data/places.json` (`places.ts`, D1 `place_edits`), кэш 60 с;
+- `GET /academic` — правки учебного графика (`academic.ts`, D1 `calendar_edits`), кэш 60 с;
 - `POST /support {text}` — «Написать в поддержку»: владельцу в бот с кнопкой «Ответить» (`sp:reply:N`), ответ
   владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки);
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
@@ -97,9 +99,9 @@ LibreOffice ставится, только если изменился .doc (н�
   `session-notified`, кнопка мини-приложения `?open=session`), в :35 — чистка чата, остаток лимита — досылка
   рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0016`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0017`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
-`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`. Группа (`users.grp` и т. п.) — id.
+`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
@@ -184,6 +186,16 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   чужих тайлов. Аудитория в паре → корпус по префиксу (`rooms` места: «ЛК» → ЛК-405, «Актовый зал» целиком);
   места спорта (СК, бассейн, стадион) — группа «Спорт» в списке. «Открыть в…»: Apple / Google / Яндекс /
   2ГИС через `openLink` (на iOS первой — Apple). Тексты «Как пройти» — черновики, правит владелец.
+- Календарный учебный график (этап 8.3, `shared/calendar-core.ts` — одна логика для приложения и бота): официальные
+  КУГ ГУУ — PDF на программу, надёжно не разбираются (одна сетка без курса / четыре курса на шаблонном году), поэтому:
+  учёба осени — по файлам расписания (`calendar.json`, «по расписанию (уточняется)»), опубликованная сессия группы —
+  «по документу ГУУ», остальное — типовой график 2026/27 по уровню/форме/курсу (даты из официального КУГ ГУУ на
+  2026/27: зимняя сессия 9–29.01, каникулы 30.01–7.02…, «по типовому графику (уточняется)»); правки владельца —
+  «Админ-панель → Учебный график» (курс или программа, «Сверено с документом ГУУ»). Праздники РФ 2026/27 — `HOLIDAYS`
+  (ТК ст. 112, постановления № 1466 и № 1187), их не правят. Экран — «Другое → Календарный учебный график»
+  (`AcademicCalendar.tsx`: «Сейчас», полоса года, сетка месяцев, нажатие на день), блок «Когда сессия по учебному
+  графику» в сессии; бот в первый день каникул пишет в беседу «🎉 Каникулы! Пар нет до ДД.ММ». Новый учебный год —
+  обновить `YEAR`, шаблон и `HOLIDAYS`.
 - Беседы-форумы: ответ в ту же тему (`message_thread_id`, если `is_topic_message`; General — без темы);
   тема рассылки — из `/setup` или `/here`; тема удалена/закрыта — в General не писать, владельцу ошибку.
 - Telegram открывает из приложения только http(s): `webcal://` — через `/cal/<токен>/apple`.

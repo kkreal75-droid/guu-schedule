@@ -11,6 +11,7 @@
 //   POST /board/<действие> — «Подслушано», анонимный чат (board.ts), жалобы и баны — board-moderation.ts.
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
 //   GET  /places  — правки мест «Корпусов ГУУ» поверх data/places.json (places.ts), правит владелец в админке.
+//   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
@@ -28,6 +29,7 @@ import { sendAlerts } from './alerts'
 import { notifySessions } from './session'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
+import { handleAcademicGet } from './academic'
 import { handlePlacesGet } from './places'
 import { handleSupport, onSupportButton } from './support'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
@@ -179,6 +181,7 @@ export default {
     if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
     if (url.pathname === '/support' && request.method === 'POST') return guarded(env, 'Поддержка', () => handleSupport(env, request))
     if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env))
+    if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env))
     if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
     if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
     if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Section } from '../components/Section'
+import { KIND_TITLES, SOURCE_TITLES, formatIsoLong, type Period } from '../../shared/calendar-core'
+import { isoFromDay } from '../../shared/schedule-core'
+import { groupCalendar } from '../academic'
 import { loadSession, loadSessionStatus, type SessionFile, type SessionItem } from '../data'
 import { WEEKDAYS_SHORT, formatDate } from '../format'
 import { dayFromIso, groupName, moscowNow } from '../schedule'
@@ -39,6 +42,29 @@ function Item({ item, past }: { item: SessionItem; past: boolean }) {
   )
 }
 
+// «Когда сессия по учебному графику» — сессии группы из учебного графика (src/academic.ts)
+function SessionPlan({ periods }: { periods: Period[] }) {
+  const today = isoFromDay(moscowNow().day)
+  return (
+    <Section title="Когда сессия по учебному графику" footer="Весь учебный год — «Другое → Календарный учебный график».">
+      <div className="session-plan">
+        {periods.map((p) => (
+          <div key={p.start} className="cal-period ck-session" data-now={(p.start <= today && today <= p.end) || undefined}>
+            <span className="cal-dot" />
+            <span className="cal-period-text">
+              <span className="cal-period-title">{p.title || KIND_TITLES[p.kind]}</span>
+              <span className="cal-period-dates">
+                {formatIsoLong(p.start)} — {formatIsoLong(p.end)}
+                <span className="cal-period-source"> · {SOURCE_TITLES[p.source]}</span>
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
 // какую сессию ждём: осенний семестр (август–январь) — зимнюю, весенний — летнюю
 const upcoming = (day: number) => {
   const month = new Date(day * 86_400_000).getUTCMonth() + 1
@@ -50,8 +76,10 @@ const upcoming = (day: number) => {
 export function SessionPage({ group }: { group: string }) {
   const [state, setState] = useState<{ file: SessionFile | null } | 'loading' | 'error'>('loading')
   const [page, setPage] = useState<string | null>(null)
+  const [plan, setPlan] = useState<Period[] | null>(null)
   useEffect(() => {
     let alive = true
+    groupCalendar(group).then((c) => alive && setPlan(c.periods.filter((p) => p.kind === 'session')), () => {})
     loadSession(group).then(
       (file) => alive && setState({ file }),
       () => alive && setState('error'),
@@ -77,6 +105,7 @@ export function SessionPage({ group }: { group: string }) {
             оно будет здесь, а я пришлю уведомление.
           </p>
         </div>
+        {plan && plan.length > 0 && <SessionPlan periods={plan} />}
         {page && page.includes('прошлого года') && (
           <p className="section-footer">
             Сейчас на странице сессии guu.ru — {page}. Её группы уже на следующем курсе, поэтому здесь она не показывается.

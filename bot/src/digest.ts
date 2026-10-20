@@ -1,5 +1,6 @@
 // Автосообщения в беседы (cron раз в минуту):
-//   • в учебные дни (Пн–Сб) в выбранное время — пары на сегодня или «Сегодня пар нет 🎉»;
+//   • в учебные дни (Пн–Сб) в выбранное время — пары на сегодня или «Сегодня пар нет 🎉»; в первый день
+//     каникул по учебному графику — «🎉 Каникулы! Пар нет до ДД.ММ» (academic.ts);
 //   • в субботу в 19:00 — неделя вперёд;
 //   • раз в 10 минут — сверка пар на 7 дней вперёд; изменились — «⚠️ Изменение в расписании».
 // Расписание и настройки читаем только в те минуты, когда есть что делать, и только для групп,
@@ -9,6 +10,7 @@ import { WEEKDAYS_FULL, formatDate } from '../../shared/format-core'
 import { dayLessons, type DayLesson } from '../../shared/edits-core'
 import { isoFromDay, moscowNow, toMinutes } from '../../shared/schedule-core'
 import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
+import { holidayTexts } from './academic'
 import { reportError } from './errors'
 import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
 import { sendMessage } from './telegram'
@@ -86,13 +88,20 @@ export async function runDigests(env: Env, now: number): Promise<number> {
     if (todo.length) plan.push({ slot, key, sent, todo })
   }
   if (!plan.length) return 0
-  const tt = await loadTimetable(env, [...new Set(plan.flatMap((p) => p.todo.map(([, c]) => c.group!)))])
+  const groups = [...new Set(plan.flatMap((p) => p.todo.map(([, c]) => c.group!)))]
+  const tt = await loadTimetable(env, groups)
+  // первый день каникул по учебному графику — вместо пар «🎉 Каникулы! Пар нет до ДД.ММ»
+  const daily = plan.some((p) => p.slot.id.startsWith('daily-'))
+  const holidays = daily
+    ? await holidayTexts(env, groups, day).catch((err) => (reportError(env, 'Учебный график в сводке', err), new Map<string, string>()))
+    : new Map<string, string>()
   let sends = 0
   for (const { slot, key, sent, todo } of plan) {
     for (const [chatId, settings] of todo) {
       sent.add(chatId)
       // нет файла группы (пропала из расписания ГУУ) — молчим
-      const text = tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!) : null
+      const holiday = slot.id.startsWith('daily-') ? holidays.get(settings.group!) : undefined
+      const text = holiday ?? (tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!) : null)
       if (!text) continue
       sends++
       await deliver(env, chatId, settings, text, 'Сводка')

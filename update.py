@@ -19,6 +19,7 @@
   public/data/rooms.json                — аудитория → когда занята
   public/data/session/<id>.json         — сессия группы (только текущего учебного года)
   public/data/session_status.json        — что на странице сессии guu.ru, у каких групп сессия (рассылка ботом)
+  public/data/calendar.json              — первая и последняя пара курса (учебный график, shared/calendar-core.ts)
   public/data/parse_report.json         — что разобрано по каждому файлу и листу, где парсер не уверен
   public/data/alerts.json               — тревоги для владельца (бот присылает их в личку)
   public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
@@ -828,6 +829,23 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         e["updated_at"] = body["updated_at"]
         writer.write(path, dump(body))
     writer.prune(OUT / "schedule")
+
+    # 6б. учебный график (shared/calendar-core.ts): первая и последняя пара курса по файлам расписания —
+    #     «учёба до …» в «Другое → Учебный график» и у бота; последняя — у 90% групп (одна поздняя пара
+    #     не растягивает семестр всем). Остальные периоды — шаблон и правки владельца в админке.
+    spans: dict[str, list[tuple[date, date]]] = defaultdict(list)
+    for e in entries:
+        days = [SEMESTER_START + timedelta(days=(w - 1) * 7 + l["weekday"]) for l in group_lessons[e["id"]] for w in l["weeks"]]
+        if days:
+            spans[f"{e['level']}|{e['form']}|{e['course']}"].append((min(days), max(days)))
+    study = {}
+    for key, items in sorted(spans.items()):
+        lasts = sorted(last for _, last in items)
+        study[key] = {"first": min(first for first, _ in items).isoformat(),
+                      "last": lasts[int(0.9 * (len(lasts) - 1))].isoformat(), "groups": len(items)}
+    calendar = {"updated_at": now, "year": current_year, "semester_start": semester_start, "study": study}
+    writer.write(OUT / "calendar.json", dump(stable(OUT / "calendar.json", calendar)))
+
     for gid, body in session_out.items():
         body["items"].sort(key=lambda i: (i["date"], i["start"] or ""))
         writer.write(OUT / "session" / f"{gid}.json", dump(body))

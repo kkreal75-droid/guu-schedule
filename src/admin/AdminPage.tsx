@@ -1,6 +1,6 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { BuildingIcon, CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, StarIcon, UserIcon } from '../icons'
+import { BuildingIcon, CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, PlanIcon, SendIcon, StarIcon, UserIcon } from '../icons'
 import { resetIntro } from '../intro'
 import { confirmAction, haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -9,13 +9,14 @@ import { useFlash } from './common'
 import { Dashboard } from './Dashboard'
 import { Moderation } from './Moderation'
 import { ReviewsAdmin } from './ReviewsAdmin'
+import { AcademicAdmin } from './AcademicAdmin'
 import { PlacesAdmin } from './PlacesAdmin'
 import { ScheduleAdmin } from './ScheduleAdmin'
 import { SettingsAdmin } from './SettingsAdmin'
 import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
-type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'places' | 'settings'
+type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'academic' | 'places' | 'settings'
 type Item = { id: SectionId; title: string; icon: ComponentType<SVGProps<SVGSVGElement>>; render: () => ReactNode }
 
 const ITEMS: Item[] = [
@@ -25,6 +26,7 @@ const ITEMS: Item[] = [
   { id: 'moderation', title: 'Модерация Подслушано', icon: ChatIcon, render: () => <Moderation /> },
   { id: 'reviews', title: 'Отзывы', icon: StarIcon, render: () => <ReviewsAdmin /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
+  { id: 'academic', title: 'Учебный график', icon: PlanIcon, render: () => <AcademicAdmin /> },
   { id: 'places', title: 'Места', icon: BuildingIcon, render: () => <PlacesAdmin /> },
   { id: 'settings', title: 'Настройки', icon: NoteIcon, render: () => <SettingsAdmin /> },
 ]
