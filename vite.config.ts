@@ -6,7 +6,7 @@ import { defineConfig, type Plugin } from 'vite'
 // Эти файлы не встраиваются в JS, а лежат рядом с сайтом отдельно:
 // schedule.json приложение скачивает при каждом запуске (см. loadSchedule в src/schedule.ts),
 // а бот (bot/) берёт с сайта и правки, чтобы показывать то же расписание.
-const DATA_FILES = ['schedule.json', 'overrides.json', 'overrides/thursday.json'].map((name) => ({
+const DATA_FILES = ['schedule.json', 'overrides.json', 'overrides/thursday.json', 'overrides/thursday-1-2.json'].map((name) => ({
   name,
   path: resolve(import.meta.dirname, name),
 }))

@@ -1,5 +1,6 @@
 import rawOverrides from '../overrides.json'
 import thursday from '../overrides/thursday.json'
+import thursday12 from '../overrides/thursday-1-2.json'
 import { makeTimetable, type DayReplacement, type Lesson, type Overrides, type Schedule, type Timetable } from '../shared/schedule-core'
 import { readLocal, writeLocal } from './storage'
 
@@ -43,8 +44,8 @@ export async function loadSchedule(): Promise<void> {
     fromCache = true
   }
 
-  // правки встроены в сборку: overrides.json и замены дней целиком (overrides/thursday.json)
-  timetable = makeTimetable(data, rawOverrides as Overrides, [thursday as DayReplacement])
+  // правки встроены в сборку: overrides.json и замены дней целиком (overrides/thursday*.json)
+  timetable = makeTimetable(data, rawOverrides as Overrides, [thursday as DayReplacement, thursday12 as DayReplacement])
   schedule = timetable.schedule
   START_DAY = timetable.startDay
   MAX_WEEK = timetable.maxWeek

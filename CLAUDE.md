@@ -13,10 +13,10 @@
 | Общая логика | `shared/` | `schedule-core.ts` (формат, правки, недели, пары на день), `format-core.ts` — одна для фронта и бота |
 | Бот | `bot/` (Cloudflare Worker `guu-schedule-bot`) | `https://guu-schedule-bot.guu-schedule-bot.workers.dev`, вебхук Telegram |
 | Данные расписания | `schedule.json` (корень) | вывод `parser.py` из xlsx ГУУ (`data/raw/k1.xlsx`) |
-| Ручные правки | `overrides.json`, `overrides/thursday.json` | накладываются поверх `schedule.json` (см. ниже) |
+| Ручные правки | `overrides.json`, `overrides/thursday.json`, `overrides/thursday-1-2.json` | накладываются поверх `schedule.json` (см. ниже) |
 | Автообновление | `update.py` + `.github/workflows/deploy.yml` | раз в час проверяет guu.ru |
 
-**Сайт.** Vite отдаёт/кладёт рядом с сайтом `schedule.json`, `overrides.json`, `overrides/thursday.json`
+**Сайт.** Vite отдаёт/кладёт рядом с сайтом `schedule.json`, `overrides.json`, `overrides/thursday*.json`
 (плагин `dataFiles` в `vite.config.ts`). Приложение качает `schedule.json` при каждом запуске
 (`?v=<время>`, `no-store`, копия в localStorage на случай без сети); правки встроены в бандл.
 Бот берёт те же три файла с сайта (кэш CDN 120 с + 60 с в памяти воркера).
@@ -90,7 +90,7 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 - Чётность недели: `неделя % 2 === 0` — чётная; 1-я неделя с `semester_start` (31.08.2026);
   20.10.2026 — 8-я, чётная.
 - `schedule.json` — чистый вывод `parser.py`. Правки — поверх, в `makeTimetable`: `overrides.json`
-  (remove/add пар) → замены дня целиком (`overrides/thursday.json`: **четверг МБ(МП) 1-1** — все пары ГУУ
+  (remove/add пар) → замены дня целиком (`overrides/thursday.json` — **четверг МБ(МП) 1-1**, `overrides/thursday-1-2.json` — **четверг 1-2**; все пары ГУУ
   заменяются, `even`/`odd` по чётности, тип «Практика», весь семестр). Новый файл замены — добавить в
   `DATA_FILES` (vite.config.ts), импорт в `src/schedule.ts` и `REPLACEMENT_FILES` в `bot/src/schedule.ts`.
 - Разовые правки из админки (отмена пары / пометка) — D1 `schedule_edits`; видны в приложении (зачёркнуто /
@@ -111,7 +111,7 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 Работает в проде: расписание + заметки (CloudStorage) + профиль; ежечасное автообновление; `/start`
 с приветствиями из админки; `/stats`, рассылки, экспорт CSV, баны; inline; бот в беседах (у «МБ 1-1» — форум,
 рассылка привязана к теме «Расписание», id 11); живой календарь (Apple/Google); общая анонимная доска;
-админ-панель (дашборд, пользователи, рассылка, модерация, расписание, настройки); четверг 1-1 из файла.
+админ-панель (дашборд, пользователи, рассылка, модерация, расписание, настройки); четверги 1-1 и 1-2 из файлов.
 
 Известные проблемы:
 - `GITHUB_TOKEN` не задан → «Обновить сейчас» в админке выключена (автообновление по часам работает).
@@ -121,4 +121,4 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 - GitHub Actions бывает в очереди надолго (сбой 19.10) — сайт обновляется позже воркера; Telegram держит
   старую версию приложения, пока его не закрыть полностью.
 - «Изменение в расписании» не приходит для дней, которые только вошли в окно 7 дней (так задумано).
-- Четверг 1-2 — данные ГУУ (заменён только 1-1); `marketing/` (иконка рассылки) не в git.
+- `marketing/` (иконка рассылки) не в git.

@@ -20,7 +20,7 @@ export type BotTimetable = Timetable & { edits: ScheduleEdit[]; replacements: Fi
 export type FileReplacement = DayReplacement & { file: string }
 
 // Замены дней целиком: файлы лежат на сайте рядом с schedule.json (см. vite.config.ts)
-const REPLACEMENT_FILES = ['overrides/thursday.json']
+const REPLACEMENT_FILES = ['overrides/thursday.json', 'overrides/thursday-1-2.json']
 
 // Сайт отдаёт файлы с кэшем CDN; храним разобранное и в памяти воркера на минуту
 const MEMORY_TTL_MS = 60_000
