@@ -41,7 +41,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote 
       <div className="lesson-body">
         <div className="lesson-top">
           {lesson.kind && <span className="badge">{lesson.kind}</span>}
-          <span className="lesson-pair">{pairNumber(lesson.start)} пара</span>
+          <span className="lesson-pair">{pairNumber(lesson)} пара</span>
           <button
             type="button"
             className="lesson-note-btn"
@@ -65,7 +65,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote 
             )}
             {lesson.teacher && (
               <span>
-                <PersonIcon /> {lesson.teacher}
+                <PersonIcon /> {lesson.teachers?.join(', ') ?? lesson.teacher}
               </span>
             )}
           </div>

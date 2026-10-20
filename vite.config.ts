@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 
-// Эти файлы не встраиваются в JS, а лежат рядом с сайтом отдельно:
-// schedule.json приложение скачивает при каждом запуске (см. loadSchedule в src/schedule.ts),
-// а бот (bot/) берёт с сайта и правки, чтобы показывать то же расписание.
+// Эти файлы не встраиваются в JS, а лежат рядом с сайтом отдельно: бот (bot/) берёт с сайта правки,
+// чтобы показывать то же расписание; schedule.json (только МБ(МП) 1-1/1-2) — для старых версий
+// приложения, которые Telegram ещё держит в кэше. Данные всего ГУУ (public/data/: группы, пары,
+// преподаватели, аудитории) Vite кладёт на сайт сам — как всё из public/.
 const DATA_FILES = ['schedule.json', 'overrides.json', 'overrides/thursday.json', 'overrides/thursday-1-2.json'].map((name) => ({
   name,
   path: resolve(import.meta.dirname, name),

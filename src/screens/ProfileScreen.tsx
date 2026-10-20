@@ -3,7 +3,7 @@ import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
 import { CheckIcon, ExternalIcon } from '../icons'
 import type { Prefs, ThemeMode } from '../prefs'
-import { MAX_WEEK, START_DAY, inSemester, moscowNow, schedule, weekOf } from '../schedule'
+import { MAX_WEEK, START_DAY, groupName, inSemester, moscowNow, schedule, weekOf } from '../schedule'
 import { cloudAvailable } from '../storage'
 import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
 
@@ -76,7 +76,7 @@ export function ProfileScreen({ prefs, onChange, noteCount }: Props) {
               onChange({ group: g })
             }}
           >
-            <span>{g}</span>
+            <span>{groupName(g)}</span>
             {g === prefs.group && <CheckIcon className="row-check" />}
           </button>
         ))}

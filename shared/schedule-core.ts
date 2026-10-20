@@ -1,7 +1,9 @@
 // Логика расписания, общая для мини-приложения (src/) и бота (bot/):
-// формат schedule.json, ручные правки overrides.json и overrides/*.json, учебные недели, пары на день.
+// файлы групп data/schedule/<id>.json, ручные правки overrides.json и overrides/*.json,
+// учебные недели, пары на день.
+import { normalizeGroup } from './groups'
 
-// Формат schedule.json — см. parser.py и update.py
+// Пара. group — id группы («b1-mb-mp-1»); в старом schedule.json — имя («МБ(МП) 1-1»).
 export type Lesson = {
   group: string
   weekday: number // 0 = понедельник
@@ -12,6 +14,7 @@ export type Lesson = {
   weeks: number[]
   teacher: string | null
   room: string | null
+  teachers?: string[] // в ячейке несколько преподавателей (teacher — первый из них)
 }
 
 export type Schedule = {
@@ -21,6 +24,36 @@ export type Schedule = {
   semester_start: string // понедельник 1-й недели, YYYY-MM-DD
   groups: string[]
   lessons: Lesson[]
+  names?: Record<string, string> // id группы → имя
+  grids?: Record<string, Grid> // id группы → сетка пар по дням (из файла ГУУ)
+}
+
+// Сетка времени по дням недели: «0» → ["09:00-10:30", "10:40-12:10", …]
+export type Grid = Record<string, string[]>
+
+// Файл группы data/schedule/<id>.json — его пишет update.py
+export type GroupFile = {
+  id: string
+  name: string
+  updated_at: string
+  semester_start: string
+  source_file?: string | null
+  grid: Grid
+  lessons: Omit<Lesson, 'group'>[]
+}
+
+// Несколько файлов групп → одно расписание
+export function scheduleFromGroups(files: GroupFile[]): Schedule {
+  const updated = files.map((f) => f.updated_at).sort().at(-1)
+  return {
+    updated_at: updated,
+    source_file: files[0]?.source_file ?? undefined,
+    semester_start: files[0]?.semester_start ?? '2026-08-31',
+    groups: files.map((f) => f.id),
+    lessons: files.flatMap((f) => f.lessons.map((l) => ({ ...l, group: f.id }))),
+    names: Object.fromEntries(files.map((f) => [f.id, f.name])),
+    grids: Object.fromEntries(files.map((f) => [f.id, f.grid])),
+  }
 }
 
 // ---------- ручные правки (overrides.json) ----------
@@ -48,6 +81,14 @@ export function parseWeeks(spec: Weeks): number[] {
     for (let w = a; w <= b; w++) weeks.add(w)
   }
   return [...weeks].filter((w) => Number.isInteger(w) && w >= 1).sort((x, y) => x - y)
+}
+
+// В файлах правок группа может быть записана именем («МБ(МП) 1-1») — приводим к id;
+// правки для групп, которых сейчас нет в расписании, пропускаем
+function forGroups<T extends { group: string }>(rules: T[] | undefined, groups: Set<string>): T[] {
+  return (rules ?? [])
+    .map((r) => ({ ...r, group: groups.has(r.group) ? r.group : (normalizeGroup(r.group) ?? r.group) }))
+    .filter((r) => groups.has(r.group))
 }
 
 export function applyOverrides(lessons: Lesson[], overrides: Overrides): Lesson[] {
@@ -172,15 +213,29 @@ export type Timetable = {
   weekdayOf(day: number): number // 0 = понедельник
   dayOf(week: number, weekday: number): number
   inSemester(week: number): boolean
-  pairNumber(start: string): number
+  pairNumber(lesson: Pick<Lesson, 'group' | 'weekday' | 'start'>): number
+  nameOf(group: string): string // id → «МБ(МП) 1-1»
   lessonsOn(group: string, week: number, weekday: number): Lesson[]
 }
 
 export function makeTimetable(data: Schedule, overrides: Overrides, replacements: DayReplacement[] = []): Timetable {
-  const schedule = { ...data, lessons: applyReplacements(applyOverrides(data.lessons, overrides), replacements) }
+  const groups = new Set(data.groups)
+  const own: Overrides = { remove: forGroups(overrides.remove, groups), add: forGroups(overrides.add, groups) }
+  const schedule = {
+    ...data,
+    lessons: applyReplacements(applyOverrides(data.lessons, own), forGroups(replacements, groups)),
+  }
   const startDay = dayFromIso(schedule.semester_start)
-  const maxWeek = Math.max(...schedule.lessons.flatMap((l) => l.weeks))
+  // не меньше 18 недель (так в файлах ГУУ); reduce, а не Math.max(...): пар бывает много
+  const maxWeek = schedule.lessons.reduce((max, l) => l.weeks.reduce((m, w) => (w > m ? w : m), max), 18)
   const slotStarts = [...new Set(schedule.lessons.map((l) => l.start))].sort()
+  // номер пары — по сетке группы на этот день (у вечерних групп 18:50 — это 1-я пара);
+  // нет сетки — по порядку времени начала
+  const pairNumber = (lesson: Pick<Lesson, 'group' | 'weekday' | 'start'>) => {
+    const day = schedule.grids?.[lesson.group]?.[String(lesson.weekday)]
+    const i = day ? day.findIndex((slot) => slot.startsWith(lesson.start)) : -1
+    return i >= 0 ? i + 1 : slotStarts.indexOf(lesson.start) + 1
+  }
   return {
     schedule,
     startDay,
@@ -189,7 +244,8 @@ export function makeTimetable(data: Schedule, overrides: Overrides, replacements
     weekdayOf: (day) => (((day - startDay) % 7) + 7) % 7,
     dayOf: (week, weekday) => startDay + (week - 1) * 7 + weekday,
     inSemester: (week) => week >= 1 && week <= maxWeek,
-    pairNumber: (start) => slotStarts.indexOf(start) + 1,
+    pairNumber,
+    nameOf: (group) => schedule.names?.[group] ?? group,
     lessonsOn: (group, week, weekday) =>
       schedule.lessons
         .filter((l) => l.group === group && l.weekday === weekday && l.weeks.includes(week))

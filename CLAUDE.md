@@ -1,6 +1,7 @@
 # Расписание ГУУ — Telegram Mini App + бот
 
-Расписание групп **МБ(МП) 1-1** и **МБ(МП) 1-2** (1 курс, ГУУ) для студентов этих групп.
+Расписание всего ГУУ (бакалавриат ОФО/ОЗФО, магистратура, аспирантура; началось с **МБ(МП) 1-1/1-2**).
+План новой версии и ход работ — `docs/roadmap.md`.
 Мини-приложение в Telegram (@GUU_Scheduule_bot, кнопка меню и `/start`) + бот: команды, inline,
 автосообщения в беседы групп, живой календарь, анонимная доска, админ-панель владельца.
 Всё бесплатно: GitHub Pages + бесплатный тариф Cloudflare Workers / D1 / KV.
@@ -10,25 +11,44 @@
 | Часть | Где | Что |
 |---|---|---|
 | Фронт | `src/` (React 19, Vite 8, TypeScript) | мини-приложение, хостинг — GitHub Pages `https://kkreal75-droid.github.io/guu-schedule/` |
-| Общая логика | `shared/` | `schedule-core.ts` (формат, правки, недели, пары на день), `format-core.ts` — одна для фронта и бота |
+| Общая логика | `shared/` | `schedule-core.ts` (формат, правки, недели, пары на день), `groups.ts` (id групп, МБ), `format-core.ts` — одна для фронта и бота |
 | Бот | `bot/` (Cloudflare Worker `guu-schedule-bot`) | `https://guu-schedule-bot.guu-schedule-bot.workers.dev`, вебхук Telegram |
-| Данные расписания | `schedule.json` (корень) | вывод `parser.py` из xlsx ГУУ (`data/raw/k1.xlsx`) |
-| Ручные правки | `overrides.json`, `overrides/thursday.json`, `overrides/thursday-1-2.json` | накладываются поверх `schedule.json` (см. ниже) |
+| Данные расписания | `public/data/` | вывод `update.py` + `guu_parser.py` из всех файлов guu.ru (см. ниже) |
+| Старый формат | `schedule.json` (корень) | только МБ(МП) 1-1/1-2 — для версий приложения, закэшированных в Telegram |
+| Ручные правки | `overrides.json`, `overrides/thursday.json`, `overrides/thursday-1-2.json` | накладываются поверх файлов групп (см. ниже) |
 | Автообновление | `update.py` + `.github/workflows/deploy.yml` | раз в час проверяет guu.ru |
+| Служебное | `data/state.json`, `data/group_ids.json`, `data/doc-cache/` | SHA файлов ГУУ, реестр id групп, .doc → .docx |
 
-**Сайт.** Vite отдаёт/кладёт рядом с сайтом `schedule.json`, `overrides.json`, `overrides/thursday*.json`
-(плагин `dataFiles` в `vite.config.ts`). Приложение качает `schedule.json` при каждом запуске
-(`?v=<время>`, `no-store`, копия в localStorage на случай без сети); правки встроены в бандл.
-Бот берёт те же три файла с сайта (кэш CDN 120 с + 60 с в памяти воркера).
+**Данные (`public/data/`, Vite кладёт на сайт как есть).** `groups.json` — все группы (id, имя, уровень,
+форма, курс, институт, программа); `schedule/<id>.json` — пары группы + сетка времени по дням (номер
+пары — по ней: у вечерних 18:50 — 1-я); `teachers.json` + `teachers/<id>.json`; `rooms.json` (аудитория →
+занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года;
+`parse_report.json` — что разобрано по файлам/листам и где парсер не уверен; `alerts.json` — тревоги,
+бот присылает их владельцу (cron раз в 10 мин, отправленные — KV `alerts-sent`).
+
+**Группы.** id стабильный (`b1-mb-mp-1`: b — бакалавриат ОФО, z — ОЗФО, m — магистратура, a — аспирантура;
+курс; аббревиатура программы; номер), выдаётся один раз — реестр `data/group_ids.json`. Имя — «МБ(МП) 1-1»,
+«ГМУ 2-3», «… ОЗФО», «… маг.». МБ(МП) 1-1/1-2 раньше хранились по имени: `shared/groups.ts`
+(`normalizeGroup`) понимает старые имена везде (D1, KV, старые версии приложения), миграция 0005 перевела D1.
+Ключи заметок и UID календаря у МБ считаются, как раньше (от «МБ(МП) 1-1» / «1-1»).
+
+**Сайт.** Приложение качает `data/schedule/<id>.json` своих групп при каждом запуске (`?v=<время>`,
+`no-store`, копия в localStorage на случай без сети) и шлёт в `/seen` `v: 2` (правки — по id); правки
+встроены в бандл. Бот берёт файлы групп по требованию и правки с сайта (кэш CDN 120 с + 60 с в памяти).
 
 **GitHub Actions (`deploy.yml`).** push в main → сборка и деплой Pages; cron `17 * * * *` →
-`update.py` → коммит `schedule.json` + `data/raw/k1.xlsx`, только если пары изменились → деплой;
-`workflow_dispatch` (вход `force`) — то же вручную (кнопка «Обновить сейчас» в админке).
+`update.py` → коммит `public/data`, `schedule.json`, `data/`, только если что-то изменилось → деплой;
+LibreOffice ставится, только если изменился .doc (нет в `data/doc-cache/`); `workflow_dispatch`
+(вход `force`) — то же вручную (кнопка «Обновить сейчас» в админке).
 
-**update.py.** Ищет на `https://guu.ru/student/schedule/` ссылку «1 курс бакалавриат ОФО», сравнивает
-SHA-256 файла с `source_sha256`, запускает `parser.py` во временной папке, требует ≥30 пар у каждой
-группы (`MIN_LESSONS`), пишет `updated_at` / `source_file` / `source_sha256`. User-Agent без слова «bot»
-(иначе guu.ru даёт 403), SSL через certifi. **`parser.py` не менять — логика проверена.**
+**update.py.** Берёт все .xlsx/.doc/.docx со страниц `/student/schedule/` и `/student/session/` (раздел —
+по заголовкам «Бакалавриат / Магистратура / Аспирантура»), сравнивает SHA-256 с `data/state.json`; если
+что-то поменялось — разбирает всё (`guu_parser.py`, ~3 с). Файл не публикуется (остаются прошлые группы
+этого файла, владельцу тревога), если групп стало на >10% меньше или у МБ(МП) 1-1/1-2 < 30 пар.
+Дубли групп из двух файлов — берётся более свежий. `--local DIR` — файлы из папки. User-Agent без слова
+«bot» (иначе guu.ru даёт 403), SSL через certifi. Локально .doc: `SOFFICE=…/soffice`.
+**`parser.py` не менять — логика проверена**; `guu_parser.py` импортирует из него разбор недель и даёт
+для МБ(МП) 1-1/1-2 ровно тот же результат (95 пар; проверка — сравнение с `parser.parse_workbook`).
 
 **Воркер — эндпоинты** (`bot/src/index.ts`):
 - `POST /webhook` — обновления Telegram (секрет в заголовке = SHA-256 от `webhook:`+токен);
@@ -37,15 +57,17 @@ SHA-256 файла с `source_sha256`, запускает `parser.py` во вр�
 - `POST /board/<enter|accept|poll|send|react|report|delete|stroke|undo|erase|clear>` — доска;
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
 - `GET /` — setWebhook + меню команд (`?force` — заново) + строка о данных в описании бота;
-- cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней,
+- cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней
+  (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
   в :35 — чистка доски, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0004`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0005`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
-`board_strokes`, `board_snapshots`, `schedule_edits`.
-**KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума), `settings` (приветствия,
-техработы, объявление), `snapshot:1-1|1-2` (пары на 7 дней для «Изменения»), `sent:<дата>:<слот>`
-(уже отправленные сводки, TTL 3 дня), `board-snapshot:<id>` (PNG холста перед очисткой).
+`board_strokes`, `board_snapshots`, `schedule_edits`, `group_snapshots`. Группа (`users.grp` и т. п.) — id.
+**KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
+(приветствия, техработы, объявление), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
+`alerts-sent` (присланные тревоги), `board-snapshot:<id>` (PNG холста перед очисткой).
+Старые `snapshot:1-1|1-2` больше не используются.
 
 **Команды бота.** Личка: `/start` (одно из 3 приветствий), `/today`, `/tomorrow`.
 Владелец (у остальных молчат): `/stats`, `/broadcast`, `/broadcasts`, `/export`, `/ban`, `/unban`, `/bans`,
@@ -62,8 +84,10 @@ cd bot && npm run deploy         # деплой воркера, затем: curl
 cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и проверить: … migrations list guu-bot --remote
 ```
 Сайт деплоится только через push в main (GitHub Actions). Локально: `bot/.dev.vars` (тестовый токен
-`123456:LOCAL-TEST-TOKEN`, `TELEGRAM_API`/`GITHUB_API` на поддельные сервера) и `.env.development.local`
-(`VITE_BOT_URL=http://127.0.0.1:8787`) — оба в .gitignore, в git не класть. Автотестов в репозитории нет.
+`123456:LOCAL-TEST-TOKEN`, `TELEGRAM_API`/`GITHUB_API` на поддельные сервера, `WEBAPP_URL=http://localhost:5173/`
+— данные с локального Vite) и `.env.development.local` (`VITE_BOT_URL=http://127.0.0.1:8787`) — оба в
+.gitignore, в git не класть. Локальный cron: `/cdn-cgi/handler/scheduled?cron=*+*+*+*+*&time=<мс>`.
+Автотестов в репозитории нет.
 
 ## Секреты (Cloudflare, `npx wrangler secret put <ИМЯ>` в `bot/`)
 
@@ -89,7 +113,8 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   10 мс CPU, D1 100 тыс. записей/сутки).
 - Чётность недели: `неделя % 2 === 0` — чётная; 1-я неделя с `semester_start` (31.08.2026);
   20.10.2026 — 8-я, чётная.
-- `schedule.json` — чистый вывод `parser.py`. Правки — поверх, в `makeTimetable`: `overrides.json`
+- Файлы групп (`public/data/schedule/*.json`) — чистый вывод парсера. Правки — поверх, в `makeTimetable`
+  (группа в правках — id или имя МБ): `overrides.json`
   (remove/add пар) → замены дня целиком (`overrides/thursday.json` — **четверг МБ(МП) 1-1**, `overrides/thursday-1-2.json` — **четверг 1-2**; все пары ГУУ
   заменяются, `even`/`odd` по чётности, тип «Практика», весь семестр). Новый файл замены — добавить в
   `DATA_FILES` (vite.config.ts), импорт в `src/schedule.ts` и `REPLACEMENT_FILES` в `bot/src/schedule.ts`.

@@ -2,14 +2,17 @@
 // Токен — случайный; «Отключить» удаляет его, и старая ссылка перестаёт работать.
 import type { Lesson, Timetable } from '../../shared/schedule-core'
 import { isoFromDay } from '../../shared/schedule-core'
+import { MB_IDS, normalizeGroup, shortName } from '../../shared/groups'
 import { json, readApi } from './api'
-import { GROUPS, shortGroup } from './db'
-import { loadTimetable } from './schedule'
+import { loadGroupFile, loadTimetable } from './schedule'
 
 // Ручная правка из админ-панели (edits.ts): отменённая пара или пометка (start null — ко всему дню)
 export type CalendarEdit = { group: string; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }
 
-type TokenRow = { token: string; user_id: number; grp: string; created_at: number }
+type TokenRow = { token: string; user_id: number; grp: string; created_at: number } // grp — id группы
+
+// UID событий и имя файла: у МБ — «1-1», как раньше (иначе календари задвоят пары), у остальных — id
+const uidPrefix = (group: string) => shortName(group, group)
 
 // ---------- .ics ----------
 
@@ -76,7 +79,7 @@ export function buildIcs(tt: Timetable, group: string, edits: CalendarEdit[] = [
     'PRODID:-//guu-schedule//Расписание ГУУ//RU',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeText(`Расписание ${group}`)}`,
+    `X-WR-CALNAME:${escapeText(`Расписание ${tt.nameOf(group)}`)}`,
     'X-WR-TIMEZONE:Europe/Moscow',
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     'X-PUBLISHED-TTL:PT1H',
@@ -92,11 +95,11 @@ export function buildIcs(tt: Timetable, group: string, edits: CalendarEdit[] = [
       const notes = related.map((e) => (e.kind === 'cancel' ? `Отменена${e.text ? `: ${e.text}` : ''}` : e.text)).filter(Boolean)
       const description = [
         ...notes.map((n) => `⚠️ ${n}`),
-        [lesson.kind, lesson.teacher, `${tt.pairNumber(lesson.start)} пара`].filter(Boolean).join(' · '),
+        [lesson.kind, lesson.teachers?.join(', ') ?? lesson.teacher, `${tt.pairNumber(lesson)} пара`].filter(Boolean).join(' · '),
       ].join('\n')
       lines.push(
         'BEGIN:VEVENT',
-        `UID:${shortGroup(group)}-${iso}-${lesson.start.replace(':', '')}-${hash(lesson.subject)}@guu-schedule-bot`,
+        `UID:${uidPrefix(group)}-${iso}-${lesson.start.replace(':', '')}-${hash(lesson.subject)}@guu-schedule-bot`,
         `DTSTAMP:${stamp}`,
         `DTSTART;TZID=Europe/Moscow:${localStamp(iso, lesson.start)}`,
         `DTEND;TZID=Europe/Moscow:${localStamp(iso, lesson.end)}`,
@@ -122,7 +125,9 @@ function newToken(): string {
 const feedUrl = (origin: string, token: string) => `${origin}/cal/${token}.ics`
 
 function status(origin: string, row: TokenRow | null) {
-  return row ? { ok: true, connected: true, url: feedUrl(origin, row.token), group: row.grp } : { ok: true, connected: false }
+  return row
+    ? { ok: true, connected: true, url: feedUrl(origin, row.token), group: normalizeGroup(row.grp) ?? row.grp }
+    : { ok: true, connected: false }
 }
 
 // POST /cal/status | /cal/connect {group} | /cal/disconnect — из мини-приложения
@@ -139,7 +144,9 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
     return json({ ok: true, connected: false })
   }
   if (action === 'connect') {
-    const group = (GROUPS as readonly string[]).includes(req.body.group ?? '') ? req.body.group! : GROUPS[0]
+    // группа из приложения (старые версии присылают имя «МБ(МП) 1-1»); такой нет на сайте — 400
+    const group = normalizeGroup(req.body.group) ?? MB_IDS[0]
+    if (!(await loadGroupFile(env, group))) return json({ ok: false, error: 'group' }, 400)
     if (current) {
       await env.DB.prepare('UPDATE calendar_tokens SET grp = ? WHERE user_id = ?').bind(group, userId).run()
       return json(status(origin, { ...current, grp: group }))
@@ -162,12 +169,13 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
       .bind(Date.now(), token)
       .run(),
   )
-  const tt = await loadTimetable(env)
-  const ics = buildIcs(tt, row.grp, tt.edits)
+  const group = normalizeGroup(row.grp) ?? row.grp
+  const tt = await loadTimetable(env, [group])
+  const ics = buildIcs(tt, group, tt.edits)
   return new Response(ics, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': `inline; filename="guu-${shortGroup(row.grp)}.ics"`,
+      'Content-Disposition': `inline; filename="guu-${uidPrefix(group)}.ics"`,
       'Cache-Control': 'private, max-age=300',
     },
   })
@@ -193,7 +201,9 @@ a.btn{display:inline-block;margin:20px 0 8px;padding:14px 24px;border-radius:12p
     )
   if (!row) return html('<h1>Календарь отключён</h1><p>Подключите его заново в приложении: Ещё → Календарь на телефоне.</p>', 404)
   const webcal = feedUrl(new URL(request.url).origin, token).replace(/^https?:/, 'webcal:')
-  return html(`<h1>📅 Расписание ${escapeHtmlText(row.grp)}</h1>
+  const group = normalizeGroup(row.grp) ?? row.grp
+  const title = (await loadGroupFile(env, group).catch(() => null))?.name ?? group
+  return html(`<h1>📅 Расписание ${escapeHtmlText(title)}</h1>
 <p>Сейчас откроется Календарь — нажмите «Подписаться».</p>
 <a class="btn" href="${webcal}">Подписаться в Календаре</a>
 <p>Если ничего не открылось — нажмите кнопку.</p>

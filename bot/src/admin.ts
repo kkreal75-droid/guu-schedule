@@ -1,6 +1,7 @@
 // Админские команды бота про пользователей: /stats, /export, /ban, /unban, /bans.
 import { isOwner } from './auth'
 import { boardBanTerm } from './board-moderation'
+import { mbName, normalizeGroup } from '../../shared/groups'
 import { allUsers, findUserByUsername, getUser, userLabel, type UserRow } from './db'
 import { sendMessage, tgForm } from './telegram'
 import { csv, escapeHtml, formatMsk, formatMskFull } from './util'
@@ -57,7 +58,7 @@ export async function exportUsers(env: Env, chatId: number): Promise<void> {
       u.id,
       u.name,
       u.username ? `@${u.username}` : '',
-      u.grp,
+      u.grp ? (mbName(normalizeGroup(u.grp) ?? '') ?? u.grp) : '',
       formatMskFull(u.first_seen),
       formatMskFull(u.last_seen),
       u.visits,

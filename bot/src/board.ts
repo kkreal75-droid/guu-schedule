@@ -10,7 +10,7 @@ import { CORS, json, readApi, type ApiRequest } from './api'
 import { ALIASES, BOARDS, BOARD_IDS, COLORS, LIMITS, REACTIONS, WIDTHS, type BoardId } from './board-config'
 import { passesFilter } from './board-filter'
 import { deleteMessage, notifyReport, sendSnapshot } from './board-moderation'
-import { GROUPS } from './db'
+import { MB_IDS, normalizeGroup } from '../../shared/groups'
 
 const DAY_MS = 86_400_000
 const MINUTE_MS = 60_000
@@ -71,7 +71,7 @@ export function semesterOf(ms: number): string {
   return `${year}-весна`
 }
 
-const validGroup = (group: unknown) => (GROUPS as readonly unknown[]).includes(group) ? (group as string) : null
+const validGroup = (group: unknown) => normalizeGroup(group)
 
 // все видят одни и те же доски — сейчас это одна общая
 export const visibleBoards = (): BoardId[] => BOARD_IDS
@@ -262,7 +262,7 @@ async function enter(call: Call): Promise<Response> {
   const { member, req } = call
   if (!member?.rules_accepted_at) {
     // группа доски закрепится при «Понятно» — показываем, какая
-    const group = member?.board_grp ?? validGroup(req.body.group) ?? req.user?.grp ?? GROUPS[0]
+    const group = member?.board_grp ?? validGroup(req.body.group) ?? req.user?.grp ?? MB_IDS[0]
     return json({ ok: true, rules: false, group })
   }
   return json(await enterPayload(call))
@@ -270,7 +270,7 @@ async function enter(call: Call): Promise<Response> {
 
 async function accept(call: Call): Promise<Response> {
   const { env, req, now } = call
-  const group = call.member?.board_grp ?? validGroup(req.body.group) ?? req.user?.grp ?? GROUPS[0]
+  const group = call.member?.board_grp ?? validGroup(req.body.group) ?? req.user?.grp ?? MB_IDS[0]
   call.member = await env.DB.prepare(
     `INSERT INTO board_members (user_id, rules_accepted_at, board_grp) VALUES (?1, ?2, ?3)
      ON CONFLICT (user_id) DO UPDATE SET

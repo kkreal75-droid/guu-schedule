@@ -11,7 +11,7 @@
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
-//   раз в час — чистка доски.
+//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка доски.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
@@ -20,11 +20,13 @@ import { isOwner, verifyInitData, webhookSecret } from './auth'
 import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
+import { sendAlerts } from './alerts'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
+import { mbName } from '../../shared/groups'
 import { touchUser } from './db'
 import { detectChanges, runDigests } from './digest'
 import { loadEdits } from './edits'
@@ -78,28 +80,35 @@ async function guarded(env: Env, where: string, run: () => Promise<Response>): P
 }
 
 // Что приложению показать при открытии: ручные правки расписания (за 2 недели назад и вперёд),
-// объявление-плашку и режим техработ (админу — никогда)
-async function appExtras(env: Env, admin: boolean) {
+// объявление-плашку и режим техработ (админу — никогда). Старые версии приложения (без v) ждут
+// в правках имя группы («МБ(МП) 1-1»), новые — id.
+async function appExtras(env: Env, admin: boolean, version: number) {
   const [settings, edits] = await Promise.all([loadSettings(env), loadEdits(env)])
   const since = new Date(Date.now() + 3 * 3_600_000 - 14 * 86_400_000).toISOString().slice(0, 10)
+  const groupOut = (group: string) => (version >= 2 ? group : (mbName(group) ?? group))
   return {
-    edits: edits.filter((e) => e.date >= since).map(({ id, group, date, start, kind, text }) => ({ id, group, date, start, kind, text })),
+    edits: edits
+      .filter((e) => e.date >= since)
+      .map(({ id, group, date, start, kind, text }) => ({ id, group: groupOut(group), date, start, kind, text })),
     notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
     maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
   }
 }
 
-// Открытие мини-приложения. Тело — JSON {initData, group} или просто initData (старые версии).
+// Открытие мини-приложения. Тело — JSON {initData, group, v} или просто initData (старые версии).
+// group — id группы (старые версии присылают имя «МБ(МП) 1-1»), v — версия формата приложения.
 // В ответе ещё время последних сообщений на досках (точка «есть новое») и appExtras.
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
   let group: string | null = null
+  let version = 1
   if (body.startsWith('{')) {
     try {
-      const parsed = JSON.parse(body) as { initData?: string; group?: string }
+      const parsed = JSON.parse(body) as { initData?: string; group?: string; v?: number }
       initData = parsed.initData ?? ''
       group = parsed.group ?? null
+      version = typeof parsed.v === 'number' ? parsed.v : 1
     } catch {
       return json({ ok: false }, 400)
     }
@@ -112,7 +121,7 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
       touchUser(env.DB, profile, 'open', group),
       // доска, правки и настройки не должны мешать открытию приложения
       boardLatest(env).catch((err) => (console.error('Доска в /seen:', err), {})),
-      appExtras(env, admin).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
+      appExtras(env, admin, version).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
     return json({ ok: true, banned: banned && !admin, admin, board, ...extras })
   } catch (err) {
@@ -186,6 +195,7 @@ export default {
       used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
       if (new Date(now).getUTCMinutes() % 10 === 5) {
         used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
+        used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
       }
       if (new Date(now).getUTCMinutes() === 35) {
         used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка доски', err), 0))

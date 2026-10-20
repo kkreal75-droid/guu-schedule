@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
 import type { LessonEdit, ScheduleEdit } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import {
-  MAX_WEEK, dayOf, inSemester, isoFromDay, lessonsOn, moscowNow, schedule, toMinutes, weekOf, weekdayOf,
+  MAX_WEEK, dayOf, groupName, inSemester, isoFromDay, lessonsOn, moscowNow, schedule, toMinutes, weekOf, weekdayOf,
 } from '../schedule'
 import { haptic } from '../telegram'
 
@@ -130,7 +130,7 @@ export function ScheduleScreen({ edits, group, onGroupChange, cursor, onCursorCh
         <Segmented
           label="Группа"
           value={group}
-          options={schedule.groups.map((g) => ({ value: g, label: g }))}
+          options={schedule.groups.map((g) => ({ value: g, label: groupName(g) }))}
           onChange={onGroupChange}
         />
 

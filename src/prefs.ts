@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { normalizeGroup } from '../shared/groups'
 import { schedule } from './schedule'
 import { readCloud, readLocal, save } from './storage'
 
 export type ThemeMode = 'light' | 'system' | 'dark'
+// group — id группы («b1-mb-mp-1»); раньше хранилось имя («МБ(МП) 1-1») — его понимаем
 export type Prefs = { group: string; theme: ThemeMode }
 
 const KEY = 'prefs'
@@ -14,8 +16,9 @@ function parse(value: string | null): Prefs | null {
   if (!value) return null
   try {
     const p = JSON.parse(value) as Partial<Prefs>
+    const group = normalizeGroup(p.group)
     return {
-      group: p.group && schedule.groups.includes(p.group) ? p.group : defaults().group,
+      group: group && schedule.groups.includes(group) ? group : defaults().group,
       theme: p.theme && THEMES.includes(p.theme) ? p.theme : defaults().theme,
     }
   } catch {

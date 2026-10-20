@@ -76,7 +76,8 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
   try {
     const res = await fetch(`${BOT_URL}/seen`, {
       method: 'POST',
-      body: JSON.stringify({ initData: tg!.initData, group }),
+      // v: 2 — группа и правки по id («b1-mb-mp-1»), а не по имени
+      body: JSON.stringify({ initData: tg!.initData, group, v: 2 }),
       signal: controller.signal,
     })
     if (!res.ok) return null

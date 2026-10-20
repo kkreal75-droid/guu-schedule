@@ -1,4 +1,5 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
+import { normalizeGroup, shortName } from '../../shared/groups'
 import { callBot, callBotBlob } from '../api'
 import type { BoardId, Stroke } from '../board/api'
 import type { ScheduleEdit } from '../edits'
@@ -134,7 +135,7 @@ export function adminError(err: unknown): string {
 export const stamp = (ms: number | null | undefined) =>
   ms ? new Date(ms).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
-export const shortGroup = (group: string | null | undefined) => (group ? group.replace('МБ(МП) ', '') : '—')
+export const shortGroup = (group: string | null | undefined) => (group ? shortName(normalizeGroup(group) ?? group) : '—')
 
 export const userName = (u: { name?: string | null; username?: string | null; id?: number; user_id?: number }) =>
   u.username ? `@${u.username}` : u.name || `id ${u.id ?? u.user_id}`

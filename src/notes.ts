@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { mbName } from '../shared/groups'
 import { dateOf } from './format'
 import type { Lesson } from './schedule'
 import { cloudAvailable, cloudGetMany, cloudKeys, cloudRemove, cloudSet, readLocal, writeLocal } from './storage'
@@ -22,8 +23,10 @@ function ymd(day: number) {
   return `${year}${pad(month + 1)}${pad(date)}`
 }
 
-// FNV-1a: из «МБ(МП) 1-1» — стабильный короткий ASCII-идентификатор для ключа
-function groupSlug(group: string) {
+// FNV-1a: из группы — стабильный короткий ASCII-идентификатор для ключа. У МБ(МП) 1-1/1-2 ключ
+// считается, как раньше, от имени («МБ(МП) 1-1»): так их старые заметки к парам на месте.
+function groupSlug(id: string) {
+  const group = mbName(id) ?? id
   let h = 0x811c9dc5
   for (const ch of group) {
     h ^= ch.codePointAt(0)!

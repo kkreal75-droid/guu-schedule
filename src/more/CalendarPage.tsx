@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import { normalizeGroup, shortName } from '../../shared/groups'
 import { Section } from '../components/Section'
 import { botAvailable, callBot } from '../api'
 import { confirmAction, haptic, openLink } from '../telegram'
 
 type Status = { connected: false } | { connected: true; url: string; group: string }
 
-const short = (group: string) => group.replace('МБ(МП) ', '')
+// «1-1» для МБ, иначе имя группы; со старых версий бота может прийти имя — понимаем и его
+const short = (group: string) => shortName(normalizeGroup(group) ?? group)
 
 export function CalendarPage({ group }: { group: string }) {
   const [status, setStatus] = useState<Status | null>(null)
@@ -77,7 +79,7 @@ export function CalendarPage({ group }: { group: string }) {
         {status?.connected && (
           <div className="row">
             <span>Группа</span>
-            <span className="row-value">{status.group}</span>
+            <span className="row-value">{short(status.group)}</span>
           </div>
         )}
       </Section>
@@ -86,7 +88,7 @@ export function CalendarPage({ group }: { group: string }) {
 
       {status?.connected && (
         <>
-          {status.group !== group && (
+          {normalizeGroup(status.group) !== group && (
             <button type="button" className="button-secondary" disabled={busy} onClick={() => run(() => callBot<Status>('/cal/connect', { group }))}>
               Переключить на {short(group)} (как в профиле)
             </button>

@@ -2,7 +2,7 @@
 // На бесплатном тарифе один вызов воркера — максимум 50 подзапросов (Telegram, D1, KV),
 // поэтому за раз отправляем BATCH сообщений, остальное досылает cron раз в минуту.
 import { isOwner } from './auth'
-import { GROUPS, shortGroup } from './db'
+import { MB_GROUPS } from '../../shared/groups'
 import { TelegramError, answerCallback, sendMessage, tg, tgForm, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
 import { entitiesToHtml, escapeHtml, formatMsk, hasFormatting, stripCommand } from './util'
 
@@ -32,7 +32,7 @@ export type BroadcastRow = {
 
 // Кому можно слать: писали боту, не заблокировали его, не забанены
 const RECIPIENTS = 'can_message = 1 AND blocked_bot = 0 AND banned = 0'
-const groupOf = (audience: Audience) => GROUPS.find((g) => shortGroup(g) === audience) ?? null
+const groupOf = (audience: Audience) => MB_GROUPS.find((g) => g.short === audience)?.id ?? null
 
 export async function audienceCounts(db: D1Database): Promise<Record<Audience, number>> {
   const row = await db
@@ -42,7 +42,7 @@ export async function audienceCounts(db: D1Database): Promise<Record<Audience, n
               COALESCE(SUM(grp = ?2), 0) AS g12
        FROM users WHERE ${RECIPIENTS}`,
     )
-    .bind(GROUPS[0], GROUPS[1])
+    .bind(MB_GROUPS[0].id, MB_GROUPS[1].id)
     .first<{ total: number; g11: number; g12: number }>()
   return { all: row?.total ?? 0, '1-1': row?.g11 ?? 0, '1-2': row?.g12 ?? 0 }
 }

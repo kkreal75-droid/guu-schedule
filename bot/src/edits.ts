@@ -1,10 +1,10 @@
 // Ручные правки расписания (админ-панель): «пара отменена» или пометка к паре / ко всему дню.
 // Видны в приложении, inline, беседах, /today и календаре. Таблица — migrations/0004.
-import { GROUPS } from './db'
+import { MB_IDS, normalizeGroup } from '../../shared/groups'
 
 export type ScheduleEdit = {
   id: number
-  group: string
+  group: string // id группы («b1-mb-mp-1»)
   date: string // ГГГГ-ММ-ДД
   start: string | null // начало пары; null — ко всему дню
   kind: 'cancel' | 'note'
@@ -20,8 +20,10 @@ export async function loadEdits(env: Env): Promise<ScheduleEdit[]> {
   const { results } = await env.DB.prepare(
     'SELECT id, grp AS "group", date, start, kind, text, created_at FROM schedule_edits ORDER BY date, start, id',
   ).all<ScheduleEdit>()
-  cached = { at: Date.now(), edits: results }
-  return results
+  // старые записи — с именем группы («МБ(МП) 1-1»)
+  const edits = results.map((e) => ({ ...e, group: normalizeGroup(e.group) ?? e.group }))
+  cached = { at: Date.now(), edits }
+  return edits
 }
 
 const invalidate = () => {
@@ -32,7 +34,7 @@ export type NewEdit = { groups: string[]; date: string; start: string | null; ki
 
 // Проверка правки из панели; null — всё хорошо, иначе текст ошибки
 export function editProblem(edit: Partial<NewEdit>): string | null {
-  if (!edit.groups?.length || !edit.groups.every((g) => (GROUPS as readonly string[]).includes(g))) return 'Выберите группу'
+  if (!edit.groups?.length || !edit.groups.every((g) => MB_IDS.includes(g))) return 'Выберите группу'
   if (!edit.date || !/^\d{4}-\d{2}-\d{2}$/.test(edit.date) || Number.isNaN(Date.parse(edit.date))) return 'Выберите дату'
   if (edit.start !== null && (typeof edit.start !== 'string' || !/^\d{2}:\d{2}$/.test(edit.start))) return 'Выберите пару'
   if (edit.kind !== 'cancel' && edit.kind !== 'note') return 'Выберите, что сделать'

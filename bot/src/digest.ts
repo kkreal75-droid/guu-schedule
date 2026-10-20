@@ -2,11 +2,12 @@
 //   • в учебные дни (Пн–Сб) в выбранное время — пары на сегодня или «Сегодня пар нет 🎉»;
 //   • в субботу в 19:00 — неделя вперёд;
 //   • раз в 10 минут — сверка пар на 7 дней вперёд; изменились — «⚠️ Изменение в расписании».
-// Расписание и настройки читаем только в те минуты, когда есть что делать.
+// Расписание и настройки читаем только в те минуты, когда есть что делать, и только для групп,
+// к которым привязаны беседы. Снимки «пары на 7 дней» — в D1 (group_snapshots): групп много,
+// а у KV всего 1000 записей в сутки.
 import { WEEKDAYS_FULL, formatDate } from '../../shared/format-core'
 import { isoFromDay, moscowNow, toMinutes, type Lesson, type Timetable } from '../../shared/schedule-core'
 import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
-import { GROUPS, shortGroup } from './db'
 import { reportError } from './errors'
 import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
 import { sendMessage } from './telegram'
@@ -15,6 +16,7 @@ import { escapeHtml } from './util'
 const WEEKLY_AT = 19 * 60 // суббота, 19:00 МСК
 const LATE_WINDOW = 10 // cron опоздал — досылаем в течение 10 минут
 const MAX_SENDS = 20 // за один запуск (лимит 50 подзапросов делим с рассылками)
+const MAX_GROUPS = 15 // файлов групп за запуск сверки изменений (каждый — подзапрос к сайту)
 
 type Slot = { id: string; chats: [string, ChatSettings][]; text: (tt: BotTimetable, group: string) => string | null }
 
@@ -71,22 +73,30 @@ export async function runDigests(env: Env, now: number): Promise<number> {
 
   const slots = dueSlots(day, minutes, weekday, await loadChats(env)).filter((s) => s.chats.length)
   if (!slots.length) return 0
-  const tt = await loadTimetable(env)
-  let sends = 0
+  // кому уже отправили сегодня — запоминаем, чтобы повторный запуск cron не продублировал;
+  // за запуск — не больше MAX_SENDS бесед, и грузим расписание только их групп
+  const plan: { slot: Slot; key: string; sent: Set<string>; todo: [string, ChatSettings][] }[] = []
+  let budget = MAX_SENDS
   for (const slot of slots) {
-    // кому уже отправили сегодня — запоминаем, чтобы повторный запуск cron не продублировал
-    const sentKey = `sent:${isoFromDay(day)}:${slot.id}`
-    const sent = new Set((await env.KV.get<string[]>(sentKey, 'json')) ?? [])
-    const before = sent.size
-    for (const [chatId, settings] of slot.chats) {
-      if (sent.has(chatId) || sends >= MAX_SENDS) continue
-      const text = slot.text(tt, settings.group!)
+    const key = `sent:${isoFromDay(day)}:${slot.id}`
+    const sent = new Set((await env.KV.get<string[]>(key, 'json')) ?? [])
+    const todo = slot.chats.filter(([chatId]) => !sent.has(chatId)).slice(0, budget)
+    budget -= todo.length
+    if (todo.length) plan.push({ slot, key, sent, todo })
+  }
+  if (!plan.length) return 0
+  const tt = await loadTimetable(env, [...new Set(plan.flatMap((p) => p.todo.map(([, c]) => c.group!)))])
+  let sends = 0
+  for (const { slot, key, sent, todo } of plan) {
+    for (const [chatId, settings] of todo) {
       sent.add(chatId)
+      // нет файла группы (пропала из расписания ГУУ) — молчим
+      const text = tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!) : null
       if (!text) continue
       sends++
       await deliver(env, chatId, settings, text, 'Сводка')
     }
-    if (sent.size !== before) await env.KV.put(sentKey, JSON.stringify([...sent]), { expirationTtl: 3 * 86_400 })
+    await env.KV.put(key, JSON.stringify([...sent]), { expirationTtl: 3 * 86_400 })
   }
   return sends
 }
@@ -128,30 +138,48 @@ function describeChanges(previous: Snapshot, current: Snapshot): string[] {
   return blocks
 }
 
-// Раз в 10 минут: сверяем пары на неделю вперёд со снимком в KV
+// Раз в 10 минут: сверяем пары на неделю вперёд со снимком в D1 — для групп, у которых есть беседы
+// с автосообщениями. Групп больше MAX_GROUPS — по кругу, разные части в разные запуски.
 export async function detectChanges(env: Env, now: number): Promise<number> {
   const { day } = moscowNow(new Date(now))
-  const tt = await loadTimetable(env)
-  let chats: Record<string, ChatSettings> | null = null
+  const chats = await loadChats(env)
+  const all = [...new Set(Object.values(chats).filter((c) => c.group && c.time).map((c) => c.group!))].sort()
+  if (!all.length) return 0
+  const parts = Math.ceil(all.length / MAX_GROUPS)
+  const part = Math.floor(now / 600_000) % parts
+  const groups = all.slice(part * MAX_GROUPS, (part + 1) * MAX_GROUPS)
+
+  const [tt, stored] = await Promise.all([
+    loadTimetable(env, groups),
+    env.DB.prepare('SELECT grp, data FROM group_snapshots WHERE grp IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(groups))
+      .all<{ grp: string; data: string }>(),
+  ])
+  const previousOf = new Map(stored.results.map((r) => [r.grp, JSON.parse(r.data) as Snapshot]))
+  const writes: D1PreparedStatement[] = []
   let sends = 0
-  for (const group of GROUPS) {
-    const key = `snapshot:${shortGroup(group)}`
+  for (const group of groups) {
+    if (!tt.schedule.groups.includes(group)) continue // файла группы нет — не считаем, что пары пропали
     const current = snapshot(tt, group, day)
-    const previous = await env.KV.get<Snapshot>(key, 'json')
-    const same = previous && JSON.stringify(previous) === JSON.stringify(current)
-    if (same) continue
-    await env.KV.put(key, JSON.stringify(current)) // окно сдвинулось на день или пары поменялись
+    const previous = previousOf.get(group)
+    if (previous && JSON.stringify(previous) === JSON.stringify(current)) continue
+    // окно сдвинулось на день или пары поменялись
+    writes.push(
+      env.DB.prepare(
+        'INSERT INTO group_snapshots (grp, data, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT (grp) DO UPDATE SET data = ?2, updated_at = ?3',
+      ).bind(group, JSON.stringify(current), now),
+    )
     if (!previous) continue
     const blocks = describeChanges(previous, current)
     if (!blocks.length) continue
 
-    chats ??= await loadChats(env)
-    const text = `⚠️ <b>Изменение в расписании</b> · ${escapeHtml(group)}\n\n${blocks.join('\n\n')}`.slice(0, 4000)
+    const text = `⚠️ <b>Изменение в расписании</b> · ${escapeHtml(tt.nameOf(group))}\n\n${blocks.join('\n\n')}`.slice(0, 4000)
     for (const [chatId, settings] of Object.entries(chats)) {
       if (settings.group !== group || !settings.time || sends >= MAX_SENDS) continue
       sends++
       await deliver(env, chatId, settings, text, '«Изменение в расписании»')
     }
   }
-  return sends
+  if (writes.length) await env.DB.batch(writes)
+  return sends + groups.length
 }

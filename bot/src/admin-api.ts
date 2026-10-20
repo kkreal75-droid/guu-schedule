@@ -7,7 +7,8 @@ import { BOARD_IDS, type BoardId } from './board-config'
 import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-moderation'
 import { audienceCounts, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
-import { GROUPS, getUser } from './db'
+import { MB_IDS, normalizeGroup } from '../../shared/groups'
+import { getUser } from './db'
 import { addEdits, deleteEdit, editProblem, type NewEdit, type ScheduleEdit } from './edits'
 import { isOwner } from './auth'
 import { loadTimetable } from './schedule'
@@ -37,7 +38,7 @@ async function dashboard({ env }: Call): Promise<Response> {
               COALESCE(SUM(grp = ?4), 0) AS g11, COALESCE(SUM(grp = ?5), 0) AS g12,
               COALESCE(SUM(banned), 0) AS banned, COALESCE(SUM(blocked_bot), 0) AS blocked
        FROM users`,
-    ).bind(now - DAY_MS, now - 7 * DAY_MS, now - 30 * DAY_MS, GROUPS[0], GROUPS[1]),
+    ).bind(now - DAY_MS, now - 7 * DAY_MS, now - 30 * DAY_MS, MB_IDS[0], MB_IDS[1]),
     env.DB.prepare(
       `SELECT date((first_seen + ?2) / 1000, 'unixepoch') AS day, COUNT(*) AS n
        FROM users WHERE first_seen >= ?1 GROUP BY day`,
@@ -71,8 +72,8 @@ async function dashboard({ env }: Call): Promise<Response> {
     opens_by_hour: Array.from({ length: 24 }, (_, hour) => perHour.get(hour) ?? 0),
     chats: {
       total: chats.length,
-      g11: chats.filter((c) => c.group === GROUPS[0]).length,
-      g12: chats.filter((c) => c.group === GROUPS[1]).length,
+      g11: chats.filter((c) => c.group === MB_IDS[0]).length,
+      g12: chats.filter((c) => c.group === MB_IDS[1]).length,
       digests: chats.filter((c) => c.group && c.time).length,
     },
     calendar: calendar.results[0],
@@ -316,11 +317,11 @@ async function editList(env: Env): Promise<ScheduleEdit[]> {
   const { results } = await env.DB.prepare(
     'SELECT id, grp AS "group", date, start, kind, text, created_at FROM schedule_edits ORDER BY date DESC, start, id',
   ).all<ScheduleEdit>()
-  return results
+  return results.map((e) => ({ ...e, group: normalizeGroup(e.group) ?? e.group }))
 }
 
 async function schedule({ env }: Call): Promise<Response> {
-  const [tt, edits, gh] = await Promise.all([loadTimetable(env), editList(env), workflowRuns(env)])
+  const [tt, edits, gh] = await Promise.all([loadTimetable(env, MB_IDS), editList(env), workflowRuns(env)])
   const s = tt.schedule
   return json({
     ok: true,
@@ -330,7 +331,13 @@ async function schedule({ env }: Call): Promise<Response> {
     lessons: s.lessons.length,
     edits,
     // замены дней целиком из файлов репозитория — в панели с пометкой «из файла», удалить нельзя
-    file_edits: tt.replacements.map(({ file, group, weekday, even, odd }) => ({ file, group, weekday, even, odd })),
+    file_edits: tt.replacements.map(({ file, group, weekday, even, odd }) => ({
+      file,
+      group: normalizeGroup(group) ?? group,
+      weekday,
+      even,
+      odd,
+    })),
     github: { token: Boolean(env.GITHUB_TOKEN), runs: gh.runs, error: gh.error },
   })
 }
@@ -354,7 +361,9 @@ async function updateNow({ env, req }: Call): Promise<Response> {
 }
 
 async function editAdd({ env, req }: Call): Promise<Response> {
-  const edit = req.body as Partial<NewEdit>
+  const body = req.body as Partial<NewEdit>
+  // старая админ-панель присылает имена групп («МБ(МП) 1-1») — переводим в id
+  const edit = { ...body, groups: Array.isArray(body.groups) ? body.groups.map((g) => normalizeGroup(g) ?? String(g)) : body.groups }
   const problem = editProblem(edit)
   if (problem) return json({ ok: false, error: problem }, 400)
   await addEdits(env, { ...(edit as NewEdit), text: (edit.text as string | undefined) ?? '' })

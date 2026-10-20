@@ -1,11 +1,12 @@
 // Пользователи в D1 (схема — migrations/0001_init.sql).
+import { normalizeGroup } from '../../shared/groups'
 import type { Profile } from './auth'
 
 export type UserRow = {
   id: number
   username: string | null
   name: string | null
-  grp: string | null
+  grp: string | null // id группы («b1-mb-mp-1»); у старых записей — имя, см. normalizeGroup
   first_seen: number
   last_seen: number
   visits: number
@@ -22,9 +23,6 @@ export type UserRow = {
 // открытия приложения одним человеком чаще этого считаем за одно
 export const VISIT_GAP_MS = 10 * 60_000
 
-export const GROUPS = ['МБ(МП) 1-1', 'МБ(МП) 1-2'] as const
-export const shortGroup = (group: string) => group.replace('МБ(МП) ', '') // «1-1»
-
 // open — открыл приложение, start — /start, message — написал боту в личку,
 // inline — пользуется inline-режимом в другом чате (бот ему писать не может)
 export type SeenKind = 'open' | 'start' | 'message' | 'inline'
@@ -40,7 +38,7 @@ export async function touchUser(
   const isOpen = kind === 'open' ? 1 : 0
   const isStart = kind === 'start' ? 1 : 0
   const wrote = kind === 'start' || kind === 'message' ? 1 : 0 // писал боту сам — значит, бот может ему ответить
-  const grp = group && (GROUPS as readonly string[]).includes(group) ? group : null
+  const grp = normalizeGroup(group)
   const [upsert] = await db.batch([
     db
       .prepare(
@@ -68,7 +66,7 @@ export async function touchUser(
       .bind(profile.id, now, kind),
   ])
   const row = (upsert.results as { banned: number; grp: string | null }[])[0]
-  return { banned: Boolean(row?.banned), grp: row?.grp ?? null }
+  return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp) }
 }
 
 export const getUser = (db: D1Database, id: number) =>

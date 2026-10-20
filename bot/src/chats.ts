@@ -4,15 +4,15 @@
 //
 // Супергруппы с темами (форумы): отвечаем в ту тему, откуда пришла команда; сводки и
 // «Изменение в расписании» — в тему, где сделали /setup (или /here). General — без темы.
-import { GROUPS, shortGroup } from './db'
+import { MB_GROUPS, mbName, normalizeGroup } from '../../shared/groups'
 import { ERROR_REPLY, reportError } from './errors'
-import { formatDay, loadTimetable, todayMsk } from './schedule'
+import { formatDay, groupsFor, loadTimetable, todayMsk } from './schedule'
 import { TelegramError, answerCallback, sendMessage, tg, type TgCallbackQuery, type TgChat, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 
 export type ChatSettings = {
   title: string
-  group: string | null // «МБ(МП) 1-1» / «МБ(МП) 1-2»; null — ещё не настроено
+  group: string | null // id группы («b1-mb-mp-1»); null — ещё не настроено. Раньше — имя «МБ(МП) 1-1»
   time: DigestTime | null // время сводки по Москве; null — автосообщения выключены
   thread?: number | null // тема форума для автосообщений; нет — General или беседа без тем
   added_at: number
@@ -22,9 +22,22 @@ export const DIGEST_TIMES: DigestTime[] = ['07:00', '07:30', '08:00']
 
 const KEY = 'chats'
 
+// Старые настройки хранили имя группы («МБ(МП) 1-1») — один раз переводим в id и сохраняем
 export async function loadChats(env: Env): Promise<Record<string, ChatSettings>> {
-  return (await env.KV.get<Record<string, ChatSettings>>(KEY, 'json')) ?? {}
+  const chats = (await env.KV.get<Record<string, ChatSettings>>(KEY, 'json')) ?? {}
+  let migrated = false
+  for (const settings of Object.values(chats)) {
+    const id = settings.group ? normalizeGroup(settings.group) : null
+    if (settings.group && id !== settings.group) {
+      settings.group = id
+      migrated = true
+    }
+  }
+  if (migrated) await env.KV.put(KEY, JSON.stringify(chats))
+  return chats
 }
+
+const groupTitle = (group: string) => mbName(group) ?? group
 
 async function updateChats(env: Env, change: (chats: Record<string, ChatSettings>) => void): Promise<void> {
   const chats = await loadChats(env)
@@ -67,7 +80,7 @@ const INTRO = `👋 Привет! Я присылаю расписание МБ(
 Админ беседы, настройте меня: /setup`
 
 const groupKeyboard = () => ({
-  inline_keyboard: [GROUPS.map((g) => ({ text: shortGroup(g), callback_data: `gs:grp:${shortGroup(g)}` }))],
+  inline_keyboard: [MB_GROUPS.map((g) => ({ text: g.short, callback_data: `gs:grp:${g.short}` }))],
 })
 
 const timeKeyboard = () => ({
@@ -101,10 +114,10 @@ type Reply = (text: string, extra?: object) => Promise<unknown>
 type GroupCommand = (env: Env, message: TgMessage, settings: ChatSettings | undefined, reply: Reply) => Promise<void>
 
 const today: GroupCommand = async (env, _message, settings, reply) =>
-  void (await reply(formatDay(await loadTimetable(env), todayMsk(), settings?.group ?? null)))
+  void (await reply(formatDay(await loadTimetable(env, groupsFor(settings?.group)), todayMsk(), settings?.group ?? null)))
 
 const tomorrow: GroupCommand = async (env, _message, settings, reply) =>
-  void (await reply(formatDay(await loadTimetable(env), todayMsk() + 1, settings?.group ?? null)))
+  void (await reply(formatDay(await loadTimetable(env, groupsFor(settings?.group)), todayMsk() + 1, settings?.group ?? null)))
 
 const setup: GroupCommand = async (env, message, _settings, reply) => {
   if (!message.from || !(await isChatAdmin(env, message.chat.id, message.from.id))) {
@@ -222,7 +235,7 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
     })
 
   if (step === 'grp') {
-    const group = GROUPS.find((g) => shortGroup(g) === value)
+    const group = MB_GROUPS.find((g) => g.short === value)?.id
     if (!group) return void (await answerCallback(env, query.id))
     await updateChats(env, (chats) => {
       const current = chats[String(chat.id)]
@@ -234,7 +247,7 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
         added_at: current?.added_at ?? Date.now(),
       }
     })
-    await edit(`⚙️ <b>Настройка</b>\nГруппа: <b>${escapeHtml(group)}</b>.\nВо сколько присылать пары на день (по Москве)?`, timeKeyboard())
+    await edit(`⚙️ <b>Настройка</b>\nГруппа: <b>${escapeHtml(groupTitle(group))}</b>.\nВо сколько присылать пары на день (по Москве)?`, timeKeyboard())
     await answerCallback(env, query.id)
     return
   }
@@ -248,7 +261,7 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
       chats[String(chat.id)] = { title: chat.title ?? current?.title ?? '', group, time, thread, added_at: current?.added_at ?? Date.now() }
     })
     const done = time
-      ? `Каждый учебный день в ${time.replace(/^0/, '')} пришлю пары${group ? ` <b>${escapeHtml(group)}</b>` : ''}, по субботам вечером — неделю вперёд, а если расписание поменяется — сразу напишу.`
+      ? `Каждый учебный день в ${time.replace(/^0/, '')} пришлю пары${group ? ` <b>${escapeHtml(groupTitle(group))}</b>` : ''}, по субботам вечером — неделю вперёд, а если расписание поменяется — сразу напишу.`
       : 'По утрам присылать не буду. Пары можно посмотреть командами ниже.'
     const title = time && chat.is_forum ? HERE_DONE : '✅ <b>Готово</b>'
     const hereHint = chat.is_forum ? '\n/here — присылать в другую тему (написать в ней)' : ''

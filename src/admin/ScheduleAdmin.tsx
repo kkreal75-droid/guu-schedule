@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MB_GROUPS, MB_IDS } from '../../shared/groups'
 import { Segmented } from '../components/Segmented'
 import { Section } from '../components/Section'
 import { WEEKDAYS_FULL, formatDate, formatStamp } from '../format'
@@ -7,8 +8,8 @@ import { confirmAction, haptic, openLink } from '../telegram'
 import { adminApi, adminError, shortGroup, type FileEdit, type Run } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
-const GROUPS = ['МБ(МП) 1-1', 'МБ(МП) 1-2']
-type GroupChoice = 'МБ(МП) 1-1' | 'МБ(МП) 1-2' | 'both'
+const GROUPS = MB_IDS
+type GroupChoice = string // id группы или 'both'
 
 // замена дня из файла репозитория: «чётные» и «нечётные» недели, пара за парой
 function FileEditRow({ edit }: { edit: FileEdit }) {
@@ -65,7 +66,7 @@ export function ScheduleAdmin() {
   const { data, setData } = useLoad(adminApi.schedule)
   const [force, setForce] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [group, setGroup] = useState<GroupChoice>('МБ(МП) 1-1')
+  const [group, setGroup] = useState<GroupChoice>(MB_IDS[0])
   const [date, setDate] = useState(() => isoFromDay(moscowNow().day))
   const [kind, setKind] = useState<'cancel' | 'note'>('cancel')
   const [start, setStart] = useState<string>('')
@@ -168,8 +169,7 @@ export function ScheduleAdmin() {
             label="Группа"
             value={group}
             options={[
-              { value: 'МБ(МП) 1-1', label: '1-1' },
-              { value: 'МБ(МП) 1-2', label: '1-2' },
+              ...MB_GROUPS.map((g) => ({ value: g.id, label: g.short })),
               { value: 'both', label: 'Обе' },
             ]}
             onChange={(g) => {

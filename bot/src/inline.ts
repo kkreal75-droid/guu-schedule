@@ -3,9 +3,9 @@
 import { WEEKDAYS_FULL, dateOf, formatDate, pluralPairs } from '../../shared/format-core'
 import type { Timetable } from '../../shared/schedule-core'
 import { profileOf } from './auth'
-import { shortGroup, touchUser } from './db'
+import { touchUser } from './db'
 import { reportError } from './errors'
-import { formatDay, formatWeek, loadTimetable, todayMsk } from './schedule'
+import { formatDay, formatWeek, groupsFor, loadTimetable, todayMsk, type BotTimetable } from './schedule'
 import { tg, type TgUser } from './telegram'
 
 export type TgInlineQuery = { id: string; from: TgUser; query: string; chat_type?: string }
@@ -33,7 +33,7 @@ export function parseQuery(query: string, today: number, tt: Timetable): Target 
   return { kind: 'day', day: today, title: 'Сегодня' }
 }
 
-function summary(tt: Timetable, target: Target, group: string): string {
+function summary(tt: BotTimetable, target: Target, group: string): string {
   if (target.kind === 'week') {
     const { date, month } = dateOf(target.monday + 5)
     return `${formatDate(target.monday)} – ${date}.${String(month + 1).padStart(2, '0')}`
@@ -61,14 +61,14 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
     return
   }
 
-  const tt = await loadTimetable(env)
+  const tt = await loadTimetable(env, groupsFor(group))
   const today = todayMsk()
   const target = parseQuery(query.query, today, tt)
   const appLink = `https://t.me/${env.BOT_USERNAME}/schedule`
-  const results = (group ? [group] : tt.schedule.groups).map((g) => ({
+  const results = tt.schedule.groups.map((g) => ({
     type: 'article',
-    id: `${target.kind}-${target.kind === 'day' ? target.day : target.monday}-${shortGroup(g)}`,
-    title: `${target.title} · ${g}`,
+    id: `${target.kind}-${target.kind === 'day' ? target.day : target.monday}-${g}`,
+    title: `${target.title} · ${tt.nameOf(g)}`,
     description: summary(tt, target, g),
     input_message_content: {
       message_text: target.kind === 'day' ? formatDay(tt, target.day, g) : formatWeek(tt, target.monday, g),
