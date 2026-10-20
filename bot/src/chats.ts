@@ -4,6 +4,8 @@
 //
 // Супергруппы с темами (форумы): отвечаем в ту тему, откуда пришла команда; сводки и
 // «Изменение в расписании» — в тему, где сделали /setup (или /here). General — без темы.
+import { isOwner } from './auth'
+import { getUser } from './db'
 import { MB_GROUPS, mbName, normalizeGroup, searchGroups } from '../../shared/groups'
 import { ERROR_REPLY, reportError } from './errors'
 import { formatDay, groupsFor, loadGroupsIndex, loadTimetable, todayMsk } from './schedule'
@@ -215,6 +217,8 @@ export async function handleGroupMessage(env: Env, message: TgMessage): Promise<
   if (mention && mention !== env.BOT_USERNAME.toLowerCase()) return
   const handler = GROUP_COMMANDS[command]
   if (!handler) return
+  // забаненному боту и в беседах не отвечаем (владелец — исключение)
+  if (message.from && !isOwner(env, message.from.id) && (await getUser(env.DB, message.from.id))?.banned) return
 
   const thread = threadOf(message)
   const reply: Reply = (text, extra = {}) => sendMessage(env, message.chat.id, text, { ...inThread(thread), ...extra })

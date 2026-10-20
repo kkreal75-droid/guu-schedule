@@ -26,6 +26,8 @@
 import { isOwner, verifyInitData, webhookSecret } from './auth'
 import { BODY_LIMIT, WEBHOOK_LIMIT, allow, clientIp, readBody, safeEqual, tooMany, withCors } from './guard'
 import { cleanupJournal, firstDelivery, logAdmin } from './journal'
+import { backupToOwner } from './backup'
+import { onDeleteMeButton } from './privacy'
 import { checkBudget, countRequest, economyMode, flushUsage, meterEnv } from './usage'
 import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
@@ -97,6 +99,8 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
       await logAdmin(env, query.from.id, 'кнопка', null, query.data)
     }
     await safely(env, 'Кнопка', chatId, async () => {
+      // «Удалить мои данные» — и забаненным тоже
+      if (query.data?.startsWith('dm:')) return void (await onDeleteMeButton(env, query))
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
@@ -328,6 +332,10 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
     // расход лимитов: тревога владельцу и режим экономии на 80% (usage.ts)
     if (new Date(now).getUTCMinutes() % 10 === 3) {
       used += await checkBudget(env).catch((err) => (reportError(env, 'Учёт лимитов', err), 0))
+    }
+    // ежедневный бэкап D1 владельцу в личку — 00:20 UTC (03:20 МСК), когда тихо
+    if (new Date(now).getUTCHours() === 0 && new Date(now).getUTCMinutes() === 20) {
+      used += await backupToOwner(env, now).catch((err) => (reportError(env, 'Бэкап базы', err), 0))
     }
     if (new Date(now).getUTCMinutes() === 35) {
       used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))

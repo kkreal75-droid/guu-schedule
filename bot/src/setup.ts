@@ -52,6 +52,7 @@ const ADMIN_COMMANDS = [
   { command: 'bans', description: 'Список банов' },
   { command: 'boardban', description: 'Бан в Подслушано: /boardban id [дни]' },
   { command: 'usage', description: 'Расход лимитов Cloudflare' },
+  { command: 'backup', description: 'Бэкап базы сейчас' },
 ]
 
 export async function setupBot(env: Env, origin: string, force: boolean) {

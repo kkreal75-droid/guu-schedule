@@ -12,6 +12,8 @@ import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
 import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 import { handleSupportReply } from './support'
+import { backupToOwner } from './backup'
+import { deleteMeCommand } from './privacy'
 
 export const BANNED_REPLY = 'Доступ к боту ограничен.'
 
@@ -67,6 +69,7 @@ const ADMIN: Record<string, Handler> = {
   '/bans': ({ env, message }) => listBans(env, message.chat.id),
   '/boardban': ({ env, message, args }) => boardBanCommand(env, message.chat.id, args),
   '/usage': async ({ env, message }) => void (await sendMessage(env, message.chat.id, usageText(await usageToday(env)))),
+  '/backup': async ({ env }) => void (await backupToOwner(env)),
 }
 
 export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, message: TgMessage): Promise<void> {
@@ -89,6 +92,8 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
   } catch (err) {
     await reportError(env, 'Учёт пользователя', err)
   }
+  // удалить свои данные можно и с баном (бан при этом остаётся)
+  if (command === '/deleteme') return void (await safely(env, 'Команда /deleteme', message.chat.id, () => deleteMeCommand(env, message)))
   if (banned && !owner) return void (await sendMessage(env, message.chat.id, BANNED_REPLY))
   // владелец отвечает на обращение в поддержку (ответом на «✍️ Ответ на обращение №…»)
   if (owner && !command && message.reply_to_message) {
