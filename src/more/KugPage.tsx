@@ -90,71 +90,74 @@ export function KugPage({ group }: { group: string }) {
         <p className="lead">Загружаю график…</p>
       )}
 
-      <Section
-        title="Семестр по расписанию ГУУ"
-        footer="Номера недель и чётность — как в файлах расписания. Сессия и каникулы — в графике своей программы ниже."
-      >
-        <div className="row">
-          <span>Занятия</span>
-          <span className="row-value">{formatShortRange(firstMonday, lastSunday)}</span>
-        </div>
-        <div className="row">
-          <span>Недель</span>
-          <span className="row-value">{T.maxWeek}</span>
-        </div>
-        <div className="row">
-          <span>Сейчас</span>
-          <span className="row-value">
-            {T.inSemester(current) ? `${current}-я неделя, ${isEvenWeek(current) ? 'чётная' : 'нечётная'}` : current < 1 ? 'семестр не начался' : 'семестр окончен'}
-          </span>
-        </div>
-      </Section>
-
-      <Section title="Недели">
-        {visibleWeeks.map((w) => (
-          <div key={w} className="row kug-week" data-current={w === current || undefined}>
-            <span className="kug-week-no">{w}</span>
-            <span className="kug-week-dates">{formatShortRange(T.dayOf(w, 0), T.dayOf(w, 6))}</span>
-            <span className="row-value">{isEvenWeek(w) ? 'чётная' : 'нечётная'}</span>
+      <details className="cd-details">
+        <summary>Недели семестра и официальные графики (PDF)</summary>
+        <Section
+          title="Семестр по расписанию ГУУ"
+          footer="Номера недель и чётность — как в файлах расписания. Сессия и каникулы — в графике своей программы ниже."
+        >
+          <div className="row">
+            <span>Занятия</span>
+            <span className="row-value">{formatShortRange(firstMonday, lastSunday)}</span>
           </div>
-        ))}
-        {!all && (
-          <button type="button" className="row row-btn row-link" onClick={() => setAll(true)}>
-            <span>Все {T.maxWeek} недель</span>
-          </button>
-        )}
-      </Section>
-
-      {best && (
-        <Section title="Твоя программа" footer="Официальный документ с сайта ГУУ: даты сессий, практик и каникул.">
-          <button type="button" className="row row-btn kug-row" onClick={() => openLink(best.url)}>
-            <span className="kug-row-text">
-              <span className="kug-title">{best.title}</span>
-              <span className="kug-sub">
-                {[best.code, best.level ? LEVEL_TITLES[best.level] : null, best.form].filter(Boolean).join(' · ')}
-              </span>
+          <div className="row">
+            <span>Недель</span>
+            <span className="row-value">{T.maxWeek}</span>
+          </div>
+          <div className="row">
+            <span>Сейчас</span>
+            <span className="row-value">
+              {T.inSemester(current) ? `${current}-я неделя, ${isEvenWeek(current) ? 'чётная' : 'нечётная'}` : current < 1 ? 'семестр не начался' : 'семестр окончен'}
             </span>
-            <ExternalIcon className="row-check" />
-          </button>
+          </div>
         </Section>
-      )}
 
-      <Section title="Графики всех программ (PDF)" footer="Источник: guu.ru → Сведения об образовательной организации → Образование.">
-        <div className="row row-form">
-          <input className="input" type="search" placeholder="Название или код программы" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
-        {error && <div className="row row-text">Не получилось загрузить список. Проверь интернет.</div>}
-        {!kug && !error && <div className="row row-text">Загружаю…</div>}
-        {shown.slice(0, 80).map((k) => (
-          <button key={k.url + k.title} type="button" className="row row-btn kug-row" onClick={() => openLink(k.url)}>
-            <span className="kug-row-text">
-              <span className="kug-title">{k.title}</span>
-              <span className="kug-sub">{[k.code, k.level ? LEVEL_TITLES[k.level] : null, k.form].filter(Boolean).join(' · ')}</span>
-            </span>
-            <ChevronRight className="row-chevron" />
-          </button>
-        ))}
-      </Section>
+        <Section title="Недели">
+          {visibleWeeks.map((w) => (
+            <div key={w} className="row kug-week" data-current={w === current || undefined}>
+              <span className="kug-week-no">{w}</span>
+              <span className="kug-week-dates">{formatShortRange(T.dayOf(w, 0), T.dayOf(w, 6))}</span>
+              <span className="row-value">{isEvenWeek(w) ? 'чётная' : 'нечётная'}</span>
+            </div>
+          ))}
+          {!all && (
+            <button type="button" className="row row-btn row-link" onClick={() => setAll(true)}>
+              <span>Все {T.maxWeek} недель</span>
+            </button>
+          )}
+        </Section>
+
+        {best && (
+          <Section title="Твоя программа" footer="Официальный документ с сайта ГУУ: даты сессий, практик и каникул.">
+            <button type="button" className="row row-btn kug-row" onClick={() => openLink(best.url)}>
+              <span className="kug-row-text">
+                <span className="kug-title">{best.title}</span>
+                <span className="kug-sub">
+                  {[best.code, best.level ? LEVEL_TITLES[best.level] : null, best.form].filter(Boolean).join(' · ')}
+                </span>
+              </span>
+              <ExternalIcon className="row-check" />
+            </button>
+          </Section>
+        )}
+
+        <Section title="Графики всех программ (PDF)" footer="Источник: guu.ru → Сведения об образовательной организации → Образование.">
+          <div className="row row-form">
+            <input className="input" type="search" placeholder="Название или код программы" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          {error && <div className="row row-text">Не получилось загрузить список. Проверь интернет.</div>}
+          {!kug && !error && <div className="row row-text">Загружаю…</div>}
+          {shown.slice(0, 80).map((k) => (
+            <button key={k.url + k.title} type="button" className="row row-btn kug-row" onClick={() => openLink(k.url)}>
+              <span className="kug-row-text">
+                <span className="kug-title">{k.title}</span>
+                <span className="kug-sub">{[k.code, k.level ? LEVEL_TITLES[k.level] : null, k.form].filter(Boolean).join(' · ')}</span>
+              </span>
+              <ChevronRight className="row-chevron" />
+            </button>
+          ))}
+        </Section>
+      </details>
     </>
   )
 }
