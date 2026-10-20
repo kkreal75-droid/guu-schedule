@@ -1,17 +1,23 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { boardApi, errorText } from '../board/api'
 import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
-import { formatFullDate, weekTitle } from '../format'
-import { isMbGroup } from '../../shared/groups'
 import { useGroupNames } from '../data'
 import type { Extras } from '../edits'
 import { botAvailable, callBot } from '../api'
-import { CheckIcon, ChevronRight, CloseIcon, ExternalIcon } from '../icons'
+import { CheckIcon, ChevronLeft, ChevronRight, CloseIcon, ExternalIcon } from '../icons'
+import { CalendarPage } from '../more/CalendarPage'
+import { AccountForm } from '../onboarding/AccountForm'
+import type { Choice } from '../onboarding/Onboarding'
 import type { Prefs, ThemeMode } from '../prefs'
-import { MAX_WEEK, START_DAY, groupName, inSemester, moscowNow, schedule, weekOf } from '../schedule'
+import { groupName, schedule } from '../schedule'
 import { cloudAvailable } from '../storage'
 import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
+import { useBackButton } from '../useBackButton'
+
+// «Профиль» (этап 7.8, сверено с profile-28): крупный заголовок, карточка «аватар · имя · @ник · группа»,
+// «Параметры аккаунта» (студент / преподаватель + выпадающие списки и «Сохранить»), подгруппы, избранные
+// группы, тема, «Подслушано», календарь, знакомство ещё раз, о приложении. Подписок и платных функций нет.
 
 const SOURCE_URL = 'https://guu.ru/student/schedule/'
 
@@ -21,7 +27,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: 'Тёмная' },
 ]
 
-function UserCard() {
+function UserCard({ who }: { who: string }) {
   const user = telegramUser()
   const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : 'Гость'
   const initials = name
@@ -29,6 +35,7 @@ function UserCard() {
     .map((part) => part[0])
     .slice(0, 2)
     .join('')
+  const sub = [user?.username ? `@${user.username}` : null, who].filter(Boolean).join(' · ')
   return (
     <div className="user-card">
       {user?.photo_url ? (
@@ -38,13 +45,8 @@ function UserCard() {
       )}
       <div className="user-text">
         <div className="user-name">{name}</div>
-        <div className="user-sub">
-          {user?.username
-            ? `@${user.username}`
-            : inTelegram
-              ? 'Настройки синхронизируются через Telegram'
-              : 'Откройте через Telegram — настройки будут синхронизироваться'}
-        </div>
+        <div className="user-sub">{sub}</div>
+        {!inTelegram && <div className="user-sub">Откройте через Telegram — настройки будут синхронизироваться</div>}
       </div>
     </div>
   )
@@ -53,7 +55,8 @@ function UserCard() {
 type Props = {
   prefs: Prefs
   onChange: (patch: Partial<Prefs>) => void
-  onChangeProfile: () => void // «Сменить группу / роль» — снова онбординг
+  onSaveChoice: (choice: Choice) => Promise<void> // «Параметры аккаунта → Сохранить»
+  onSearchGroup: () => void // «Знаю свою группу» — поиск группы
   noteCount: number
   extras: Extras
   boardOrigin: boolean | null // «Подслушано»: курс и институт у псевдонима; null — вне Telegram
@@ -88,15 +91,24 @@ function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) =
           : 'По умолчанию — только псевдоним. Группа и имя не показываются никогда.')
       }
     >
-      <button type="button" className="row row-btn" role="switch" aria-checked={on} disabled={busy} onClick={toggle}>
-        <span>Курс и институт у псевдонима</span>
-        {on && <CheckIcon className="row-check" />}
-      </button>
+      <label className="row row-switch">
+        <span className="row-label">Курс и институт у псевдонима</span>
+        <input type="checkbox" className="switch" checked={on} disabled={busy} onChange={toggle} />
+      </label>
     </Section>
   )
 }
 
-export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras, boardOrigin, onBoardOrigin, onShowIntro }: Props) {
+export function ProfileScreen({
+  prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, boardOrigin, onBoardOrigin, onShowIntro,
+}: Props) {
+  const [sub, setSub] = useState<'calendar' | null>(null)
+  const closeSub = useCallback(() => {
+    setSub(null)
+    window.scrollTo(0, 0)
+  }, [])
+  useBackButton(sub ? closeSub : null)
+
   // подгруппы своей группы (их заводит староста): выбранные — только свои пары
   const ownSubgroups = prefs.role === 'student' ? extras.subgroups.filter((s) => s.group === prefs.group) : []
   const toggleSubgroup = (id: number) => {
@@ -109,45 +121,38 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
   const teacher = prefs.role === 'teacher' && prefs.teacher
   const favorites = prefs.favorites
   const nameOf = useGroupNames()
-  const week = weekOf(moscowNow().day)
   // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
   const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
+  const who = teacher ? (prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)
+
+  if (sub === 'calendar') {
+    return (
+      <div className="screen more">
+        <header className="page-head">
+          <button type="button" className="page-back" onClick={closeSub} aria-label="Назад">
+            <ChevronLeft /> Профиль
+          </button>
+          <h2 className="page-title">Календарь на телефоне</h2>
+        </header>
+        <CalendarPage group={prefs.group} />
+      </div>
+    )
+  }
 
   return (
     <div className="screen profile">
-      <UserCard />
+      <header className="screen-head profile-head">
+        <h1 className="screen-title">Профиль</h1>
+      </header>
 
-      <Section
-        title="Расписание"
-        footer={
-          teacher
-            ? 'Главный экран — ваши пары по файлам ГУУ.'
-            : isMbGroup(prefs.group)
-              ? 'Открывается при запуске. На экране расписания можно переключиться между 1-1 и 1-2.'
-              : 'Открывается при запуске.'
-        }
-      >
-        <div className="row">
-          <span>{teacher ? 'Преподаватель' : 'Моя группа'}</span>
-          <span className="row-value">{teacher ? (prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)}</span>
-        </div>
-        <button
-          type="button"
-          className="row row-btn row-link"
-          onClick={() => {
-            haptic()
-            onChangeProfile()
-          }}
-        >
-          <span>Сменить группу / роль</span>
-          <ChevronRight className="row-check" />
-        </button>
-      </Section>
+      <UserCard who={who} />
+
+      <AccountForm key={`${prefs.role}:${prefs.group}:${prefs.teacher}`} prefs={prefs} onSave={onSaveChoice} onSearch={onSearchGroup} />
 
       {ownSubgroups.length > 0 && (
         <Section
-          title="Мои подгруппы"
-          footer="Пары чужих подгрупп (например, другого преподавателя английского) не будут показываться. Ничего не выбрано — видно всё."
+          title="Подгруппы"
+          footer="Например, по языку. Пары чужих подгрупп не будут показываться. Ничего не выбрано — видно всё."
         >
           {ownSubgroups.map((s) => (
             <button
@@ -166,7 +171,7 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
       )}
 
       {favorites.length > 0 && (
-        <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «Ещё → Расписание группы».">
+        <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «+» у групп на главном экране.">
           {favorites.map((g) => (
             <div key={g} className="row">
               <span>{nameOf(g)}</span>
@@ -186,50 +191,49 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
         </Section>
       )}
 
-      {boardOrigin !== null && !teacher && <OriginToggle on={boardOrigin} onChange={onBoardOrigin} />}
-
-      <Section
-        title="Тема"
-        footer={inTelegram ? 'Системная — как в Telegram.' : 'Системная — как в настройках устройства.'}
-      >
+      <Section title="Тема" footer={inTelegram ? 'Системная — как в Telegram.' : 'Системная — как в настройках устройства.'}>
         <div className="row row-plain">
-          <Segmented
-            label="Тема оформления"
-            value={prefs.theme}
-            options={THEME_OPTIONS}
-            onChange={(theme) => onChange({ theme })}
-          />
+          <Segmented label="Тема оформления" value={prefs.theme} options={THEME_OPTIONS} onChange={(theme) => onChange({ theme })} />
         </div>
       </Section>
 
+      {boardOrigin !== null && !teacher && <OriginToggle on={boardOrigin} onChange={onBoardOrigin} />}
+
+      {!teacher && (
+        <Section title="Календарь" footer="Пары сами появятся в календаре телефона и будут обновляться.">
+          <button type="button" className="row row-btn row-nav" onClick={() => (haptic(), setSub('calendar'), window.scrollTo(0, 0))}>
+            <span className="row-label">Календарь на телефоне</span>
+            <span className="row-value">Apple / Google</span>
+            <ChevronRight className="row-chevron" />
+          </button>
+        </Section>
+      )}
+
+      <Section>
+        <button type="button" className="row row-btn row-link" onClick={() => (haptic(), onShowIntro())}>
+          <span>Показать знакомство ещё раз</span>
+          <ChevronRight className="row-check" />
+        </button>
+      </Section>
+
       <Section
-        title="Заметки"
+        title="О приложении"
         footer={
           cloudAvailable()
-            ? 'Хранятся в облаке Telegram и видны на всех ваших устройствах.'
-            : 'Вне Telegram заметки хранятся только в этом браузере.'
+            ? 'Заметки хранятся в облаке Telegram и видны на всех твоих устройствах. Всё бесплатно.'
+            : 'Вне Telegram заметки хранятся только в этом браузере. Всё бесплатно.'
         }
       >
         <div className="row">
-          <span>Всего заметок</span>
-          <span className="row-value">{noteCount}</span>
-        </div>
-      </Section>
-
-      <Section title="Семестр" footer="Новый файл расписания на guu.ru проверяем каждый час.">
-        <div className="row">
-          <span>Сейчас</span>
+          <span>Версия</span>
           <span className="row-value">
-            {inSemester(week) ? weekTitle(week).toLowerCase() : week < 1 ? 'семестр не начался' : 'семестр окончен'}
+            {__BUILD__.version} · {__BUILD__.date.split('-').reverse().join('.')}
+            {__BUILD__.sha && ` · ${__BUILD__.sha}`}
           </span>
         </div>
         <div className="row">
-          <span>Первая неделя</span>
-          <span className="row-value">с {formatFullDate(START_DAY)}</span>
-        </div>
-        <div className="row">
-          <span>Недель в расписании</span>
-          <span className="row-value">{MAX_WEEK}</span>
+          <span>Заметок</span>
+          <span className="row-value">{noteCount}</span>
         </div>
         {schedule.source_file && (
           <div className="row">
@@ -240,13 +244,6 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
         <button type="button" className="row row-btn row-link" onClick={() => openLink(SOURCE_URL)}>
           <span>Расписание на guu.ru</span>
           <ExternalIcon className="row-check" />
-        </button>
-      </Section>
-
-      <Section>
-        <button type="button" className="row row-btn row-link" onClick={() => (haptic(), onShowIntro())}>
-          <span>Показать знакомство ещё раз</span>
-          <ChevronRight className="row-check" />
         </button>
       </Section>
     </div>

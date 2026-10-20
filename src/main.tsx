@@ -64,7 +64,7 @@ type Tab = import('./components/TabBar').Tab
 type Phase =
   | { kind: 'app'; version: number; tab?: Tab }
   | { kind: 'intro'; registered: boolean }
-  | { kind: 'onboarding'; first: boolean; reason?: string }
+  | { kind: 'onboarding'; first: boolean; reason?: string; search?: boolean }
 
 // что уже выбрано — для «Это твоя группа?» в знакомстве
 function currentChoice(prefs: Prefs): Current {
@@ -121,6 +121,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
     return (
       <Onboarding
         reason={phase.reason}
+        startSearch={phase.search}
         onDone={finish}
         onCancel={phase.first ? undefined : () => setPhase({ kind: 'app', version: lastApp, tab: 'profile' })}
       />
@@ -133,9 +134,13 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
       extras={extras}
       startTab={phase.tab}
       onReload={reload}
-      onChangeProfile={() => {
+      onChangeProfile={(search) => {
         setLastApp(phase.version)
-        setPhase({ kind: 'onboarding', first: false })
+        setPhase({ kind: 'onboarding', first: false, search })
+      }}
+      onSaveChoice={async (choice) => {
+        await choose(choice)
+        await openApp('profile')
       }}
       onShowIntro={() => setPhase({ kind: 'intro', registered: true })}
     />

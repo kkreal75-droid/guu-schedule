@@ -17,6 +17,7 @@ export type Choice = { role: 'student'; group: string } | { role: 'teacher'; tea
 
 type Props = {
   reason?: string // почему снова: «группы больше нет в расписании»
+  startSearch?: boolean // «Профиль → Знаю свою группу» — сразу поиск
   onDone: (choice: Choice) => Promise<void>
   onCancel?: () => void // «Назад» с первого экрана (к знакомству или в профиль)
   cancelLabel?: string
@@ -24,11 +25,11 @@ type Props = {
 
 // ---------- шаги студента ----------
 
-type StepKey = 'form' | 'level' | 'course' | 'institute' | 'direction' | 'program' | 'group'
-type Value = string | number
-type Option = { value: Value; label: string; sub?: string }
+export type StepKey = 'form' | 'level' | 'course' | 'institute' | 'direction' | 'program' | 'group'
+export type Value = string | number
+export type Option = { value: Value; label: string; sub?: string }
 
-type Step = {
+export type Step = {
   key: StepKey
   title: string
   tiles?: 'small' | 'wide' // плитки вместо карточек: курс — маленькие, группы — по две в ряд
@@ -42,7 +43,7 @@ const LEVEL_ORDER = ['bachelor', 'master', 'postgrad']
 const uniq = <T,>(items: T[]) => [...new Set(items)]
 const byLabel = (a: Option, b: Option) => a.label.localeCompare(b.label, 'ru')
 
-const STEPS: Step[] = [
+export const STEPS: Step[] = [
   {
     key: 'form',
     title: 'Форма обучения',
@@ -117,7 +118,7 @@ const STEPS: Step[] = [
   },
 ]
 
-type Selection = Partial<Record<StepKey, Value>>
+export type Selection = Partial<Record<StepKey, Value>>
 type Crumb = { step: Step; value: Value; auto: boolean }
 
 // Проходим шаги по выбранному; шаг с одним вариантом выбирается сам
@@ -202,8 +203,8 @@ export function GroupCard({ emoji, name, text }: { emoji: string; name: string; 
 type Screen = 'role' | 'student' | 'search' | 'teacher'
 type Picked = { choice: Choice; name: string; from: Screen }
 
-export function Onboarding({ reason, onDone, onCancel, cancelLabel = 'Назад' }: Props) {
-  const [screen, setScreen] = useState<Screen>('role')
+export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel = 'Назад' }: Props) {
+  const [screen, setScreen] = useState<Screen>(startSearch ? 'search' : 'role')
   const [sel, setSel] = useState<Selection>({})
   const [index, setIndex] = useState<GroupsIndex | null>(null)
   const [error, setError] = useState(false)
@@ -269,7 +270,7 @@ export function Onboarding({ reason, onDone, onCancel, cancelLabel = 'Назад
       }
       return
     }
-    if (screen === 'search') return setScreen(index && walked?.crumbs.length ? 'student' : 'role')
+    if (screen === 'search') return startSearch ? onCancel?.() : setScreen(index && walked?.crumbs.length ? 'student' : 'role')
     if (screen === 'teacher') return setScreen('role')
     if (screen === 'student') {
       const last = walked?.crumbs.filter((c) => !c.auto).at(-1)

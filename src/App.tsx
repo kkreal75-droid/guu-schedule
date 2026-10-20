@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { AddGroupSheet } from './components/AddGroupSheet'
 import { loadTeachers } from './data'
+import type { Choice } from './onboarding/Onboarding'
 import { teacherKey } from '../shared/schedule-core'
 import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
@@ -21,18 +22,20 @@ export type { Tab }
 
 // status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен.
 // edits — ручные правки расписания из админ-панели.
-// onChangeProfile — «Сменить группу / роль»: снова онбординг; onReload — перегрузить расписание
+// onChangeProfile — выбор группы в онбординге (search — сразу поиск); onSaveChoice — «Профиль → Параметры
+// аккаунта → Сохранить»; onReload — перегрузить расписание
 // после смены избранного (см. main.tsx); startTab — какую вкладку открыть после перезагрузки
 type Props = {
   status: CheckIn | null
   extras: Extras
   startTab?: Tab
   onReload: (tab: Tab) => Promise<void>
-  onChangeProfile: () => void
+  onChangeProfile: (search?: boolean) => void
+  onSaveChoice: (choice: Choice) => Promise<void>
   onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
-export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile, onShowIntro }: Props) {
+export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile, onSaveChoice, onShowIntro }: Props) {
   const [prefs, updatePrefs] = usePrefs()
   // правки и подгруппы; староста меняет их — обновляем сразу, без перезапуска
   const [extras, setExtras] = useState(initialExtras)
@@ -161,7 +164,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)
           }}
-          onChangeProfile={onChangeProfile}
+          onSearchGroup={() => onChangeProfile(true)}
+          onSaveChoice={onSaveChoice}
           onShowIntro={onShowIntro}
         />
       )}

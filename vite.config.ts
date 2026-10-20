@@ -40,8 +40,13 @@ function dataFiles(): Plugin {
   }
 }
 
+// версия в «Профиле»: из package.json + дата сборки и коммит (GITHUB_SHA есть в GitHub Actions)
+const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, 'package.json'), 'utf8')) as { version: string }
+const BUILD = { version: pkg.version, date: new Date().toISOString().slice(0, 10), sha: (process.env.GITHUB_SHA ?? '').slice(0, 7) }
+
 export default defineConfig({
   plugins: [react(), dataFiles()],
+  define: { __BUILD__: JSON.stringify(BUILD) },
   // относительные пути — сайт работает и в корне домена, и на GitHub Pages (/<repo>/)
   base: './',
 })
