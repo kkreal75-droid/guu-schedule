@@ -164,3 +164,27 @@ export const ExamIcon = (p: P) => (
     <path d="M15 3v3h3M9 11h6M9 15h6M9 19h3" />
   </svg>
 )
+
+// лупа: расписание любой группы
+export const SearchIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </svg>
+)
+
+// преподаватель у доски
+export const TeacherIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="8" cy="7" r="3" />
+    <path d="M3 21v-3a5 5 0 0 1 10 0v3M13 4h8v9h-6" />
+  </svg>
+)
+
+// дверь: свободные аудитории
+export const DoorIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M5 21h14M7 21V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v17" />
+    <path d="M14 12h.01" />
+  </svg>
+)

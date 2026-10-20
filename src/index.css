@@ -2573,3 +2573,91 @@ select.input {
 .session-subject {
   font-weight: 600;
 }
+
+.lesson[data-readonly] {
+  cursor: default;
+}
+
+/* ---------- «Ещё»: чужое расписание, свободные аудитории ---------- */
+
+.viewer-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.viewer-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viewer-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.viewer-sub,
+.viewer-hint {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip[data-on] {
+  background: rgb(var(--note) / 0.18);
+  color: var(--text);
+}
+
+.more .top {
+  /* в «Ещё» шапка недели не липнет к самому верху — над ней заголовок страницы */
+  position: static;
+  padding: 12px 0 8px;
+}
+
+.rooms-note {
+  margin: 0 4px 10px;
+}
+
+.rooms-picker {
+  display: flex;
+  gap: 6px;
+  margin: 0 -16px 10px;
+  padding: 0 16px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.rooms-picker::-webkit-scrollbar {
+  display: none;
+}
+
+.rooms-count {
+  margin: 6px 4px 10px;
+  font-weight: 600;
+}
+
+.rooms-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+}
+
+.room-chip {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--fill);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}

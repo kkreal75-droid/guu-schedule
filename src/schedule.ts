@@ -86,14 +86,22 @@ export async function loadSchedule(ids: string[]): Promise<void> {
   )
   const files = loaded.filter((f): f is GroupFile => f !== null)
   // правки встроены в сборку: overrides.json и замены дней целиком (overrides/thursday*.json)
-  timetable = makeTimetable(scheduleFromGroups(files), rawOverrides as Overrides, [
-    thursday as DayReplacement,
-    thursday12 as DayReplacement,
-  ])
+  timetable = buildTimetable(files)
   schedule = timetable.schedule
   START_DAY = timetable.startDay
   MAX_WEEK = timetable.maxWeek
 }
+
+// Расписание любых групп (поиск в «Ещё»): те же правки, что у своего
+export function buildTimetable(files: GroupFile[]): Timetable {
+  return makeTimetable(scheduleFromGroups(files), rawOverrides as Overrides, [
+    thursday as DayReplacement,
+    thursday12 as DayReplacement,
+  ])
+}
+
+export { fetchGroup }
+export const getTimetable = () => timetable
 
 export const weekOf = (day: number) => timetable.weekOf(day)
 export const weekdayOf = (day: number) => timetable.weekdayOf(day)

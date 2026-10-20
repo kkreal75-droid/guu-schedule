@@ -1,7 +1,7 @@
 import { formatDuration } from '../format'
 import { NoteIcon, PersonIcon, PinIcon } from '../icons'
 import type { LessonEdit } from '../edits'
-import { pairNumber, toMinutes, type Lesson } from '../schedule'
+import { toMinutes, type Lesson } from '../schedule'
 
 const KIND_CLASS: Record<string, string> = {
   Лекция: 'k-lecture',
@@ -16,11 +16,12 @@ type Props = {
   isNext: boolean
   // правка из админ-панели: пара отменена и/или пометка
   edit?: LessonEdit
+  pair: number // номер пары по сетке группы
   note: string | undefined
-  onEditNote: () => void
+  onEditNote?: () => void // нет — чужое расписание, без заметок
 }
 
-export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote }: Props) {
+export function LessonCard({ lesson, nowMinutes, isNext, edit, pair, note, onEditNote }: Props) {
   const start = toMinutes(lesson.start)
   const end = toMinutes(lesson.end)
   const cancelled = Boolean(edit?.cancel)
@@ -33,6 +34,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote 
     <article
       className={`lesson ${kindClass}${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
       onClick={onEditNote}
+      data-readonly={onEditNote ? undefined : true}
     >
       <div className="lesson-time">
         <span className="lesson-start">{lesson.start}</span>
@@ -41,19 +43,21 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, note, onEditNote 
       <div className="lesson-body">
         <div className="lesson-top">
           {lesson.kind && <span className="badge">{lesson.kind}</span>}
-          <span className="lesson-pair">{pairNumber(lesson)} пара</span>
-          <button
-            type="button"
-            className="lesson-note-btn"
-            data-has-note={note ? true : undefined}
-            aria-label={note ? 'Изменить заметку к паре' : 'Добавить заметку к паре'}
-            onClick={(e) => {
-              e.stopPropagation()
-              onEditNote()
-            }}
-          >
-            <NoteIcon />
-          </button>
+          <span className="lesson-pair">{pair} пара</span>
+          {onEditNote && (
+            <button
+              type="button"
+              className="lesson-note-btn"
+              data-has-note={note ? true : undefined}
+              aria-label={note ? 'Изменить заметку к паре' : 'Добавить заметку к паре'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onEditNote()
+              }}
+            >
+              <NoteIcon />
+            </button>
+          )}
         </div>
         <h3 className="lesson-subject">{lesson.subject}</h3>
         {(lesson.room || lesson.teacher) && (

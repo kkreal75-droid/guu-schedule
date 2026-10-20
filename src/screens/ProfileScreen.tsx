@@ -2,6 +2,7 @@ import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
 import { isMbGroup } from '../../shared/groups'
+import { useGroupNames } from '../data'
 import { ChevronRight, CloseIcon, ExternalIcon } from '../icons'
 import type { Prefs, ThemeMode } from '../prefs'
 import { MAX_WEEK, START_DAY, groupName, inSemester, moscowNow, schedule, weekOf } from '../schedule'
@@ -54,8 +55,8 @@ type Props = {
 
 export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount }: Props) {
   const teacher = prefs.role === 'teacher' && prefs.teacher
-  // избранное, которого больше нет на сайте, в расписании не загрузилось — его и не показываем
-  const favorites = prefs.favorites.filter((g) => schedule.groups.includes(g))
+  const favorites = prefs.favorites
+  const nameOf = useGroupNames()
   const week = weekOf(moscowNow().day)
   // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
   const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
@@ -95,11 +96,11 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount }: P
         <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «Ещё → Расписание группы».">
           {favorites.map((g) => (
             <div key={g} className="row">
-              <span>{groupName(g)}</span>
+              <span>{nameOf(g)}</span>
               <button
                 type="button"
                 className="icon-btn"
-                aria-label={`Убрать ${groupName(g)} из избранного`}
+                aria-label={`Убрать ${nameOf(g)} из избранного`}
                 onClick={() => {
                   haptic()
                   onChange({ favorites: prefs.favorites.filter((f) => f !== g) })

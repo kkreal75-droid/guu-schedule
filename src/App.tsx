@@ -47,9 +47,12 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
     setBoardNew(false)
   }, [status])
 
+  // избранное поменялось — расписание перегрузим, когда человек вернётся на вкладку «Расписание»
+  const [favoritesChanged, setFavoritesChanged] = useState(false)
   const switchTab = (next: Tab) => {
     if (next === tab) return
     haptic()
+    if (next === 'schedule' && favoritesChanged) return void onReload('schedule')
     setTab(next)
     window.scrollTo(0, 0)
   }
@@ -78,9 +81,10 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
           boardNew={boardNew}
           onBoardOpen={onBoardOpen}
           prefs={prefs}
+          edits={edits}
           onPrefsChange={(patch) => {
             updatePrefs(patch)
-            if (patch.favorites) void onReload('more')
+            if (patch.favorites) setFavoritesChanged(true)
           }}
         />
       ) : (
@@ -89,7 +93,7 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
           prefs={prefs}
           onChange={(patch) => {
             updatePrefs(patch)
-            if (patch.favorites) void onReload('profile')
+            if (patch.favorites) setFavoritesChanged(true)
           }}
           onChangeProfile={onChangeProfile}
         />

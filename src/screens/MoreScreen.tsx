@@ -2,10 +2,17 @@ import { useCallback, useState, type ComponentType, type ReactNode, type SVGProp
 import { Section } from '../components/Section'
 import { AdminPage } from '../admin/AdminPage'
 import { BoardPage } from '../board/BoardPage'
-import { BoardIcon, ChevronLeft, ChevronRight, ExamIcon, GroupChatIcon, PhoneCalendarIcon, ShieldIcon } from '../icons'
+import type { ScheduleEdit } from '../edits'
+import {
+  BoardIcon, ChevronLeft, ChevronRight, DoorIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon, ShieldIcon,
+  TeacherIcon,
+} from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
+import { FreeRoomsPage } from '../more/FreeRoomsPage'
 import { GroupBotPage } from '../more/GroupBotPage'
+import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { SessionPage } from '../more/SessionPage'
+import { TeacherSchedulePage } from '../more/TeacherSchedulePage'
 import type { Prefs } from '../prefs'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -31,10 +38,19 @@ type Props = {
   onBoardOpen: () => void
   prefs: Prefs
   onPrefsChange: (patch: Partial<Prefs>) => void
+  edits: ScheduleEdit[]
 }
 
-export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen }: Props) {
+export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, edits }: Props) {
   const items: Item[] = [
+    {
+      id: 'group-schedule',
+      title: 'Расписание группы',
+      icon: SearchIcon,
+      render: () => <GroupSchedulePage prefs={prefs} onPrefsChange={onPrefsChange} edits={edits} />,
+    },
+    { id: 'teacher-schedule', title: 'Расписание преподавателя', icon: TeacherIcon, render: () => <TeacherSchedulePage /> },
+    { id: 'rooms', title: 'Свободные аудитории', icon: DoorIcon, render: () => <FreeRoomsPage /> },
     { id: 'board', title: 'Доска', icon: BoardIcon, render: () => <BoardPage group={group} />, dot: boardNew },
     ...(teacherMode
       ? []

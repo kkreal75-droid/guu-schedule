@@ -8,19 +8,18 @@ import {
 import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
 import type { LessonEdit, ScheduleEdit } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
-import {
-  MAX_WEEK, dayOf, inSemester, isoFromDay, lessonsOn, moscowNow, toMinutes, weekOf, weekdayOf,
-} from '../schedule'
+import { getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
+import type { Timetable } from '../../shared/schedule-core'
 import { haptic } from '../telegram'
 
 export type Cursor = { week: number; weekday: number }
 
-export function initialCursor(): Cursor {
+export function initialCursor(tt: Timetable = getTimetable()): Cursor {
   const { day } = moscowNow()
-  const week = weekOf(day)
+  const week = tt.weekOf(day)
   if (week < 1) return { week: 1, weekday: 0 }
-  if (week > MAX_WEEK) return { week: MAX_WEEK, weekday: 0 }
-  return { week, weekday: weekdayOf(day) }
+  if (week > tt.maxWeek) return { week: tt.maxWeek, weekday: 0 }
+  return { week, weekday: tt.weekdayOf(day) }
 }
 
 function useNow() {
@@ -48,9 +47,18 @@ type Props = {
   onCursorChange: (cursor: Cursor) => void
   notes: Notes
   onSaveNote: (key: string, text: string) => void
+  // чужое расписание (группа из поиска, преподаватель): своё расписание, без заметок
+  tt?: Timetable
+  readOnly?: boolean
 }
 
-export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote }: Props) {
+export function ScheduleScreen({
+  edits, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote, tt, readOnly,
+}: Props) {
+  const T = tt ?? getTimetable()
+  const { dayOf, weekOf, weekdayOf, inSemester } = T
+  const MAX_WEEK = T.maxWeek
+  const lessonsOn = T.lessonsOn
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
@@ -128,7 +136,7 @@ export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, on
   return (
     <div className="screen">
       <header className="top">
-        <GroupSwitch value={group} groups={groups} onChange={onGroupChange} />
+        {!readOnly && <GroupSwitch value={group} groups={groups} onChange={onGroupChange} />}
 
         <div className="weeknav">
           <button
@@ -171,7 +179,7 @@ export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, on
               <span className="day-num">{dateOf(monday + i).date}</span>
               <span className="day-dots">
                 <span className="day-dot" data-on={busyDays[i] || undefined} />
-                {dayHasNotes(notes, monday + i, group) && <span className="day-dot day-dot-note" />}
+                {!readOnly && dayHasNotes(notes, monday + i, group) && <span className="day-dot day-dot-note" />}
               </span>
             </button>
           ))}
@@ -208,7 +216,7 @@ export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, on
               {e.text}
             </div>
           ))}
-          {dayNote ? (
+          {readOnly ? null : dayNote ? (
             <button type="button" className="day-note" onClick={editDayNote}>
               <NoteIcon className="day-note-icon" />
               <span className="note-text">{dayNote}</span>
@@ -237,8 +245,9 @@ export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, on
                     nowMinutes={nowMinutes}
                     isNext={i === nextIndex}
                     edit={lessonEdit(lesson.start)}
-                    note={notes[noteKey]}
-                    onEditNote={() =>
+                    pair={T.pairNumber(lesson)}
+                    note={readOnly ? undefined : notes[noteKey]}
+                    onEditNote={readOnly ? undefined : () =>
                       setEditing({
                         key: noteKey,
                         title: lesson.subject,
