@@ -80,7 +80,11 @@ export async function touchUser(
   const isStart = kind === 'start' ? 1 : 0
   const wrote = kind === 'start' || kind === 'message' ? 1 : 0 // писал боту сам — значит, бот может ему ответить
   const grp = normalizeGroup(group)
-  const [upsert] = await db.batch([
+  // Открытия и inline чаще раза в 10 минут ничего нового не говорят — строку не переписываем (каждая запись —
+  // ещё и два индекса, а лимит записи D1 — 100 тыс. строк в сутки). Обновляем, если визит засчитывается, если
+  // прошло 10 минут, сменились ник, имя или группа; /start и сообщения — всегда (их счётчики).
+  const throttle = kind === 'open' || kind === 'inline' ? 1 : 0
+  const [upsert, , current] = await db.batch([
     db
       .prepare(
         `INSERT INTO users (id, username, name, grp, first_seen, last_seen, visits, last_open, starts, can_message, access)
@@ -97,9 +101,16 @@ export async function touchUser(
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
            access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
+         WHERE ?12 = 0
+            OR users.last_seen < ?5 - ?9
+            OR (?6 = 1 AND (users.last_open IS NULL OR ?5 - users.last_open >= ?9))
+            OR users.username IS NOT excluded.username
+            OR users.name IS NOT excluded.name
+            OR (excluded.grp IS NOT NULL AND users.grp IS NOT excluded.grp)
+            OR (?4 IN (?10, ?11) AND users.access IS NOT 'free_forever')
          RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin, intro_version`,
       )
-      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1]),
+      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1], throttle),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
     db
       .prepare(
@@ -107,8 +118,10 @@ export async function touchUser(
          SELECT ?1, ?2, ?3 WHERE ?3 = 'start' OR (?3 = 'open' AND (SELECT last_open FROM users WHERE id = ?1) = ?2)`,
       )
       .bind(profile.id, now, kind),
+    // строку не переписали (частое открытие) — берём как есть
+    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin, intro_version FROM users WHERE id = ?').bind(profile.id),
   ])
-  const row = (upsert.results as Pick<UserRow, 'banned' | MeFields>[])[0]
+  const row = ((upsert.results[0] ?? current.results[0]) as Pick<UserRow, 'banned' | MeFields> | undefined)
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }
 }
 

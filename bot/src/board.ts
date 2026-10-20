@@ -16,8 +16,9 @@ import { economyMode } from './usage'
 import { loadGroupsIndex } from './schedule'
 
 const DAY_MS = 86_400_000
-// запас при опросе «что изменилось»: часы разных серверов Cloudflare могут чуть расходиться
-const OVERLAP_MS = 15_000
+// запас при опросе «что изменилось»: часы разных серверов Cloudflare могут чуть расходиться (на деле —
+// миллисекунды). Каждая секунда запаса — повторно отданные строки на каждом опросе каждого человека.
+const OVERLAP_MS = 5_000
 
 type Member = {
   user_id: number
@@ -86,13 +87,25 @@ async function hmacIndex(salt: string, data: string): Promise<number> {
 
 async function assignAlias(env: Env, userId: number, board: BoardId, semester: string): Promise<string> {
   const start = (await hmacIndex(env.BOARD_SALT!, `${userId}:${board}:${semester}`)) % ALIASES.length
-  // занятые пропускаем; два человека одновременно — второй попробует ещё раз
+  // занятые пропускаем; два человека одновременно — второй попробует ещё раз. Сначала проверяем только
+  // ближайшие кандидаты (по уникальному индексу — десятки строк, а не весь семестр), всю таблицу — если все заняты
+  const order = ALIASES.map((_, k) => ALIASES[(start + k) % ALIASES.length])
+  const NEAR = 40
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { results } = await env.DB.prepare('SELECT alias FROM board_aliases WHERE board = ? AND semester = ?')
-      .bind(board, semester)
+    const near = await env.DB.prepare(
+      'SELECT alias FROM board_aliases WHERE board = ?1 AND semester = ?2 AND alias IN (SELECT value FROM json_each(?3))',
+    )
+      .bind(board, semester, JSON.stringify(order.slice(0, NEAR)))
       .all<{ alias: string }>()
-    const taken = new Set(results.map((row) => row.alias))
-    let alias = ALIASES.map((_, k) => ALIASES[(start + k) % ALIASES.length]).find((name) => !taken.has(name))
+    let taken = new Set(near.results.map((row) => row.alias))
+    let alias = order.slice(0, NEAR).find((name) => !taken.has(name))
+    if (!alias) {
+      const { results } = await env.DB.prepare('SELECT alias FROM board_aliases WHERE board = ? AND semester = ?')
+        .bind(board, semester)
+        .all<{ alias: string }>()
+      taken = new Set(results.map((row) => row.alias))
+      alias = order.find((name) => !taken.has(name))
+    }
     if (!alias) {
       let n = 2
       while (taken.has(`${ALIASES[start]} ${n}`)) n++
