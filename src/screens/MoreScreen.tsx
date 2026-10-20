@@ -2,9 +2,11 @@ import { useCallback, useState, type ComponentType, type ReactNode, type SVGProp
 import { Section } from '../components/Section'
 import { AdminPage } from '../admin/AdminPage'
 import { BoardPage } from '../board/BoardPage'
-import { BoardIcon, ChevronLeft, ChevronRight, GroupChatIcon, PhoneCalendarIcon, ShieldIcon } from '../icons'
+import { BoardIcon, ChevronLeft, ChevronRight, ExamIcon, GroupChatIcon, PhoneCalendarIcon, ShieldIcon } from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
 import { GroupBotPage } from '../more/GroupBotPage'
+import { SessionPage } from '../more/SessionPage'
+import type { Prefs } from '../prefs'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 
@@ -18,13 +20,28 @@ type Item = {
   bare?: boolean // страница рисует свою шапку (у админ-панели вложенные разделы)
 }
 
-// boardNew — точка «есть новое» на доске; onBoardOpen — человек зашёл на доску, точку убрать
-type Props = { admin: boolean; group: string; boardNew: boolean; onBoardOpen: () => void }
+// group — группа на экране расписания; teacherMode — роль «Преподаватель» (сессия и календарь — для групп);
+// boardNew — точка «есть новое» на доске; onBoardOpen — человек зашёл на доску, точку убрать;
+// prefs / onPrefsChange — избранные группы
+type Props = {
+  admin: boolean
+  group: string
+  teacherMode: boolean
+  boardNew: boolean
+  onBoardOpen: () => void
+  prefs: Prefs
+  onPrefsChange: (patch: Partial<Prefs>) => void
+}
 
-export function MoreScreen({ admin, group, boardNew, onBoardOpen }: Props) {
+export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen }: Props) {
   const items: Item[] = [
     { id: 'board', title: 'Доска', icon: BoardIcon, render: () => <BoardPage group={group} />, dot: boardNew },
-    { id: 'calendar', title: 'Календарь на телефоне', icon: PhoneCalendarIcon, render: () => <CalendarPage group={group} /> },
+    ...(teacherMode
+      ? []
+      : [
+          { id: 'session', title: 'Сессия', icon: ExamIcon, render: () => <SessionPage group={group} /> },
+          { id: 'calendar', title: 'Календарь на телефоне', icon: PhoneCalendarIcon, render: () => <CalendarPage group={group} /> },
+        ]),
     { id: 'groupbot', title: 'Бот в беседе группы', icon: GroupChatIcon, render: () => <GroupBotPage /> },
   ]
   const [openId, setOpenId] = useState<string | null>(null)

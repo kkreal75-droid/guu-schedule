@@ -1,5 +1,5 @@
 // Пользователи в D1 (схема — migrations/0001_init.sql).
-import { normalizeGroup } from '../../shared/groups'
+import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import type { Profile } from './auth'
 
 export type UserRow = {
@@ -18,6 +18,33 @@ export type UserRow = {
   ban_reason: string | null
   banned_at: number | null
   board_banned_until: number | null
+  role: 'student' | 'teacher' | null // NULL — ещё не выбирал (старые пользователи — студенты МБ)
+  teacher_id: string | null
+  access: Access // будущая оплата: только структура, сейчас всё бесплатно (PAYWALL_ENABLED = false)
+  legacy: number // был в базе до онбординга — его не показываем
+  onboarded_at: number | null
+}
+
+export type Access = 'free_forever' | 'standard'
+
+// Что приложению знать о человеке (POST /seen, /profile)
+export type Me = {
+  role: 'student' | 'teacher' | null
+  group: string | null
+  teacher: string | null
+  access: Access
+  onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
+}
+
+export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy'> | null): Me {
+  const group = normalizeGroup(row?.grp)
+  return {
+    role: row?.role ?? null,
+    group,
+    teacher: row?.teacher_id ?? null,
+    access: row?.access ?? 'standard',
+    onboarding: !row?.legacy && !group && !row?.role,
+  }
 }
 
 // открытия приложения одним человеком чаще этого считаем за одно
@@ -27,13 +54,14 @@ export const VISIT_GAP_MS = 10 * 60_000
 // inline — пользуется inline-режимом в другом чате (бот ему писать не может)
 export type SeenKind = 'open' | 'start' | 'message' | 'inline'
 
-// Отмечает, что человек был. Возвращает бан и группу (её выбирают в приложении).
+// Отмечает, что человек был. Возвращает бан, группу (её выбирают в приложении) и профиль.
+// Группа МБ(МП) 1-1/1-2 — доступ free_forever (навсегда бесплатно; сейчас бесплатно всем).
 export async function touchUser(
   db: D1Database,
   profile: Profile,
   kind: SeenKind,
   group: string | null = null,
-): Promise<{ banned: boolean; grp: string | null }> {
+): Promise<{ banned: boolean; grp: string | null; me: Me }> {
   const now = Date.now()
   const isOpen = kind === 'open' ? 1 : 0
   const isStart = kind === 'start' ? 1 : 0
@@ -42,8 +70,9 @@ export async function touchUser(
   const [upsert] = await db.batch([
     db
       .prepare(
-        `INSERT INTO users (id, username, name, grp, first_seen, last_seen, visits, last_open, starts, can_message)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, CASE WHEN ?6 = 1 THEN ?5 END, ?7, ?8)
+        `INSERT INTO users (id, username, name, grp, first_seen, last_seen, visits, last_open, starts, can_message, access)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, CASE WHEN ?6 = 1 THEN ?5 END, ?7, ?8,
+                 CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE 'standard' END)
          ON CONFLICT (id) DO UPDATE SET
            username = excluded.username,
            name = excluded.name,
@@ -53,10 +82,11 @@ export async function touchUser(
            last_open = CASE WHEN ?6 = 1 AND (users.last_open IS NULL OR ?5 - users.last_open >= ?9) THEN ?5 ELSE users.last_open END,
            starts = users.starts + ?7,
            can_message = MAX(users.can_message, ?8),
-           blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END
-         RETURNING banned, grp`,
+           blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
+           access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
+         RETURNING banned, grp, role, teacher_id, access, legacy`,
       )
-      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS),
+      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1]),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
     db
       .prepare(
@@ -65,8 +95,8 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
   ])
-  const row = (upsert.results as { banned: number; grp: string | null }[])[0]
-  return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp) }
+  const row = (upsert.results as (Pick<UserRow, 'banned' | 'grp' | 'role' | 'teacher_id' | 'access' | 'legacy'>)[])[0]
+  return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }
 }
 
 export const getUser = (db: D1Database, id: number) =>

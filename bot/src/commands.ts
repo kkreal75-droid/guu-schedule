@@ -5,8 +5,7 @@ import { boardBanCommand } from './board-moderation'
 import { listBroadcasts, startBroadcast } from './broadcast'
 import { getUser, touchUser } from './db'
 import { reportError, safely } from './errors'
-import { formatDay, groupsFor, loadTimetable, todayMsk } from './schedule'
-import { normalizeGroup } from '../../shared/groups'
+import { formatDay, groupsFor, loadTimetable, personalKey, todayMsk } from './schedule'
 import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
 import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
@@ -36,12 +35,13 @@ export async function sendGreeting(env: Env, chatId: number, firstName: string |
 
 const start = ({ env, message }: Context) => sendGreeting(env, message.chat.id, message.from?.first_name)
 
-// /today, /tomorrow — для группы, выбранной в приложении; не выбрана — для МБ(МП) 1-1 и 1-2
+// /today, /tomorrow — для группы, выбранной в приложении (преподавателю — его пары);
+// не выбрана — для МБ(МП) 1-1 и 1-2
 const dayCommand =
   (offset: number): Handler =>
   async ({ env, message }) => {
     const user = await getUser(env.DB, message.from!.id)
-    const group = normalizeGroup(user?.grp)
+    const group = personalKey(user)
     const tt = await loadTimetable(env, groupsFor(group))
     await sendMessage(env, message.chat.id, formatDay(tt, todayMsk() + offset, group))
   }

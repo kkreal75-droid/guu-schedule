@@ -1,11 +1,76 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { LEVEL_TITLES, describeAudience, type AudienceFilter, type GroupsIndex, type Level } from '../../shared/groups'
 import { Segmented } from '../components/Segmented'
 import { Section } from '../components/Section'
+import { loadGroups } from '../data'
+import { GroupSearch } from '../onboarding/GroupSearch'
 import { confirmAction, haptic } from '../telegram'
 import { adminApi, adminError, stamp, type Audience, type BroadcastRow } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
-const AUDIENCE: Record<Audience, string> = { all: 'Всем', '1-1': '1-1', '1-2': '1-2' }
+type Choice = 'all' | '1-1' | '1-2' | 'filter'
+const AUDIENCE: Record<Choice, string> = { all: 'Всем', '1-1': '1-1', '1-2': '1-2', filter: 'Фильтр' }
+
+// Фильтр аудитории: уровень, форма, курс, институт — или одна группа. Пустой фильтр = всем.
+function FilterForm({ value, onChange }: { value: AudienceFilter; onChange: (f: AudienceFilter) => void }) {
+  const [index, setIndex] = useState<GroupsIndex | null>(null)
+  const [picking, setPicking] = useState(false)
+  useEffect(() => {
+    loadGroups().then(setIndex, () => {})
+  }, [])
+  if (!index) return <p className="section-footer">Загружаю список групп…</p>
+  const courses = [...new Set(index.groups.map((g) => g.course))].sort((a, b) => a - b)
+  const institutes = [...new Set(index.groups.map((g) => g.institute))].sort((a, b) => a.localeCompare(b, 'ru'))
+  if (value.group) {
+    return (
+      <div className="row-chips">
+        <button type="button" className="chip" onClick={() => onChange({})}>
+          Группа: {describeAudience(value, index.groups)} ✕
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="form">
+      <select className="input" value={value.level ?? ''} onChange={(e) => onChange({ ...value, level: (e.target.value || undefined) as Level | undefined })}>
+        <option value="">Любой уровень</option>
+        {(Object.keys(LEVEL_TITLES) as Level[]).map((l) => (
+          <option key={l} value={l}>
+            {LEVEL_TITLES[l]}
+          </option>
+        ))}
+      </select>
+      <select className="input" value={value.form ?? ''} onChange={(e) => onChange({ ...value, form: (e.target.value || undefined) as AudienceFilter['form'] })}>
+        <option value="">Любая форма</option>
+        <option value="ofo">Очная</option>
+        <option value="ozfo">Очно-заочная</option>
+      </select>
+      <select className="input" value={value.course ?? ''} onChange={(e) => onChange({ ...value, course: Number(e.target.value) || undefined })}>
+        <option value="">Любой курс</option>
+        {courses.map((c) => (
+          <option key={c} value={c}>
+            {c} курс
+          </option>
+        ))}
+      </select>
+      <select className="input" value={value.institute ?? ''} onChange={(e) => onChange({ ...value, institute: e.target.value || undefined })}>
+        <option value="">Любой институт</option>
+        {institutes.map((i) => (
+          <option key={i} value={i}>
+            {i}
+          </option>
+        ))}
+      </select>
+      {picking ? (
+        <GroupSearch groups={index.groups} onPick={(g) => (setPicking(false), onChange({ group: g.id }))} />
+      ) : (
+        <button type="button" className="button-secondary" onClick={() => setPicking(true)}>
+          Одна группа…
+        </button>
+      )}
+    </div>
+  )
+}
 const TAGS: Record<string, string> = { b: 'b', strong: 'b', i: 'i', em: 'i', u: 'u', ins: 'u', s: 's', strike: 's', del: 's', code: 'code', pre: 'pre', blockquote: 'blockquote' }
 
 // Предпросмотр HTML как в Telegram — только разрешённые теги, без выполнения чего-либо
@@ -54,7 +119,20 @@ export function BroadcastAdmin() {
   const { data, reload } = useLoad(adminApi.broadcastInfo)
   const [text, setText] = useState('')
   const [photo, setPhoto] = useState<string | null>(null)
-  const [audience, setAudience] = useState<Audience>('all')
+  const [choice, setChoice] = useState<Choice>('all')
+  const [filter, setFilter] = useState<AudienceFilter>({})
+  const [filterCount, setFilterCount] = useState<number | null>(null)
+  const audience: Audience = choice === 'filter' ? filter : choice
+  // сколько получателей у фильтра — спрашиваем бота (он знает, у кого какая группа)
+  useEffect(() => {
+    if (choice !== 'filter') return
+    let alive = true
+    setFilterCount(null)
+    adminApi.broadcastCount(filter).then((r) => alive && setFilterCount(r.count), () => {})
+    return () => {
+      alive = false
+    }
+  }, [choice, filter])
   const [busy, setBusy] = useState(false)
   const [flash, notice] = useFlash()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -71,8 +149,10 @@ export function BroadcastAdmin() {
     }
   }
 
+  const count = choice === 'filter' ? filterCount : data.counts[choice]
   const send = async (to: Audience | null) => {
-    if (to && !(await confirmAction(`Отправить рассылку: ${AUDIENCE[to].toLowerCase()} — ${data.counts[to]} получателей?`))) return
+    const who = choice === 'filter' ? describeAudience(filter) : AUDIENCE[choice].toLowerCase()
+    if (to && !(await confirmAction(`Отправить рассылку: ${who} — ${count ?? '?'} получателей?`))) return
     setBusy(true)
     try {
       const res = await adminApi.broadcast(text, photo, to)
@@ -128,10 +208,19 @@ export function BroadcastAdmin() {
 
       <Segmented
         label="Кому"
-        value={audience}
-        options={(Object.keys(AUDIENCE) as Audience[]).map((a) => ({ value: a, label: `${AUDIENCE[a]} (${data.counts[a]})` }))}
-        onChange={setAudience}
+        value={choice}
+        options={(Object.keys(AUDIENCE) as Choice[]).map((a) => ({
+          value: a,
+          label: a === 'filter' ? AUDIENCE[a] : `${AUDIENCE[a]} (${data.counts[a]})`,
+        }))}
+        onChange={setChoice}
       />
+      {choice === 'filter' && (
+        <>
+          <FilterForm value={filter} onChange={setFilter} />
+          <p className="section-footer">Получателей: {filterCount ?? '…'}</p>
+        </>
+      )}
       <div className="button-row">
         <button type="button" className="button-secondary" disabled={busy || (!text.trim() && !photo)} onClick={() => send(null)}>
           Прислать себе
@@ -148,7 +237,7 @@ export function BroadcastAdmin() {
           <div key={row.id} className="row admin-msg">
             <div className="admin-msg-body">
               <div className="admin-msg-meta">
-                #{row.id} · {stamp(row.created_at)} · {row.audience ? AUDIENCE[row.audience] : '—'} · {statusText(row)}
+                #{row.id} · {stamp(row.created_at)} · {row.audience_title} · {statusText(row)}
                 {row.photo ? ' · 🖼' : ''}
               </div>
               <div className="admin-msg-text">{row.text.replace(/<[^>]+>/g, '').slice(0, 160) || 'без текста'}</div>

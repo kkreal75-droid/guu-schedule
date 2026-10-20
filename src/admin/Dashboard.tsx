@@ -6,7 +6,7 @@ export function Dashboard() {
   const { data, error } = useLoad(adminApi.dashboard)
   if (!data) return <Loading error={error ? adminError(error) : null} />
   const { users, chats, calendar, board } = data
-  const noGroup = users.total - users.g11 - users.g12
+  const noGroup = users.total - users.g11 - users.g12 - (users.other ?? 0) - (users.teachers ?? 0)
 
   return (
     <div className="page-body">
@@ -35,6 +35,8 @@ export function Dashboard() {
         <div className="stats">
           <Stat label="1-1" value={users.g11} />
           <Stat label="1-2" value={users.g12} />
+          <Stat label="другие группы" value={users.other ?? 0} />
+          <Stat label="преподаватели" value={users.teachers ?? 0} />
           <Stat label="не выбрана" value={noGroup} />
           <Stat label="открытий" value={users.opens} />
         </div>

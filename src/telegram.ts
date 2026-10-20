@@ -49,11 +49,22 @@ export function openTelegramLink(url: string) {
 export const BOT_URL: string | null =
   import.meta.env.VITE_BOT_URL ?? (import.meta.env.DEV ? null : 'https://guu-schedule-bot.guu-schedule-bot.workers.dev')
 
+// Что бот знает о человеке: выбор из онбординга (на случай, если на этом устройстве его нет)
+// и нужен ли онбординг (новый пользователь)
+export type Me = {
+  role: 'student' | 'teacher' | null
+  group: string | null
+  teacher: string | null
+  access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
+  onboarding: boolean
+}
+
 // board — время последнего сообщения на каждой видимой доске (для точки «есть новое»);
 // edits — ручные правки расписания; notice — объявление-плашка; maintenance — текст техработ
 export type CheckIn = {
   banned: boolean
   admin: boolean
+  me: Me | null
   board: Record<string, number>
   edits: ScheduleEdit[]
   notice: { id: number; text: string } | null
@@ -67,7 +78,9 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
   if (!inTelegram || !BOT_URL) return null
   let group: string | null = null
   try {
-    group = (JSON.parse(localStorage.getItem('prefs') ?? '{}') as { group?: string }).group ?? null
+    const prefs = JSON.parse(localStorage.getItem('prefs') ?? '{}') as { group?: string; role?: string }
+    // у преподавателя группы нет (в настройках — значение по умолчанию), не передаём
+    group = prefs.role === 'teacher' ? null : (prefs.group ?? null)
   } catch {
     // нет сохранённых настроек — группу не передаём
   }
@@ -85,6 +98,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
     return {
       banned: Boolean(data.banned),
       admin: Boolean(data.admin),
+      me: data.me ?? null,
       board: data.board ?? {},
       edits: Array.isArray(data.edits) ? data.edits : [],
       notice: data.notice ?? null,

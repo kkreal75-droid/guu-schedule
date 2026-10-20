@@ -3,7 +3,8 @@ import { Section } from '../components/Section'
 import { ChevronLeft } from '../icons'
 import { confirmAction, haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
-import { BOARD_TITLES, adminApi, adminError, shortGroup, stamp, userName, type AdminUser, type UserCard } from './api'
+import { useGroupNames } from '../data'
+import { BOARD_TITLES, adminApi, adminError, stamp, userName, type AdminUser, type UserCard } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
 // бан «навсегда» бот хранит как 9999 год
@@ -18,6 +19,7 @@ function flags(u: AdminUser) {
 
 export function Users() {
   const { data, reload } = useLoad(adminApi.users)
+  const groupName = useGroupNames()
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<number | null>(null)
   const close = useCallback(() => {
@@ -69,7 +71,7 @@ export function Users() {
                 {u.username ? `@${u.username}` : `id ${u.id}`} {flags(u)}
               </small>
             </span>
-            <span>{shortGroup(u.grp)}</span>
+            <span>{u.role === 'teacher' ? 'преп.' : groupName(u.grp)}</span>
             <span>{u.visits}</span>
             <span>{stamp(u.last_seen).slice(0, 5)}</span>
           </button>
@@ -83,6 +85,7 @@ export function Users() {
 }
 
 function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
+  const groupName = useGroupNames()
   const [card, setCard] = useState<UserCard | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -147,8 +150,14 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
 
       <Section>
         <div className="row">
+          <span>Кто</span>
+          <span className="row-value">
+            {u.role === 'teacher' ? `преподаватель (${u.teacher_id})` : u.role === 'student' ? 'студент' : 'не выбирал'}
+          </span>
+        </div>
+        <div className="row">
           <span>Группа в профиле</span>
-          <span className="row-value">{u.grp ?? 'не выбрана'}</span>
+          <span className="row-value">{u.grp ? groupName(u.grp) : 'не выбрана'}</span>
         </div>
         <div className="row">
           <span>Первый визит</span>
@@ -171,9 +180,31 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
         <div className="row">
           <span>Календарь</span>
           <span className="row-value">
-            {card.calendar ? `${shortGroup(card.calendar.grp)} · обновлялся ${stamp(card.calendar.last_fetch_at)}` : 'не подключён'}
+            {card.calendar ? `${groupName(card.calendar.grp)} · обновлялся ${stamp(card.calendar.last_fetch_at)}` : 'не подключён'}
           </span>
         </div>
+      </Section>
+
+      <Section
+        title="Доступ"
+        footer="На будущее: сейчас всё бесплатно для всех, доступ ни на что не влияет. free_forever — навсегда бесплатно (МБ(МП) 1-1/1-2 и все, кто был до онбординга)."
+      >
+        <div className="row">
+          <span>Сейчас</span>
+          <span className="row-value">{u.access === 'free_forever' ? 'free_forever' : 'standard'}</span>
+        </div>
+        <button
+          type="button"
+          className="row row-btn row-link"
+          disabled={busy}
+          onClick={() =>
+            u.access === 'free_forever'
+              ? run(() => adminApi.access(id, 'standard'), 'Доступ: standard')
+              : run(() => adminApi.access(id, 'free_forever'), 'Выдан free_forever')
+          }
+        >
+          {u.access === 'free_forever' ? 'Забрать free_forever' : 'Выдать free_forever'}
+        </button>
       </Section>
 
       {!u.owner && (

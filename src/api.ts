@@ -34,3 +34,11 @@ export async function callBot<T>(path: string, payload: object = {}): Promise<T>
   if (!res.ok || data.ok === false) throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`)
   return data
 }
+
+// Выбор из онбординга — боту (для /today, inline, рассылок). Вне Telegram — просто ничего.
+export type ProfileChoice = { role: 'student'; group: string } | { role: 'teacher'; teacher: string }
+
+export async function saveProfile(choice: ProfileChoice): Promise<void> {
+  if (!botAvailable()) return
+  await callBot('/profile', choice)
+}

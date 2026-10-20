@@ -53,12 +53,14 @@ export async function exportUsers(env: Env, chatId: number): Promise<void> {
   const now = Date.now()
   const yesNo = (flag: unknown) => (flag ? 'да' : 'нет')
   const rows = [
-    ['id', 'имя', 'username', 'группа', 'первый визит', 'последний визит', 'визитов', 'blocked_bot', 'banned', 'board_banned'],
+    ['id', 'имя', 'username', 'группа', 'роль', 'доступ', 'первый визит', 'последний визит', 'визитов', 'blocked_bot', 'banned', 'board_banned'],
     ...users.map((u) => [
       u.id,
       u.name,
       u.username ? `@${u.username}` : '',
       u.grp ? (mbName(normalizeGroup(u.grp) ?? '') ?? u.grp) : '',
+      u.role === 'teacher' ? `преподаватель ${u.teacher_id ?? ''}`.trim() : u.role === 'student' ? 'студент' : '',
+      u.access,
       formatMskFull(u.first_seen),
       formatMskFull(u.last_seen),
       u.visits,

@@ -1,11 +1,23 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
-import { normalizeGroup, shortName } from '../../shared/groups'
+import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot, callBotBlob } from '../api'
 import type { BoardId, Stroke } from '../board/api'
 import type { ScheduleEdit } from '../edits'
 
 export type Dashboard = {
-  users: { total: number; day: number; week: number; month: number; opens: number; g11: number; g12: number; banned: number; blocked: number }
+  users: {
+    total: number
+    day: number
+    week: number
+    month: number
+    opens: number
+    g11: number
+    g12: number
+    other: number // другие группы ГУУ
+    teachers: number
+    banned: number
+    blocked: number
+  }
   new_by_day: { day: string; n: number }[]
   opens_by_hour: number[]
   chats: { total: number; g11: number; g12: number; digests: number }
@@ -27,6 +39,9 @@ export type AdminUser = {
   banned: number
   ban_reason: string | null
   board_banned_until: number | null
+  role: 'student' | 'teacher' | null
+  teacher_id: string | null
+  access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
 }
 
 export type BoardMessageRow = {
@@ -52,13 +67,14 @@ export type UserCard = {
   calendar: { grp: string; created_at: number; last_fetch_at: number | null; fetch_count: number } | null
 }
 
-export type Audience = 'all' | '1-1' | '1-2'
+export type Audience = 'all' | '1-1' | '1-2' | AudienceFilter
 export type BroadcastRow = {
   id: number
   created_at: number
   text: string
   photo: boolean
-  audience: Audience | null
+  audience: string | null
+  audience_title: string
   status: 'draft' | 'sending' | 'done' | 'cancelled'
   total: number
   delivered: number
@@ -97,7 +113,9 @@ export const adminApi = {
   unban: (id: number) => callBot<UserCard>('/admin/unban', { id }),
   boardBan: (id: number, days: number | null) => callBot<UserCard>('/admin/board-ban', { id, days }),
   exportCsv: () => callBot('/admin/export'),
-  broadcastInfo: () => callBot<{ counts: Record<Audience, number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
+  broadcastInfo: () => callBot<{ counts: Record<'all' | '1-1' | '1-2', number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
+  broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),
+  access: (id: number, access: AdminUser['access']) => callBot<UserCard>('/admin/access', { id, access }),
   broadcast: (text: string, photo: string | null, audience: Audience | null) =>
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
   reports: () => callBot<{ reports: BoardMessageRow[] }>('/admin/reports'),

@@ -276,6 +276,14 @@ class Writer:
                 self.changed.append(p)
 
 
+def stable(path: Path, data: dict) -> dict:
+    """updated_at меняем, только если остальное содержимое поменялось — иначе коммит на каждую пересборку."""
+    old = load_json(path)
+    if old and {**old, "updated_at": None} == {**data, "updated_at": None}:
+        return {**data, "updated_at": old["updated_at"]}
+    return data
+
+
 def github_output(**values: str) -> None:
     path = os.environ.get("GITHUB_OUTPUT")
     if path:
@@ -552,7 +560,8 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         report["unrecognized"] += rep.unrecognized
         report["warnings"] += rep.warnings
         new_state["files"][src.key] = {"name": src.name, "sha256": sha, "groups": entry["groups"],
-                                       "lessons": entry["lessons"], "parsed_at": now}
+                                       "lessons": entry["lessons"],
+                                       "parsed_at": prev.get("parsed_at", now) if prev.get("sha256") == sha else now}
 
         # 2. защита от поломки: групп стало заметно меньше
         prev_count = prev.get("groups")
@@ -689,8 +698,10 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                 rec = teachers.setdefault(tid, {"id": tid, "name": t, "subjects": set(), "groups": set(), "lessons": []})
                 rec["subjects"].add(l["subject"])
                 rec["groups"].add(gid)
+                slots = group_grid[gid].get(str(l["weekday"]), [])
+                pair = next((i + 1 for i, slot in enumerate(slots) if slot.startswith(l["start"])), None)
                 rec["lessons"].append({**{k: v for k, v in l.items() if k != "teachers"}, "group": gid,
-                                       "group_name": e["name"]})
+                                       "group_name": e["name"], "pair": pair})
             if l.get("room"):
                 rooms[l["room"]].append((l["weekday"], l["start"], l["end"], weeks_mask(l["weeks"])))
     index = []
@@ -698,7 +709,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         # одна и та же пара у потока из нескольких групп — одной строкой со списком групп
         merged: dict[tuple, dict] = {}
         for l in rec["lessons"]:
-            key = (l["weekday"], l["start"], l["end"], l["subject"], l["kind"], tuple(l["weeks"]), l.get("room"))
+            key = (l["weekday"], l["start"], l["end"], l["subject"], l["kind"], tuple(l["weeks"]), l.get("room"), l["pair"])
             if key in merged:
                 merged[key]["groups"].append(l["group"])
                 merged[key]["group_names"].append(l["group_name"])
@@ -712,7 +723,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         index.append({"id": tid, "name": rec["name"], "subjects": sorted(rec["subjects"]),
                       "groups": sorted(rec["groups"]), "lessons": len(lessons)})
     writer.prune(OUT / "teachers")
-    writer.write(OUT / "teachers.json", dump({"updated_at": now, "teachers": index}))
+    writer.write(OUT / "teachers.json", dump(stable(OUT / "teachers.json", {"updated_at": now, "teachers": index})))
 
     room_out = {}
     for room, busy in sorted(rooms.items()):
@@ -722,8 +733,9 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         prefix = ROOM_PREFIX.match(room)
         room_out[room] = {"building": prefix.group(1) if prefix else room,
                           "busy": [[wd, s, e2, mask] for (wd, s, e2), mask in sorted(slots.items())]}
-    writer.write(OUT / "rooms.json", dump({"updated_at": now, "semester_start": SEMESTER_START.isoformat(),
-                                           "note": "weeks — битовая маска: бит N = N-я неделя", "rooms": room_out}))
+    writer.write(OUT / "rooms.json", dump(stable(OUT / "rooms.json", {
+        "updated_at": now, "semester_start": SEMESTER_START.isoformat(),
+        "note": "weeks — битовая маска: бит N = N-я неделя", "rooms": room_out})))
 
     # 8. groups.json, отчёт, тревоги
     institutes = {short: full for short, full, _ in gp.INSTITUTES}
@@ -732,10 +744,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                    "institutes": institutes,
                    "groups": entries}
     # updated_at в groups.json меняется только вместе с данными — иначе коммит каждый час
-    old_groups_json = load_json(OUT / "groups.json")
-    if old_groups_json and {**old_groups_json, "updated_at": None} == {**groups_json, "updated_at": None}:
-        groups_json["updated_at"] = old_groups_json["updated_at"]
-    writer.write(OUT / "groups.json", dump(groups_json))
+    writer.write(OUT / "groups.json", dump(stable(OUT / "groups.json", groups_json)))
 
     summary = Counter((e["level"], e["form"], e["course"]) for e in entries)
     level_names = {"bachelor": "бакалавриат", "master": "магистратура", "postgrad": "аспирантура"}

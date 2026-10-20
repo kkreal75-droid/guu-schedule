@@ -4,7 +4,8 @@
 //                   личные сообщения и команды — commands.ts, беседы — chats.ts,
 //                   inline-запросы — inline.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
-//                   проверяем подпись, отмечаем визит, отвечаем {banned, admin}.
+//                   проверяем подпись, отмечаем визит, отвечаем {banned, admin, me, …}.
+//   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts).
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимная доска (board.ts), жалобы и баны — board-moderation.ts.
@@ -32,6 +33,7 @@ import { detectChanges, runDigests } from './digest'
 import { loadEdits } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
+import { handleProfile } from './profile'
 import { loadSettings } from './settings'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
@@ -117,13 +119,13 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   if (!profile) return json({ ok: false }, 403)
   try {
     const admin = isOwner(env, profile.id)
-    const [{ banned }, board, extras] = await Promise.all([
+    const [{ banned, me }, board, extras] = await Promise.all([
       touchUser(env.DB, profile, 'open', group),
       // доска, правки и настройки не должны мешать открытию приложения
       boardLatest(env).catch((err) => (console.error('Доска в /seen:', err), {})),
       appExtras(env, admin, version).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
-    return json({ ok: true, banned: banned && !admin, admin, board, ...extras })
+    return json({ ok: true, banned: banned && !admin, admin, me, board, ...extras })
   } catch (err) {
     await reportError(env, 'Открытие приложения', err)
     return json({ ok: false }, 500)
@@ -151,6 +153,7 @@ export default {
     }
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
+    if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
 
     // календарь: подписка из приложения и сам .ics для Apple/Google
     const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)

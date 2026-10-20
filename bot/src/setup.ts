@@ -36,7 +36,7 @@ const PUBLIC_COMMANDS = [
 const GROUP_COMMANDS = [
   { command: 'today', description: 'Пары на сегодня' },
   { command: 'tomorrow', description: 'Пары на завтра' },
-  { command: 'setup', description: 'Настроить (для админов беседы)' },
+  { command: 'setup', description: 'Настроить: /setup или /setup название группы' },
   { command: 'here', description: 'Присылать расписание в эту тему' },
   { command: 'off', description: 'Выключить автосообщения' },
 ]

@@ -1,1 +1,1 @@
-{"id":"mezina-t","name":"Мезина Т.","semester_start":"2026-08-31","lessons":[{"weekday":4,"start":"12:55","end":"14:25","subject":"Основы проектного управления","kind":"Практика","weeks":[1,2,3,4,5,6,7,8,9,10,11,12],"room":"У-318","groups":["b2-bap-2"],"group_names":["БАП 2-2"]}]}
+{"id":"mezina-t","name":"Мезина Т.","semester_start":"2026-08-31","lessons":[{"weekday":4,"start":"12:55","end":"14:25","subject":"Основы проектного управления","kind":"Практика","weeks":[1,2,3,4,5,6,7,8,9,10,11,12],"room":"У-318","pair":3,"groups":["b2-bap-2"],"group_names":["БАП 2-2"]}]}

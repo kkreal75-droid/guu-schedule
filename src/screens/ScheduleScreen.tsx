@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
 import { LessonCard } from '../components/LessonCard'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
-import { Segmented } from '../components/Segmented'
+import { GroupSwitch } from '../components/GroupSwitch'
 import {
   WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, formatRange, pluralPairs, weekTitle,
 } from '../format'
@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
 import type { LessonEdit, ScheduleEdit } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import {
-  MAX_WEEK, dayOf, groupName, inSemester, isoFromDay, lessonsOn, moscowNow, schedule, toMinutes, weekOf, weekdayOf,
+  MAX_WEEK, dayOf, inSemester, isoFromDay, lessonsOn, moscowNow, toMinutes, weekOf, weekdayOf,
 } from '../schedule'
 import { haptic } from '../telegram'
 
@@ -42,6 +42,7 @@ const GAP_MIN = 60 // показываем «окно», если между п�
 type Props = {
   edits: ScheduleEdit[]
   group: string
+  groups: string[] // своя группа и избранные — для переключателя
   onGroupChange: (group: string) => void
   cursor: Cursor
   onCursorChange: (cursor: Cursor) => void
@@ -49,7 +50,7 @@ type Props = {
   onSaveNote: (key: string, text: string) => void
 }
 
-export function ScheduleScreen({ edits, group, onGroupChange, cursor, onCursorChange, notes, onSaveNote }: Props) {
+export function ScheduleScreen({ edits, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote }: Props) {
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
@@ -127,12 +128,7 @@ export function ScheduleScreen({ edits, group, onGroupChange, cursor, onCursorCh
   return (
     <div className="screen">
       <header className="top">
-        <Segmented
-          label="Группа"
-          value={group}
-          options={schedule.groups.map((g) => ({ value: g, label: groupName(g) }))}
-          onChange={onGroupChange}
-        />
+        <GroupSwitch value={group} groups={groups} onChange={onGroupChange} />
 
         <div className="weeknav">
           <button

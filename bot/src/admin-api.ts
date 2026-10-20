@@ -5,7 +5,7 @@ import { CORS, json, readApi, type ApiRequest } from './api'
 import { clearCanvas } from './board'
 import { BOARD_IDS, type BoardId } from './board-config'
 import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-moderation'
-import { audienceCounts, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
+import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
@@ -36,6 +36,8 @@ async function dashboard({ env }: Call): Promise<Response> {
               COALESCE(SUM(last_seen >= ?1), 0) AS day, COALESCE(SUM(last_seen >= ?2), 0) AS week,
               COALESCE(SUM(last_seen >= ?3), 0) AS month, COALESCE(SUM(visits), 0) AS opens,
               COALESCE(SUM(grp = ?4), 0) AS g11, COALESCE(SUM(grp = ?5), 0) AS g12,
+              COALESCE(SUM(role = 'teacher'), 0) AS teachers,
+              COALESCE(SUM(grp IS NOT NULL AND grp NOT IN (?4, ?5) AND COALESCE(role, '') != 'teacher'), 0) AS other,
               COALESCE(SUM(banned), 0) AS banned, COALESCE(SUM(blocked_bot), 0) AS blocked
        FROM users`,
     ).bind(now - DAY_MS, now - 7 * DAY_MS, now - 30 * DAY_MS, MB_IDS[0], MB_IDS[1]),
@@ -86,7 +88,7 @@ async function dashboard({ env }: Call): Promise<Response> {
 async function users({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT id, username, name, grp, first_seen, last_seen, visits, starts, can_message,
-            blocked_bot, banned, ban_reason, board_banned_until
+            blocked_bot, banned, ban_reason, board_banned_until, role, teacher_id, access
      FROM users ORDER BY last_seen DESC`,
   ).all()
   return json({ ok: true, users: results })
@@ -154,6 +156,16 @@ async function boardBan({ env, req }: Call): Promise<Response> {
   return userCard(env, id)
 }
 
+// Доступ (будущая оплата, сейчас не влияет ни на что): выдать / забрать free_forever вручную
+async function access({ env, req }: Call): Promise<Response> {
+  const id = asInt(req.body.id)
+  const value = req.body.access
+  if (id === null || (value !== 'free_forever' && value !== 'standard')) return fail(400, 'bad request')
+  const { meta } = await env.DB.prepare('UPDATE users SET access = ? WHERE id = ?').bind(value, id).run()
+  if (!meta.changes) return fail(404, 'not found')
+  return userCard(env, id)
+}
+
 async function exportCsv({ env }: Call): Promise<Response> {
   await exportUsers(env, Number(env.OWNER_ID))
   return json({ ok: true })
@@ -172,6 +184,7 @@ async function broadcastInfo({ env }: Call): Promise<Response> {
       text: row.text,
       photo: Boolean(row.photo),
       audience: row.audience,
+      audience_title: audienceTitle(row.audience),
       status: row.status,
       total: row.total,
       delivered: row.delivered,
@@ -193,14 +206,36 @@ function decodeImage(value: unknown): Uint8Array | null | 'bad' {
   }
 }
 
-// audience: 'all' | '1-1' | '1-2' — отправить; null — только предпросмотр себе
+// Аудитория из запроса: 'all' | '1-1' | '1-2' | {level, form, course, institute, group}; иначе null
+function parseAudience(value: unknown): Audience | null {
+  if (value === 'all' || value === '1-1' || value === '1-2') return value
+  if (!value || typeof value !== 'object') return null
+  const f = value as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  if (f.level === 'bachelor' || f.level === 'master' || f.level === 'postgrad') out.level = f.level
+  if (f.form === 'ofo' || f.form === 'ozfo') out.form = f.form
+  if (typeof f.course === 'number' && f.course >= 1 && f.course <= 6) out.course = f.course
+  if (typeof f.institute === 'string' && f.institute.length <= 20) out.institute = f.institute
+  const group = normalizeGroup(f.group)
+  if (group) out.group = group
+  return Object.keys(out).length ? (out as Audience) : 'all'
+}
+
+async function broadcastCount({ env, req }: Call): Promise<Response> {
+  const audience = parseAudience(req.body.audience)
+  if (!audience) return fail(400, 'bad request')
+  return json({ ok: true, count: await audienceCount(env, audience) })
+}
+
+// audience: см. parseAudience — отправить; null — только предпросмотр себе
 async function broadcast({ env, ctx, req }: Call): Promise<Response> {
-  const audience = req.body.audience ?? null
-  if (audience !== null && !['all', '1-1', '1-2'].includes(audience as string)) return fail(400, 'bad request')
+  const raw = req.body.audience ?? null
+  const audience = raw === null ? null : parseAudience(raw)
+  if (raw !== null && !audience) return fail(400, 'bad request')
   const photo = decodeImage(req.body.photo)
   if (photo === 'bad') return fail(400, 'Не получилось прочитать фото')
   const text = typeof req.body.text === 'string' ? req.body.text : ''
-  const result = await panelBroadcast(env, ctx, { text, photo, audience: audience as Audience | null })
+  const result = await panelBroadcast(env, ctx, { text, photo, audience })
   if (result.error) return json({ ok: false, error: result.error }, 400)
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
@@ -436,8 +471,10 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   ban,
   unban,
   'board-ban': boardBan,
+  access,
   export: exportCsv,
   'broadcast-info': broadcastInfo,
+  'broadcast-count': broadcastCount,
   broadcast,
   reports,
   moderate: moderation,

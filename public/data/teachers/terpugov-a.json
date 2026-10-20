@@ -1,1 +1,1 @@
-{"id":"terpugov-a","name":"Терпугов А.","semester_start":"2026-08-31","lessons":[{"weekday":2,"start":"10:40","end":"12:10","subject":"Основы проектного управления","kind":"Лекция","weeks":[1,2,3,4,5,6],"room":"ПА-109","groups":["b2-euisd-1"],"group_names":["ЭУИСД 2-1"]}]}
+{"id":"terpugov-a","name":"Терпугов А.","semester_start":"2026-08-31","lessons":[{"weekday":2,"start":"10:40","end":"12:10","subject":"Основы проектного управления","kind":"Лекция","weeks":[1,2,3,4,5,6],"room":"ПА-109","pair":2,"groups":["b2-euisd-1"],"group_names":["ЭУИСД 2-1"]}]}

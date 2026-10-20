@@ -156,3 +156,11 @@ export const EraserIcon = (p: P) => (
     <path d="M9 10.5 14.5 16M11.5 20H20" />
   </svg>
 )
+
+// зачётка: сессия
+export const ExamIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M6 3h9l3 3v15H6z" />
+    <path d="M15 3v3h3M9 11h6M9 15h6M9 19h3" />
+  </svg>
+)

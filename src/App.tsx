@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { teacherKey } from '../shared/schedule-core'
 import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
 import type { ScheduleEdit } from './edits'
@@ -13,18 +14,31 @@ import { fromCache, schedule } from './schedule'
 import { haptic, type CheckIn } from './telegram'
 import { useTheme } from './theme'
 
-type Tab = 'schedule' | 'more' | 'profile'
+export type Tab = 'schedule' | 'more' | 'profile'
 
 // status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен.
 // edits — ручные правки расписания из админ-панели.
-export default function App({ status, edits }: { status: CheckIn | null; edits: ScheduleEdit[] }) {
+// onChangeProfile — «Сменить группу / роль»: снова онбординг; onReload — перегрузить расписание
+// после смены избранного (см. main.tsx); startTab — какую вкладку открыть после перезагрузки
+type Props = {
+  status: CheckIn | null
+  edits: ScheduleEdit[]
+  startTab?: Tab
+  onReload: (tab: Tab) => Promise<void>
+  onChangeProfile: () => void
+}
+
+export default function App({ status, edits, startTab, onReload, onChangeProfile }: Props) {
   const [prefs, updatePrefs] = usePrefs()
   const { notes, setNote } = useNotes()
   useTheme(prefs.theme)
 
-  const [tab, setTab] = useState<Tab>('schedule')
-  // группа, выбранная переключателем на экране расписания; null — показываем группу по умолчанию
+  // своё расписание: преподавателю — его пары, студенту — его группа
+  const home = prefs.role === 'teacher' && prefs.teacher ? teacherKey(prefs.teacher) : prefs.group
+  const [tab, setTab] = useState<Tab>(startTab ?? 'schedule')
+  // группа, выбранная переключателем на экране расписания; null — своя
   const [viewGroup, setViewGroup] = useState<string | null>(null)
+  const shownGroup = viewGroup && schedule.groups.includes(viewGroup) ? viewGroup : home
   const [cursor, setCursor] = useState<Cursor>(initialCursor)
   // точка «есть новое» на доске: «Ещё» и «Доска», без счётчиков
   const [boardNew, setBoardNew] = useState(() => hasNew(status?.board))
@@ -48,7 +62,8 @@ export default function App({ status, edits }: { status: CheckIn | null; edits: 
       {tab === 'schedule' ? (
         <ScheduleScreen
           edits={edits}
-          group={viewGroup ?? prefs.group}
+          group={shownGroup}
+          groups={schedule.groups}
           onGroupChange={setViewGroup}
           cursor={cursor}
           onCursorChange={setCursor}
@@ -58,18 +73,25 @@ export default function App({ status, edits }: { status: CheckIn | null; edits: 
       ) : tab === 'more' ? (
         <MoreScreen
           admin={Boolean(status?.admin)}
-          group={viewGroup ?? prefs.group}
+          group={shownGroup}
+          teacherMode={prefs.role === 'teacher'}
           boardNew={boardNew}
           onBoardOpen={onBoardOpen}
+          prefs={prefs}
+          onPrefsChange={(patch) => {
+            updatePrefs(patch)
+            if (patch.favorites) void onReload('more')
+          }}
         />
       ) : (
         <ProfileScreen
           noteCount={Object.keys(notes).length}
           prefs={prefs}
           onChange={(patch) => {
-            if (patch.group) setViewGroup(null)
             updatePrefs(patch)
+            if (patch.favorites) void onReload('profile')
           }}
+          onChangeProfile={onChangeProfile}
         />
       )}
 

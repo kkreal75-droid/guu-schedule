@@ -1,17 +1,21 @@
 import rawOverrides from '../overrides.json'
 import thursday from '../overrides/thursday.json'
 import thursday12 from '../overrides/thursday-1-2.json'
-import { MB_IDS, normalizeGroup } from '../shared/groups'
+import { MB_IDS, isMbGroup } from '../shared/groups'
 import {
   makeTimetable,
   scheduleFromGroups,
+  teacherAsGroup,
+  teacherKey,
   type DayReplacement,
   type GroupFile,
   type Lesson,
   type Overrides,
   type Schedule,
+  type TeacherFile,
   type Timetable,
 } from '../shared/schedule-core'
+import type { Prefs } from './prefs'
 import { readLocal, writeLocal } from './storage'
 
 // Логика недель и правок — общая с ботом, в shared/schedule-core.ts
@@ -39,10 +43,17 @@ export const dataUrl = (path: string) => {
   return url
 }
 
+// Группы больше нет на сайте (пропала из расписания ГУУ) — надо выбрать заново
+export class GroupMissingError extends Error {}
+
+// Файл группы (или «t-<id>» — расписание преподавателя)
 async function fetchGroup(id: string): Promise<GroupFile> {
-  const res = await fetch(dataUrl(`schedule/${id}.json`), { cache: 'no-store' })
-  if (!res.ok) throw new Error(`schedule/${id}.json: HTTP ${res.status}`)
-  return (await res.json()) as GroupFile
+  const path = id.startsWith('t-') ? `teachers/${id.slice(2)}.json` : `schedule/${id}.json`
+  const res = await fetch(dataUrl(path), { cache: 'no-store' })
+  if (res.status === 404 || res.headers.get('content-type')?.includes('text/html')) throw new GroupMissingError(id)
+  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`)
+  const data = await res.json()
+  return id.startsWith('t-') ? teacherAsGroup(data as TeacherFile) : (data as GroupFile)
 }
 
 // Файл группы: свежий, а если сети нет — сохранённый
@@ -52,7 +63,7 @@ async function loadGroup(id: string): Promise<GroupFile> {
     writeLocal(CACHE_PREFIX + id, JSON.stringify(file))
     return file
   } catch (err) {
-    const cached = readLocal(CACHE_PREFIX + id)
+    const cached = err instanceof GroupMissingError ? null : readLocal(CACHE_PREFIX + id)
     if (!cached) throw err
     console.warn(`Не удалось скачать расписание ${id} — показываю сохранённую копию`, err)
     fromCache = true
@@ -60,20 +71,20 @@ async function loadGroup(id: string): Promise<GroupFile> {
   }
 }
 
-// Какие группы нужны при запуске: группа из настроек. Пока все пользователи — МБ(МП) 1-1/1-2,
-// и над расписанием переключатель «1-1 / 1-2», поэтому грузим обе.
-export function startGroups(): string[] {
-  try {
-    const saved = normalizeGroup((JSON.parse(readLocal('prefs') ?? '{}') as { group?: string }).group)
-    if (saved && !MB_IDS.includes(saved)) return [saved]
-  } catch {
-    // нет сохранённых настроек — группа по умолчанию
-  }
-  return MB_IDS
+// Какие расписания нужны: преподавателю — его; студенту МБ(МП) 1-1/1-2 — обе (переключатель
+// «1-1 / 1-2», как раньше), остальным — своя группа; плюс избранные группы
+export function groupsToLoad(prefs: Prefs): string[] {
+  if (prefs.role === 'teacher' && prefs.teacher) return [teacherKey(prefs.teacher)]
+  const own = isMbGroup(prefs.group) ? MB_IDS : [prefs.group]
+  return [...new Set([...own, ...prefs.favorites])]
 }
 
-export async function loadSchedule(ids: string[] = startGroups()): Promise<void> {
-  const files = await Promise.all(ids.map(loadGroup))
+// Первая группа — главная: её нет — GroupMissingError; избранные, которых больше нет, пропускаем
+export async function loadSchedule(ids: string[]): Promise<void> {
+  const loaded = await Promise.all(
+    ids.map((id, i) => (i === 0 || (isMbGroup(id) && isMbGroup(ids[0])) ? loadGroup(id) : loadGroup(id).catch(() => null))),
+  )
+  const files = loaded.filter((f): f is GroupFile => f !== null)
   // правки встроены в сборку: overrides.json и замены дней целиком (overrides/thursday*.json)
   timetable = makeTimetable(scheduleFromGroups(files), rawOverrides as Overrides, [
     thursday as DayReplacement,

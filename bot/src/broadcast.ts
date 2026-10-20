@@ -2,7 +2,8 @@
 // На бесплатном тарифе один вызов воркера — максимум 50 подзапросов (Telegram, D1, KV),
 // поэтому за раз отправляем BATCH сообщений, остальное досылает cron раз в минуту.
 import { isOwner } from './auth'
-import { MB_GROUPS } from '../../shared/groups'
+import { MB_GROUPS, describeAudience, matchGroups, type AudienceFilter } from '../../shared/groups'
+import { loadGroupsIndex } from './schedule'
 import { TelegramError, answerCallback, sendMessage, tg, tgForm, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
 import { entitiesToHtml, escapeHtml, formatMsk, hasFormatting, stripCommand } from './util'
 
@@ -11,15 +12,54 @@ const PAUSE_MS = 50
 const CAPTION_LIMIT = 1024
 const TEXT_LIMIT = 4096
 
-export type Audience = 'all' | '1-1' | '1-2'
-export const AUDIENCE_TITLE: Record<Audience, string> = { all: 'всем', '1-1': 'МБ(МП) 1-1', '1-2': 'МБ(МП) 1-2' }
+// Кому: всем, МБ 1-1 / 1-2 (кнопки под /broadcast) или по фильтру из админ-панели — уровень, форма,
+// курс, институт, группа. В broadcasts.audience фильтр хранится JSON-ом {"t": подпись, "f": фильтр}.
+export type Audience = 'all' | '1-1' | '1-2' | AudienceFilter
+const LEGACY_TITLE: Record<string, string> = { all: 'всем', '1-1': 'МБ(МП) 1-1', '1-2': 'МБ(МП) 1-2' }
+export const audienceTitle = (stored: string | null) => {
+  if (!stored) return '—'
+  if (!stored.startsWith('{')) return LEGACY_TITLE[stored] ?? stored
+  try {
+    return (JSON.parse(stored) as { t?: string }).t ?? 'по фильтру'
+  } catch {
+    return 'по фильтру'
+  }
+}
+
+// Группы аудитории; null — все пользователи
+async function audienceGroups(env: Env, audience: Audience): Promise<{ groups: string[] | null; stored: string }> {
+  if (audience === 'all') return { groups: null, stored: 'all' }
+  if (audience === '1-1' || audience === '1-2') {
+    return { groups: [MB_GROUPS.find((g) => g.short === audience)!.id], stored: audience }
+  }
+  const index = await loadGroupsIndex(env)
+  const filter: AudienceFilter = {
+    level: audience.level,
+    form: audience.form,
+    course: audience.course,
+    institute: audience.institute,
+    group: audience.group,
+  }
+  return { groups: matchGroups(index.groups, filter), stored: JSON.stringify({ t: describeAudience(filter, index.groups), f: filter }) }
+}
+
+// Сколько получателей у фильтра (админ-панель показывает до отправки)
+export async function audienceCount(env: Env, audience: Audience): Promise<number> {
+  const { groups } = await audienceGroups(env, audience)
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM users WHERE ${RECIPIENTS} AND ${BY_GROUPS('?1')}`,
+  )
+    .bind(groups ? JSON.stringify(groups) : null)
+    .first<{ n: number }>()
+  return row?.n ?? 0
+}
 
 export type BroadcastRow = {
   id: number
   created_at: number
   text: string
   photo: string | null
-  audience: Audience | null
+  audience: string | null // 'all' | '1-1' | '1-2' | JSON {t, f}
   status: 'draft' | 'sending' | 'done' | 'cancelled'
   preview_chat: number | null
   preview_message: number | null
@@ -32,9 +72,13 @@ export type BroadcastRow = {
 
 // Кому можно слать: писали боту, не заблокировали его, не забанены
 const RECIPIENTS = 'can_message = 1 AND blocked_bot = 0 AND banned = 0'
-const groupOf = (audience: Audience) => MB_GROUPS.find((g) => g.short === audience)?.id ?? null
+// по группам (param — JSON-список id или NULL = всем); преподавателю с прежней группой студента —
+// рассылка по группам не нужна
+const BY_GROUPS = (param: string) =>
+  `(${param} IS NULL OR (grp IN (SELECT value FROM json_each(${param})) AND COALESCE(role, '') != 'teacher'))`
+type ButtonAudience = 'all' | '1-1' | '1-2'
 
-export async function audienceCounts(db: D1Database): Promise<Record<Audience, number>> {
+export async function audienceCounts(db: D1Database): Promise<Record<ButtonAudience, number>> {
   const row = await db
     .prepare(
       `SELECT COUNT(*) AS total,
@@ -47,7 +91,7 @@ export async function audienceCounts(db: D1Database): Promise<Record<Audience, n
   return { all: row?.total ?? 0, '1-1': row?.g11 ?? 0, '1-2': row?.g12 ?? 0 }
 }
 
-const audienceKeyboard = (id: number, counts: Record<Audience, number>): Keyboard => ({
+const audienceKeyboard = (id: number, counts: Record<ButtonAudience, number>): Keyboard => ({
   inline_keyboard: [
     [{ text: `Всем (${counts.all})`, callback_data: `bc:${id}:all` }],
     [
@@ -133,11 +177,11 @@ export async function onBroadcastButton(env: Env, ctx: ExecutionContext, query: 
     await Promise.all([removeButtons(), answerCallback(env, query.id, 'Рассылка отменена')])
     return
   }
-  if (!(choice in AUDIENCE_TITLE)) return void (await answerCallback(env, query.id))
-  const audience = choice as Audience
+  if (!(choice in LEGACY_TITLE)) return void (await answerCallback(env, query.id))
+  const audience = choice as ButtonAudience
   const total = await enqueue(env, id, audience)
   await Promise.all([removeButtons(), answerCallback(env, query.id, `Отправляю: ${total}`)])
-  await sendMessage(env, query.from.id, `⏳ Рассылка #${id} пошла: ${AUDIENCE_TITLE[audience]}, получателей — ${total}. Пришлю отчёт.`)
+  await sendMessage(env, query.from.id, `⏳ Рассылка #${id} пошла: ${LEGACY_TITLE[audience]}, получателей — ${total}. Пришлю отчёт.`)
   // первая пачка — сразу, остальное досылает cron
   ctx.waitUntil(drainBroadcasts(env))
 }
@@ -145,16 +189,18 @@ export async function onBroadcastButton(env: Env, ctx: ExecutionContext, query: 
 // Очередь доставки — одним запросом; бан/блокировку проверяем ещё раз перед отправкой.
 // skip — кому уже отправлено (копия владельцу из админ-панели).
 async function enqueue(env: Env, id: number, audience: Audience, skip: number | null = null): Promise<number> {
+  const { groups, stored } = await audienceGroups(env, audience)
   const [, , counted] = await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO broadcast_queue (broadcast_id, user_id)
-       SELECT ?1, id FROM users WHERE ${RECIPIENTS} AND (?2 IS NULL OR grp = ?2) AND (?3 IS NULL OR id != ?3)`,
-    ).bind(id, groupOf(audience), skip),
+       SELECT ?1, id FROM users WHERE ${RECIPIENTS}
+         AND ${BY_GROUPS('?2')} AND (?3 IS NULL OR id != ?3)`,
+    ).bind(id, groups ? JSON.stringify(groups) : null, skip),
     env.DB.prepare(
       `UPDATE broadcasts SET status = 'sending', audience = ?2,
          total = (SELECT COUNT(*) FROM broadcast_queue WHERE broadcast_id = ?1)
        WHERE id = ?1`,
-    ).bind(id, audience),
+    ).bind(id, stored),
     env.DB.prepare('SELECT total FROM broadcasts WHERE id = ?').bind(id),
   ])
   return (counted.results as { total: number }[])[0]?.total ?? 0
@@ -296,7 +342,7 @@ async function finishCompleted(env: Env): Promise<void> {
     await sendMessage(
       env,
       Number(env.OWNER_ID),
-      `📣 <b>Рассылка #${row.id} завершена</b> (${AUDIENCE_TITLE[row.audience ?? 'all']})
+      `📣 <b>Рассылка #${row.id} завершена</b> (${escapeHtml(audienceTitle(row.audience ?? 'all'))})
 ✅ Доставлено: <b>${row.delivered}</b>
 🚫 Заблокировали бота: <b>${row.blocked}</b>
 ⚠️ Ошибки: <b>${row.failed}</b>`,
@@ -323,7 +369,7 @@ export async function listBroadcasts(env: Env, chatId: number): Promise<void> {
   const lines = results.map((row) => {
     const plain = row.text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
     const snippet = plain.length > 60 ? `${plain.slice(0, 60)}…` : plain
-    return `<b>#${row.id}</b> · ${formatMsk(row.created_at)} · ${row.audience ? AUDIENCE_TITLE[row.audience] : '—'} · ${status(row)}${row.photo ? ' · 🖼' : ''}\n«${escapeHtml(snippet || 'без текста')}»`
+    return `<b>#${row.id}</b> · ${formatMsk(row.created_at)} · ${escapeHtml(audienceTitle(row.audience))} · ${status(row)}${row.photo ? ' · 🖼' : ''}\n«${escapeHtml(snippet || 'без текста')}»`
   })
   await sendMessage(env, chatId, `📣 <b>Последние рассылки</b>\n\n${lines.join('\n\n')}`)
 }

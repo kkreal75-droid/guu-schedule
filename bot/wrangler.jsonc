@@ -10,7 +10,9 @@
     "BOT_USERNAME": "GUU_Scheduule_bot",
     // «Обновить сейчас» в админ-панели запускает этот workflow (нужен секрет GITHUB_TOKEN)
     "GITHUB_REPO": "kkreal75-droid/guu-schedule",
-    "GITHUB_WORKFLOW": "deploy.yml"
+    "GITHUB_WORKFLOW": "deploy.yml",
+    // будущая оплата: только структура (поле users.access), сама оплата выключена
+    "PAYWALL_ENABLED": "false"
   },
   // D1 — всё, что часто пишется: пользователи, визиты, рассылки (миграции — в migrations/)
   "d1_databases": [

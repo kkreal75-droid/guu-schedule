@@ -1,1 +1,1 @@
-{"id":"isaeva-m","name":"Исаева М.","semester_start":"2026-08-31","lessons":[{"weekday":1,"start":"10:40","end":"12:10","subject":"Основы профессионального развития","kind":"Практика","weeks":[2,4,6,8,10,12],"room":"У-458","groups":["b1-ubb-1"],"group_names":["УББ 1-1"]}]}
+{"id":"isaeva-m","name":"Исаева М.","semester_start":"2026-08-31","lessons":[{"weekday":1,"start":"10:40","end":"12:10","subject":"Основы профессионального развития","kind":"Практика","weeks":[2,4,6,8,10,12],"room":"У-458","pair":2,"groups":["b1-ubb-1"],"group_names":["УББ 1-1"]}]}

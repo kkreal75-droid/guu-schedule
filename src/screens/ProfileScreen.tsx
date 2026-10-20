@@ -1,7 +1,8 @@
 import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
-import { CheckIcon, ExternalIcon } from '../icons'
+import { isMbGroup } from '../../shared/groups'
+import { ChevronRight, CloseIcon, ExternalIcon } from '../icons'
 import type { Prefs, ThemeMode } from '../prefs'
 import { MAX_WEEK, START_DAY, groupName, inSemester, moscowNow, schedule, weekOf } from '../schedule'
 import { cloudAvailable } from '../storage'
@@ -47,10 +48,14 @@ function UserCard() {
 type Props = {
   prefs: Prefs
   onChange: (patch: Partial<Prefs>) => void
+  onChangeProfile: () => void // «Сменить группу / роль» — снова онбординг
   noteCount: number
 }
 
-export function ProfileScreen({ prefs, onChange, noteCount }: Props) {
+export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount }: Props) {
+  const teacher = prefs.role === 'teacher' && prefs.teacher
+  // избранное, которого больше нет на сайте, в расписании не загрузилось — его и не показываем
+  const favorites = prefs.favorites.filter((g) => schedule.groups.includes(g))
   const week = weekOf(moscowNow().day)
   // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
   const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
@@ -60,27 +65,52 @@ export function ProfileScreen({ prefs, onChange, noteCount }: Props) {
       <UserCard />
 
       <Section
-        title="Группа по умолчанию"
-        footer="Открывается при запуске. На экране расписания группу можно переключить в любой момент."
+        title="Расписание"
+        footer={
+          teacher
+            ? 'Главный экран — ваши пары по файлам ГУУ.'
+            : isMbGroup(prefs.group)
+              ? 'Открывается при запуске. На экране расписания можно переключиться между 1-1 и 1-2.'
+              : 'Открывается при запуске.'
+        }
       >
-        {schedule.groups.map((g) => (
-          <button
-            key={g}
-            type="button"
-            className="row row-btn"
-            role="radio"
-            aria-checked={g === prefs.group}
-            onClick={() => {
-              if (g === prefs.group) return
-              haptic()
-              onChange({ group: g })
-            }}
-          >
-            <span>{groupName(g)}</span>
-            {g === prefs.group && <CheckIcon className="row-check" />}
-          </button>
-        ))}
+        <div className="row">
+          <span>{teacher ? 'Преподаватель' : 'Моя группа'}</span>
+          <span className="row-value">{teacher ? (prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)}</span>
+        </div>
+        <button
+          type="button"
+          className="row row-btn row-link"
+          onClick={() => {
+            haptic()
+            onChangeProfile()
+          }}
+        >
+          <span>Сменить группу / роль</span>
+          <ChevronRight className="row-check" />
+        </button>
       </Section>
+
+      {favorites.length > 0 && (
+        <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «Ещё → Расписание группы».">
+          {favorites.map((g) => (
+            <div key={g} className="row">
+              <span>{groupName(g)}</span>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Убрать ${groupName(g)} из избранного`}
+                onClick={() => {
+                  haptic()
+                  onChange({ favorites: prefs.favorites.filter((f) => f !== g) })
+                }}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          ))}
+        </Section>
+      )}
 
       <Section
         title="Тема"

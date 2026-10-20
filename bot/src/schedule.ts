@@ -2,13 +2,16 @@
 // что у мини-приложения (берём с сайта), и та же логика недель — shared/schedule-core.ts.
 // Плюс ручные правки из админ-панели (edits.ts).
 import { WEEKDAYS_FULL, formatDate, weekTitle } from '../../shared/format-core'
-import { MB_IDS, normalizeGroup } from '../../shared/groups'
+import { MB_IDS, normalizeGroup, type GroupsIndex } from '../../shared/groups'
 import {
   isoFromDay,
   makeTimetable,
   moscowNow,
   scheduleFromGroups,
+  teacherAsGroup,
+  teacherKey,
   type DayReplacement,
+  type TeacherFile,
   type GroupFile,
   type Lesson,
   type Overrides,
@@ -27,6 +30,9 @@ const REPLACEMENT_FILES = ['overrides/thursday.json', 'overrides/thursday-1-2.js
 // Сайт отдаёт файлы с кэшем CDN; храним разобранное и в памяти воркера на минуту
 const MEMORY_TTL_MS = 60_000
 const groupCache = new Map<string, { at: number; file: GroupFile | null }>()
+const teacherCache = new Map<string, { at: number; file: TeacherFile | null }>()
+let indexCache: { at: number; index: GroupsIndex } | null = null
+const INDEX_TTL_MS = 10 * 60_000
 let extras: { at: number; overrides: Overrides; replacements: FileReplacement[] } | null = null
 
 class NotFound extends Error {}
@@ -54,6 +60,33 @@ export async function loadGroupFile(env: Env, id: string): Promise<GroupFile | n
   return file
 }
 
+// Файл преподавателя; такого нет — null
+export async function loadTeacherFile(env: Env, id: string): Promise<TeacherFile | null> {
+  if (!/^[a-z0-9-]{1,80}$/.test(id)) return null
+  const hit = teacherCache.get(id)
+  if (hit && Date.now() - hit.at < MEMORY_TTL_MS) return hit.file
+  let file: TeacherFile | null = null
+  try {
+    file = await fetchJson<TeacherFile>(env, `data/teachers/${id}.json`)
+  } catch (err) {
+    if (!(err instanceof NotFound)) throw err
+  }
+  teacherCache.set(id, { at: Date.now(), file })
+  return file
+}
+
+// Все группы (data/groups.json, ~170 КБ) — для поиска в /setup и рассылки по фильтрам; кэш 10 минут
+export async function loadGroupsIndex(env: Env): Promise<GroupsIndex> {
+  if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) return indexCache.index
+  const index = await fetchJson<GroupsIndex>(env, 'data/groups.json')
+  indexCache = { at: Date.now(), index }
+  return index
+}
+
+// Чьё расписание показывать человеку: преподавателю — его, студенту — его группы
+export const personalKey = (user: { role?: string | null; teacher_id?: string | null; grp?: string | null } | null) =>
+  user?.role === 'teacher' && user.teacher_id ? teacherKey(user.teacher_id) : normalizeGroup(user?.grp)
+
 async function loadExtras(env: Env): Promise<NonNullable<typeof extras>> {
   if (extras && Date.now() - extras.at < MEMORY_TTL_MS) return extras
   const [overrides, ...files] = await Promise.all([
@@ -69,8 +102,10 @@ async function loadExtras(env: Env): Promise<NonNullable<typeof extras>> {
   return extras
 }
 
-// Группы, которые понадобятся: своя группа, а если её нет — МБ(МП) 1-1 и 1-2 (как раньше)
+// Группы, которые понадобятся: своя группа (или «t-<id>» преподавателя), а если её нет —
+// МБ(МП) 1-1 и 1-2 (как раньше)
 export const groupsFor = (group: string | null | undefined): string[] => {
+  if (group?.startsWith('t-')) return [group]
   const id = normalizeGroup(group)
   return id ? [id] : MB_IDS
 }
@@ -78,9 +113,14 @@ export const groupsFor = (group: string | null | undefined): string[] => {
 // Расписание этих групп вместе с ручными правками; правки недоступны — показываем без них.
 // Группы, которой нет на сайте, в расписании просто не будет.
 export async function loadTimetable(env: Env, groups: string[]): Promise<BotTimetable> {
-  const ids = [...new Set(groups.map((g) => normalizeGroup(g)).filter((g): g is string => Boolean(g)))]
+  const ids = [...new Set(groups.map((g) => (g.startsWith('t-') ? g : normalizeGroup(g))).filter((g): g is string => Boolean(g)))]
+  const load = async (id: string) => {
+    if (!id.startsWith('t-')) return loadGroupFile(env, id)
+    const teacher = await loadTeacherFile(env, id.slice(2))
+    return teacher ? teacherAsGroup(teacher) : null
+  }
   const [files, extra, edits] = await Promise.all([
-    Promise.all(ids.map((id) => loadGroupFile(env, id))),
+    Promise.all(ids.map(load)),
     loadExtras(env),
     loadEdits(env).catch((err) => (console.error('Правки расписания:', err), [] as ScheduleEdit[])),
   ])

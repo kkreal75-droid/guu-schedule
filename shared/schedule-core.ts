@@ -15,6 +15,7 @@ export type Lesson = {
   teacher: string | null
   room: string | null
   teachers?: string[] // в ячейке несколько преподавателей (teacher — первый из них)
+  pair?: number | null // номер пары, если известен заранее (в расписании преподавателя)
 }
 
 export type Schedule = {
@@ -40,6 +41,28 @@ export type GroupFile = {
   source_file?: string | null
   grid: Grid
   lessons: Omit<Lesson, 'group'>[]
+}
+
+// Файл преподавателя data/teachers/<id>.json: одна пара потока — одной строкой со списком групп
+export type TeacherFile = {
+  id: string
+  name: string
+  semester_start: string
+  lessons: (Omit<Lesson, 'group' | 'teacher' | 'teachers'> & { groups: string[]; group_names: string[] })[]
+}
+
+export const teacherKey = (id: string) => `t-${id}` // «группа» в расписании преподавателя
+
+// Расписание преподавателя как расписание одной «группы»: вместо преподавателя у пары — группы
+export function teacherAsGroup(file: TeacherFile): GroupFile {
+  return {
+    id: teacherKey(file.id),
+    name: file.name,
+    updated_at: '',
+    semester_start: file.semester_start,
+    grid: {},
+    lessons: file.lessons.map(({ groups: _, group_names, ...l }) => ({ ...l, teacher: group_names.join(', ') })),
+  }
 }
 
 // Несколько файлов групп → одно расписание
@@ -213,7 +236,7 @@ export type Timetable = {
   weekdayOf(day: number): number // 0 = понедельник
   dayOf(week: number, weekday: number): number
   inSemester(week: number): boolean
-  pairNumber(lesson: Pick<Lesson, 'group' | 'weekday' | 'start'>): number
+  pairNumber(lesson: Pick<Lesson, 'group' | 'weekday' | 'start' | 'pair'>): number
   nameOf(group: string): string // id → «МБ(МП) 1-1»
   lessonsOn(group: string, week: number, weekday: number): Lesson[]
 }
@@ -231,7 +254,8 @@ export function makeTimetable(data: Schedule, overrides: Overrides, replacements
   const slotStarts = [...new Set(schedule.lessons.map((l) => l.start))].sort()
   // номер пары — по сетке группы на этот день (у вечерних групп 18:50 — это 1-я пара);
   // нет сетки — по порядку времени начала
-  const pairNumber = (lesson: Pick<Lesson, 'group' | 'weekday' | 'start'>) => {
+  const pairNumber = (lesson: Pick<Lesson, 'group' | 'weekday' | 'start' | 'pair'>) => {
+    if (lesson.pair) return lesson.pair
     const day = schedule.grids?.[lesson.group]?.[String(lesson.weekday)]
     const i = day ? day.findIndex((slot) => slot.startsWith(lesson.start)) : -1
     return i >= 0 ? i + 1 : slotStarts.indexOf(lesson.start) + 1

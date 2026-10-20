@@ -5,7 +5,7 @@ import type { Timetable } from '../../shared/schedule-core'
 import { profileOf } from './auth'
 import { touchUser } from './db'
 import { reportError } from './errors'
-import { formatDay, formatWeek, groupsFor, loadTimetable, todayMsk, type BotTimetable } from './schedule'
+import { formatDay, formatWeek, groupsFor, loadTimetable, personalKey, todayMsk, type BotTimetable } from './schedule'
 import { tg, type TgUser } from './telegram'
 
 export type TgInlineQuery = { id: string; from: TgUser; query: string; chat_type?: string }
@@ -52,7 +52,8 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
   try {
     const user = await touchUser(env.DB, profileOf(query.from), 'inline')
     banned = user.banned
-    group = user.grp
+    // преподавателю — его пары, студенту — его группы
+    group = personalKey({ role: user.me.role, teacher_id: user.me.teacher, grp: user.grp })
   } catch (err) {
     await reportError(env, 'Учёт пользователя (inline)', err)
   }

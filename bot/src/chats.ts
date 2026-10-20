@@ -4,9 +4,9 @@
 //
 // Супергруппы с темами (форумы): отвечаем в ту тему, откуда пришла команда; сводки и
 // «Изменение в расписании» — в тему, где сделали /setup (или /here). General — без темы.
-import { MB_GROUPS, mbName, normalizeGroup } from '../../shared/groups'
+import { MB_GROUPS, mbName, normalizeGroup, searchGroups } from '../../shared/groups'
 import { ERROR_REPLY, reportError } from './errors'
-import { formatDay, groupsFor, loadTimetable, todayMsk } from './schedule'
+import { formatDay, groupsFor, loadGroupsIndex, loadTimetable, todayMsk } from './schedule'
 import { TelegramError, answerCallback, sendMessage, tg, type TgCallbackQuery, type TgChat, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 
@@ -37,7 +37,13 @@ export async function loadChats(env: Env): Promise<Record<string, ChatSettings>>
   return chats
 }
 
-const groupTitle = (group: string) => mbName(group) ?? group
+// Имя группы для сообщений: у МБ — сразу, у остальных — из groups.json (кэш)
+async function groupTitle(env: Env, group: string): Promise<string> {
+  const mb = mbName(group)
+  if (mb) return mb
+  const index = await loadGroupsIndex(env).catch(() => null)
+  return index?.groups.find((g) => g.id === group)?.name ?? group
+}
 
 async function updateChats(env: Env, change: (chats: Record<string, ChatSettings>) => void): Promise<void> {
   const chats = await loadChats(env)
@@ -72,7 +78,7 @@ async function isChatAdmin(env: Env, chatId: number, userId: number): Promise<bo
 
 // ---------- сообщения ----------
 
-const INTRO = `👋 Привет! Я присылаю расписание МБ(МП) в беседу:
+const INTRO = `👋 Привет! Я присылаю расписание группы ГУУ в беседу:
 • каждый учебный день утром — пары на сегодня;
 • в субботу вечером — неделю вперёд;
 • если пары поменяются — сразу напишу, что изменилось.
@@ -82,6 +88,9 @@ const INTRO = `👋 Привет! Я присылаю расписание МБ(
 const groupKeyboard = () => ({
   inline_keyboard: [MB_GROUPS.map((g) => ({ text: g.short, callback_data: `gs:grp:${g.short}` }))],
 })
+
+const SETUP_HINT = 'Другая группа? Напишите /setup и её название — например, <code>/setup ГМУ 2-3</code>.'
+const FOUND_MAX = 8
 
 const timeKeyboard = () => ({
   inline_keyboard: [
@@ -119,12 +128,31 @@ const today: GroupCommand = async (env, _message, settings, reply) =>
 const tomorrow: GroupCommand = async (env, _message, settings, reply) =>
   void (await reply(formatDay(await loadTimetable(env, groupsFor(settings?.group)), todayMsk() + 1, settings?.group ?? null)))
 
+// /setup — быстрые кнопки МБ 1-1 / 1-2; /setup <название> — поиск по всем группам ГУУ
 const setup: GroupCommand = async (env, message, _settings, reply) => {
   if (!message.from || !(await isChatAdmin(env, message.chat.id, message.from.id))) {
     await reply('Настроить бота могут только админы беседы.')
     return
   }
-  await reply('⚙️ <b>Настройка</b>\nКакая группа в этой беседе?', { reply_markup: groupKeyboard() })
+  const query = (message.text ?? '').replace(/^\S+\s*/, '').trim()
+  if (!query) {
+    await reply(`⚙️ <b>Настройка</b>\nКакая группа в этой беседе?\n${SETUP_HINT}`, { reply_markup: groupKeyboard() })
+    return
+  }
+  const found = searchGroups((await loadGroupsIndex(env)).groups, query, FOUND_MAX + 1)
+  if (!found.length) {
+    await reply(`Не нашёл группу «${escapeHtml(query.slice(0, 60))}». Попробуйте иначе: <code>/setup МБ(МП) 1-1</code>, <code>/setup маркетинг 2</code>.`)
+    return
+  }
+  const shown = found.slice(0, FOUND_MAX)
+  const more = found.length > FOUND_MAX ? '\nЕсли вашей нет в списке — уточните название.' : ''
+  await reply(`⚙️ <b>Настройка</b>\nВыберите группу:${more}`, {
+    reply_markup: {
+      inline_keyboard: shown.map((g) => [
+        { text: `${g.name} · ${g.institute}, ${g.course} к.`.slice(0, 60), callback_data: `gs:g:${g.id}` },
+      ]),
+    },
+  })
 }
 
 const HERE_DONE = 'Готово! Буду присылать расписание в эту тему 👍'
@@ -234,9 +262,13 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
       ...(reply_markup ? { reply_markup } : {}),
     })
 
-  if (step === 'grp') {
-    const group = MB_GROUPS.find((g) => g.short === value)?.id
-    if (!group) return void (await answerCallback(env, query.id))
+  if (step === 'grp' || step === 'g') {
+    // grp:1-1 — быстрые кнопки МБ; g:<id> — найденная поиском группа
+    const group =
+      step === 'grp'
+        ? MB_GROUPS.find((g) => g.short === value)?.id
+        : (await loadGroupsIndex(env)).groups.find((g) => g.id === normalizeGroup(value))?.id
+    if (!group) return void (await answerCallback(env, query.id, 'Такой группы больше нет — повторите /setup'))
     await updateChats(env, (chats) => {
       const current = chats[String(chat.id)]
       chats[String(chat.id)] = {
@@ -247,7 +279,7 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
         added_at: current?.added_at ?? Date.now(),
       }
     })
-    await edit(`⚙️ <b>Настройка</b>\nГруппа: <b>${escapeHtml(groupTitle(group))}</b>.\nВо сколько присылать пары на день (по Москве)?`, timeKeyboard())
+    await edit(`⚙️ <b>Настройка</b>\nГруппа: <b>${escapeHtml(await groupTitle(env, group))}</b>.\nВо сколько присылать пары на день (по Москве)?`, timeKeyboard())
     await answerCallback(env, query.id)
     return
   }
@@ -261,7 +293,7 @@ async function setupStep(env: Env, query: TgCallbackQuery): Promise<void> {
       chats[String(chat.id)] = { title: chat.title ?? current?.title ?? '', group, time, thread, added_at: current?.added_at ?? Date.now() }
     })
     const done = time
-      ? `Каждый учебный день в ${time.replace(/^0/, '')} пришлю пары${group ? ` <b>${escapeHtml(groupTitle(group))}</b>` : ''}, по субботам вечером — неделю вперёд, а если расписание поменяется — сразу напишу.`
+      ? `Каждый учебный день в ${time.replace(/^0/, '')} пришлю пары${group ? ` <b>${escapeHtml(await groupTitle(env, group))}</b>` : ''}, по субботам вечером — неделю вперёд, а если расписание поменяется — сразу напишу.`
       : 'По утрам присылать не буду. Пары можно посмотреть командами ниже.'
     const title = time && chat.is_forum ? HERE_DONE : '✅ <b>Готово</b>'
     const hereHint = chat.is_forum ? '\n/here — присылать в другую тему (написать в ней)' : ''

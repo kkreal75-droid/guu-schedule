@@ -63,3 +63,68 @@ export type GroupsIndex = {
 
 export const LEVEL_TITLES: Record<Level, string> = { bachelor: 'Бакалавриат', master: 'Магистратура', postgrad: 'Аспирантура' }
 export const FORM_TITLES: Record<Form, string> = { ofo: 'Очная', ozfo: 'Очно-заочная' }
+
+// ---------- поиск групп ----------
+// «мб 1-1», «МБ(МП)», «гму 2-3», «маркетинг 2», «международный бизнес» — по имени, программе и id.
+
+const squash = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, '')
+const words = (text: string) => text.toLowerCase().replace(/ё/g, 'е').split(/[^a-zа-я0-9]+/).filter(Boolean)
+
+export function searchGroups(groups: GroupInfo[], query: string, limit = 20): GroupInfo[] {
+  const q = squash(query)
+  if (!q) return []
+  const qWords = words(query)
+  const scored: [number, GroupInfo][] = []
+  for (const g of groups) {
+    const name = squash(g.name)
+    const program = squash(g.program)
+    let score = 0
+    if (name === q) score = 100
+    else if (name.startsWith(q)) score = 80
+    else if (name.includes(q)) score = 60
+    else if (program.startsWith(q)) score = 50
+    else if (program.includes(q)) score = 40
+    else {
+      // «маркетинг 2» — все слова запроса есть в имени, программе или институте (числа — в курсе-номере)
+      const hay = `${squash(g.name)} ${squash(g.program)} ${squash(g.institute)} ${g.course}-${g.number}`
+      if (qWords.length > 1 && qWords.every((w) => hay.includes(w))) score = 30
+    }
+    if (score) scored.push([score, g])
+  }
+  return scored
+    .sort((a, b) => b[0] - a[0] || a[1].course - b[1].course || a[1].name.localeCompare(b[1].name, 'ru'))
+    .slice(0, limit)
+    .map(([, g]) => g)
+}
+
+// Подпись к группе в списках: «Международный бизнес · ИУПСиБК · 1 курс»
+export const groupSubtitle = (g: GroupInfo) =>
+  [g.program, g.institute, g.level === 'postgrad' ? `аспирантура, ${g.course} курс` : `${g.course} курс`].join(' · ')
+
+// ---------- рассылка: кому ----------
+
+export type AudienceFilter = { level?: Level; form?: Form; course?: number; institute?: string; group?: string }
+
+export function matchGroups(groups: GroupInfo[], f: AudienceFilter): string[] {
+  return groups
+    .filter(
+      (g) =>
+        (!f.level || g.level === f.level) &&
+        (!f.form || g.form === f.form) &&
+        (!f.course || g.course === f.course) &&
+        (!f.institute || g.institute === f.institute) &&
+        (!f.group || g.id === f.group),
+    )
+    .map((g) => g.id)
+}
+
+export function describeAudience(f: AudienceFilter, groups: GroupInfo[] = []): string {
+  if (f.group) return groups.find((g) => g.id === f.group)?.name ?? f.group
+  const parts = [
+    f.level ? LEVEL_TITLES[f.level].toLowerCase() : null,
+    f.form ? (f.form === 'ozfo' ? 'ОЗФО' : 'ОФО') : null,
+    f.course ? `${f.course} курс` : null,
+    f.institute ?? null,
+  ].filter(Boolean)
+  return parts.length ? parts.join(', ') : 'всем'
+}

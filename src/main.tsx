@@ -1,59 +1,153 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
-import { cachedEdits, rememberEdits } from './edits'
-import { loadSchedule } from './schedule'
-import { checkIn, initTelegram } from './telegram'
+import { cachedEdits, rememberEdits, type ScheduleEdit } from './edits'
+import { Onboarding, type Choice } from './onboarding/Onboarding'
+import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from './prefs'
+import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
+import { readCloud, readLocal } from './storage'
+import { checkIn, initTelegram, type CheckIn } from './telegram'
 
 if (import.meta.env.DEV) installTelegramMock()
 initTelegram()
-// параллельно с расписанием: визит для статистики и проверка бана
+// параллельно: визит для статистики и проверка бана, настройки из облака Telegram
 const status = checkIn()
+const cloudPrefs = Promise.race([readCloud('prefs'), new Promise<null>((r) => setTimeout(() => r(null), 1500))])
 
 const root = createRoot(document.getElementById('root')!)
 root.render(<p className="boot">Загружаю расписание…</p>)
 
-Promise.all([loadSchedule(), status])
-  .then(async ([, checked]) => {
-    if (checked?.banned) {
-      root.render(
-        <div className="boot">
-          <p className="boot-title">Доступ ограничен</p>
-          <p>Владелец бота ограничил вам доступ к расписанию.</p>
-        </div>,
-      )
-      return
-    }
-    // техработы включаются в админ-панели; самому админу бот этот текст не присылает
-    if (checked?.maintenance) {
-      root.render(
-        <div className="boot">
-          <p className="boot-title">🛠 Технические работы</p>
-          <p className="boot-text">{checked.maintenance}</p>
-        </div>,
-      )
-      return
-    }
-    // правки расписания: свежие от бота, а если он не ответил — последние сохранённые
-    if (checked) rememberEdits(checked.edits)
-    const edits = checked ? checked.edits : cachedEdits()
-    // App подгружаем после данных: его модули читают schedule уже при запуске
-    const { default: App } = await import('./App')
-    root.render(
-      <StrictMode>
-        <App status={checked} edits={edits} />
-      </StrictMode>,
+// Следы старой версии на этом устройстве: заметки, сохранённое расписание — значит, человек не новый
+const hasLocalTraces = () =>
+  ['notes_cache', 'schedule_cache', 'edits_cache', 'group_cache_b1-mb-mp-1'].some((key) => readLocal(key))
+
+// Выбор из онбординга → настройки (тема и избранное — как были)
+function applyChoice(prefs: Prefs, choice: Choice): Prefs {
+  return choice.role === 'teacher'
+    ? { ...prefs, role: 'teacher', teacher: choice.teacher, teacherName: choice.name, at: Date.now() }
+    : { ...prefs, role: 'student', group: choice.group, teacher: null, teacherName: null, at: Date.now() }
+}
+
+type Tab = 'schedule' | 'more' | 'profile'
+type Phase = { kind: 'app'; version: number; tab?: Tab } | { kind: 'onboarding'; first: boolean; reason?: string }
+
+let versions = 0
+
+function Root({ checked, edits, initial }: { checked: CheckIn | null; edits: ScheduleEdit[]; initial: Phase }) {
+  const [phase, setPhase] = useState<Phase>(initial)
+  const [lastApp, setLastApp] = useState(0) // версия App до онбординга — «Отмена» возвращает его как был
+
+  // настройки поменялись (избранное) — заново грузим расписание и перерисовываем приложение
+  const reload = async (tab: Tab) => {
+    await loadSchedule(groupsToLoad(readPrefs()))
+    setPhase({ kind: 'app', version: ++versions, tab })
+  }
+
+  const finish = async (choice: Choice) => {
+    const prefs = applyChoice(readPrefs(), choice)
+    savePrefs(prefs)
+    // боту — для /today, inline и рассылок; не получилось — расписание всё равно откроем
+    saveProfile(choice.role === 'teacher' ? { role: 'teacher', teacher: choice.teacher } : choice).catch((err) =>
+      console.warn('Не удалось сохранить выбор в боте', err),
     )
-  })
-  .catch((err) => {
-    console.error(err)
+    await loadSchedule(groupsToLoad(prefs))
+    setPhase({ kind: 'app', version: ++versions })
+  }
+
+  if (phase.kind === 'onboarding') {
+    return (
+      <Onboarding
+        reason={phase.reason}
+        onDone={finish}
+        onCancel={phase.first ? undefined : () => setPhase({ kind: 'app', version: lastApp, tab: 'profile' })}
+      />
+    )
+  }
+  return (
+    <AppLazy
+      key={phase.version}
+      status={checked}
+      edits={edits}
+      startTab={phase.tab}
+      onReload={reload}
+      onChangeProfile={() => {
+        setLastApp(phase.version)
+        setPhase({ kind: 'onboarding', first: false })
+      }}
+    />
+  )
+}
+
+// App подгружаем после данных: его модули читают schedule уже при запуске
+let AppLazy: typeof import('./App').default
+
+async function boot() {
+  const [checked, cloud] = await Promise.all([status, cloudPrefs])
+  if (checked?.banned) {
     root.render(
       <div className="boot">
-        <p>Не удалось загрузить расписание. Проверьте интернет.</p>
-        <button type="button" className="boot-retry" onClick={() => location.reload()}>
-          Повторить
-        </button>
+        <p className="boot-title">Доступ ограничен</p>
+        <p>Владелец бота ограничил вам доступ к расписанию.</p>
       </div>,
     )
-  })
+    return
+  }
+  // техработы включаются в админ-панели; самому админу бот этот текст не присылает
+  if (checked?.maintenance) {
+    root.render(
+      <div className="boot">
+        <p className="boot-title">🛠 Технические работы</p>
+        <p className="boot-text">{checked.maintenance}</p>
+      </div>,
+    )
+    return
+  }
+  // правки расписания: свежие от бота, а если он не ответил — последние сохранённые
+  if (checked) rememberEdits(checked.edits)
+  const edits = checked ? checked.edits : cachedEdits()
+
+  // Чьё расписание показывать. Порядок: настройки на устройстве / в облаке Telegram → выбор, который
+  // помнит бот (другое устройство) → онбординг для новых → МБ(МП) 1-1 по умолчанию (как раньше)
+  const merged = mergeBootPrefs(readLocal('prefs'), cloud)
+  let initial: Phase = { kind: 'app', version: 0 }
+  const me = checked?.me
+  if (!merged || merged.groupless) {
+    if (me?.role === 'teacher' && me.teacher) {
+      savePrefs({ ...(merged ?? defaultPrefs()), role: 'teacher', teacher: me.teacher, at: Date.now() })
+    } else if (me?.group) {
+      savePrefs({ ...(merged ?? defaultPrefs()), role: 'student', group: me.group, at: Date.now() })
+    } else if (me?.onboarding || (!checked && !hasLocalTraces())) {
+      initial = { kind: 'onboarding', first: true }
+    }
+  }
+
+  if (initial.kind === 'app') {
+    try {
+      await loadSchedule(groupsToLoad(readPrefs()))
+    } catch (err) {
+      // группы больше нет в расписании ГУУ — выбрать заново
+      if (!(err instanceof GroupMissingError)) throw err
+      initial = { kind: 'onboarding', first: true, reason: 'Твоей группы больше нет в расписании ГУУ — выбери заново.' }
+    }
+  }
+  AppLazy = (await import('./App')).default
+  root.render(
+    <StrictMode>
+      <Root checked={checked} edits={edits} initial={initial} />
+    </StrictMode>,
+  )
+}
+
+boot().catch((err) => {
+  console.error(err)
+  root.render(
+    <div className="boot">
+      <p>Не удалось загрузить расписание. Проверьте интернет.</p>
+      <button type="button" className="boot-retry" onClick={() => location.reload()}>
+        Повторить
+      </button>
+    </div>,
+  )
+})
