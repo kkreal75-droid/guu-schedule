@@ -51,7 +51,7 @@ export function Dashboard() {
         </div>
       </Section>
 
-      <Section title="Чат">
+      <Section title="Подслушано">
         <div className="stats">
           <Stat label="участников" value={board.members} />
           <Stat label="сообщений" value={board.messages_day} hint={`за 7 дней: ${board.messages_week}`} />

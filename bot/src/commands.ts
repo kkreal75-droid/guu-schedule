@@ -9,6 +9,7 @@ import { formatDay, groupsFor, loadTimetable, personalKey, todayMsk } from './sc
 import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
 import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
+import { handleSupportReply } from './support'
 
 export const BANNED_REPLY = 'Доступ к боту ограничен.'
 
@@ -82,6 +83,14 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
     await reportError(env, 'Учёт пользователя', err)
   }
   if (banned && !owner) return void (await sendMessage(env, message.chat.id, BANNED_REPLY))
+  // владелец отвечает на обращение в поддержку (ответом на «✍️ Ответ на обращение №…»)
+  if (owner && !command && message.reply_to_message) {
+    let handled = false
+    await safely(env, 'Ответ в поддержку', message.chat.id, async () => {
+      handled = await handleSupportReply(env, message)
+    })
+    if (handled) return
+  }
   if (!command) return
 
   // админские команды у остальных — как несуществующие: ни ответа, ни намёка

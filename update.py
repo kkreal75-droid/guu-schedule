@@ -20,6 +20,8 @@
   public/data/session/<id>.json         — сессия группы (только текущего учебного года)
   public/data/parse_report.json         — что разобрано по каждому файлу и листу, где парсер не уверен
   public/data/alerts.json               — тревоги для владельца (бот присылает их в личку)
+  public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
+                                          «Сведения → Образование»; раз в сутки (в 4 ч МСК) или с --force
   schedule.json                         — как раньше: только МБ(МП) 1-1 и 1-2 (для старых версий приложения)
   data/state.json, data/group_ids.json  — SHA файлов, число групп; реестр id групп (id не меняются)
   data/teacher_history.json             — у каких групп вёл пары преподаватель: текущий и прошлый семестр
@@ -190,6 +192,98 @@ class LinkCollector(HTMLParser):
         if tag == "a" and self._href is not None:
             self.links.append((normalize("".join(self._text)), self._href, self._section))
             self._href = None
+
+
+# ---------- календарные учебные графики (guu.ru/sveden/education/) ----------
+
+KUG_PAGE = "https://guu.ru/sveden/education/"
+KUG_SECTIONS = {"бакалавриат": "bachelor", "магистратура": "master", "аспирантура": "postgrad", "специалитет": "specialist"}
+
+
+class KugCollector(HTMLParser):
+    """Программы: <h4>«38.03.02 Менеджмент»</h4>, дальше таблица со строками «Форма обучения» и
+    «Календарный учебный график» (ссылка на PDF). Разделы — «БАКАЛАВРИАТ» / «МАГИСТРАТУРА» / …."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.programs: list[dict] = []
+        self._section: str | None = None
+        self._title: str | None = None
+        self._in_h4 = False
+        self._h4: list[str] = []
+        self._cells: list[tuple[list[str], list[str]]] | None = None  # строка: (текст, ссылки) ячеек
+        self._form: str | None = None
+        self._kug: str | None = None
+        self._tables = 0  # глубина таблиц: заголовки <h4> внутри таблиц — не программы
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table":
+            self._tables += 1
+        elif tag == "h4" and not self._tables:
+            self._in_h4, self._h4 = True, []
+        elif tag == "tr":
+            self._cells = []
+        elif tag in ("td", "th") and self._cells is not None:
+            self._cells.append(([], []))
+        elif tag == "a" and self._cells:
+            href = dict(attrs).get("href")
+            if href:
+                self._cells[-1][1].append(href)
+
+    def handle_data(self, data):
+        if self._in_h4:
+            self._h4.append(data)
+        elif self._cells:
+            self._cells[-1][0].append(data)
+        elif normalize(data) in KUG_SECTIONS:
+            self._section = KUG_SECTIONS[normalize(data)]
+
+    def handle_endtag(self, tag):
+        if tag == "h4" and self._in_h4:
+            self._in_h4 = False
+            self._title, self._form, self._kug = re.sub(r"\s+", " ", "".join(self._h4)).strip(), None, None
+        elif tag == "tr" and self._cells:
+            label = normalize("".join(self._cells[0][0]))
+            if label.startswith("форма обучения"):
+                self._form = re.sub(r"\s+", " ", "".join(self._cells[-1][0])).strip() or None
+            elif "календарн" in label and "график" in label:
+                links = [h for _, hs in self._cells for h in hs if h.lower().endswith(".pdf")]
+                self._kug = links[0] if links else None
+            self._cells = None
+        elif tag == "table":
+            self._tables = max(0, self._tables - 1)
+            if self._tables or not (self._title and self._kug):
+                return
+            m = re.match(r"^([\d.\s]+?)\s+(\D.*)$", self._title)
+            code, title = (m.group(1).strip(), m.group(2).strip()) if m else (None, self._title)
+            self.programs.append({"level": self._section, "code": code, "title": title, "form": self._form, "url": unquote(self._kug)})
+            self._title = None
+
+
+def update_kug(force: bool) -> bool:
+    """Раз в сутки (или с --force) обновляет public/data/kug.json. Не получилось — оставляем прошлый."""
+    path = OUT / "kug.json"
+    if path.exists() and not force and datetime.now(MSK).hour != 4:
+        return False
+    try:
+        _, page = fetch(KUG_PAGE)
+    except UpdateError as e:
+        warn(f"календарные учебные графики: {e}")
+        return False
+    collector = KugCollector()
+    collector.feed(page.decode("utf-8", errors="replace"))
+    programs = sorted({json.dumps(p, ensure_ascii=False, sort_keys=True) for p in collector.programs})
+    if len(programs) < 10:
+        warn(f"календарные учебные графики: нашлось только {len(programs)} — страница изменилась?")
+        return False
+    body = {"source": KUG_PAGE, "programs": [json.loads(p) for p in programs]}
+    old = load_json(path, {})
+    if old.get("programs") == body["programs"]:
+        return False
+    body["updated_at"] = datetime.now(MSK).isoformat(timespec="seconds")
+    Writer().write(path, dump(body))
+    print(f"Календарные учебные графики: {len(programs)}")
+    return True
 
 
 @dataclass
@@ -879,6 +973,8 @@ def check_overrides(lessons: list[dict]) -> None:
 
 
 def update(force: bool, local: Path | None) -> tuple[bool, str, bool]:
+    if not local:
+        update_kug(force)
     state = load_json(STATE_FILE, {"files": {}})
     sources = local_sources(local) if local else find_sources()
     contents: dict[str, bytes] = {}

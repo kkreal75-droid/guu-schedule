@@ -25,7 +25,7 @@ export type UserRow = {
   onboarded_at: number | null
   starosta_of: string | null // староста этой группы (назначает владелец)
   subgroups: string | null // JSON: выбранные подгруппы
-  board_origin: number // «Чат»: показывать у псевдонима курс и институт
+  board_origin: number // «Подслушано»: показывать у псевдонима курс и институт
   review_banned_until: number | null // бан в отзывах о преподавателях
   intro_version: number // какую версию знакомства (истории, тур) уже видел
 }
@@ -40,7 +40,7 @@ export type Me = {
   access: Access
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
-  origin: boolean // «Чат»: курс и институт у псевдонима (переключатель в профиле)
+  origin: boolean // «Подслушано»: курс и институт у псевдонима (переключатель в профиле)
   intro: number // какую версию знакомства уже видел (приложение покажет новую один раз)
 }
 

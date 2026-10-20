@@ -56,12 +56,12 @@ type Props = {
   onChangeProfile: () => void // «Сменить группу / роль» — снова онбординг
   noteCount: number
   extras: Extras
-  boardOrigin: boolean | null // «Чат»: курс и институт у псевдонима; null — вне Telegram
+  boardOrigin: boolean | null // «Подслушано»: курс и институт у псевдонима; null — вне Telegram
   onBoardOrigin: (on: boolean) => void
   onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
-// «Чат»: показывать у псевдонима курс и институт («Выдра 🦦 · 1 курс, ИУПСиБК»). Решает бот:
+// «Подслушано»: показывать у псевдонима курс и институт («Выдра 🦦 · 1 курс, ИУПСиБК»). Решает бот:
 // включить — у новых сообщений, выключить — пропадает и у старых.
 function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   const [busy, setBusy] = useState(false)
@@ -80,7 +80,7 @@ function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) =
   }
   return (
     <Section
-      title="Чат"
+      title="Подслушано"
       footer={
         error ??
         (on

@@ -102,7 +102,7 @@ export const PhoneCalendarIcon = (p: P) => (
   </svg>
 )
 
-// «Чат»: облачко с многоточием — анонимный чат
+// «Подслушано»: облачко с многоточием — анонимный чат
 export const ChatIcon = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 20l1-3.6C4.5 15 3.5 13.1 3.5 11c0-3.9 3.8-7 8.5-7Z" />
@@ -202,5 +202,67 @@ export const StarFillIcon = (p: P) => (
 export const DumbbellIcon = (p: P) => (
   <svg {...base} {...p}>
     <path d="M6.5 7.5v9M17.5 7.5v9M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />
+  </svg>
+)
+
+// таблица: «Документы»
+export const TableIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15 9.5v10" />
+  </svg>
+)
+
+// календарь со строками: «Календарный учебный график»
+export const PlanIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+    <path d="M3.5 10h17M8 3v4M16 3v4M7.5 13.5h4M7.5 16.5h7" />
+  </svg>
+)
+
+// двое: «Расписание группы»
+export const PeopleIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.5 19.5c.7-3.3 2.9-5 5.5-5s4.8 1.7 5.5 5" />
+    <path d="M15.5 5.2a3.2 3.2 0 0 1 0 5.9M17.5 14.8c1.6.6 2.6 2.1 3 4.7" />
+  </svg>
+)
+
+// здание: «Корпуса ГУУ»
+export const BuildingIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="5" y="3.5" width="14" height="17" rx="2" />
+    <path d="M9 7.5h2M13 7.5h2M9 11h2M13 11h2M9 14.5h2M13 14.5h2M10.5 20.5v-3h3v3" />
+  </svg>
+)
+
+// вопрос: «Частые вопросы»
+export const QuestionIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.8-2.4 2.2-2.4 3.7M12 17h.01" />
+  </svg>
+)
+
+// загрузка: «Установить приложение»
+export const DownloadIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </svg>
+)
+
+// облачко: «Написать в поддержку»
+export const MessageIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z" />
+  </svg>
+)
+
+// рупор: «Канал новостей»
+export const MegaphoneIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1ZM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11" />
   </svg>
 )

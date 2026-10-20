@@ -4,7 +4,7 @@ import { haptic } from '../telegram'
 import { boardApi, errorText, type Entered, type EnterResult } from './api'
 import { BoardChat } from './BoardChat'
 
-// «Ещё → Чат»: анонимный чат на весь ГУУ; при первом входе — правила
+// «Другое → Подслушано»: анонимный чат на весь ГУУ; при первом входе — правила
 export function BoardPage() {
   const [state, setState] = useState<EnterResult | null>(null)
   const [error, setError] = useState<string | null>(null)

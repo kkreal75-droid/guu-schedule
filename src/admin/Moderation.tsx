@@ -27,7 +27,7 @@ export function Moderation() {
 function MessageRow({ m, onDone }: { m: BoardMessageRow; onDone: (id: number, result: string) => void }) {
   const [busy, setBusy] = useState(false)
   const act = async (action: 'del' | 'ban' | 'ign') => {
-    const question = { del: 'Удалить сообщение?', ban: 'Удалить и забанить автора в чате навсегда?', ign: 'Оставить сообщение?' }[action]
+    const question = { del: 'Удалить сообщение?', ban: 'Удалить и забанить автора в Подслушано навсегда?', ign: 'Оставить сообщение?' }[action]
     if (!(await confirmAction(question))) return
     setBusy(true)
     try {
@@ -85,7 +85,7 @@ function Reports() {
   )
 }
 
-// лента чата с настоящими авторами
+// лента Подслушано с настоящими авторами
 function Feed() {
   const [messages, setMessages] = useState<BoardMessageRow[] | null>(null)
   const [hasMore, setHasMore] = useState(false)

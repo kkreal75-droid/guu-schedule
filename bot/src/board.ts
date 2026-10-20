@@ -1,4 +1,4 @@
-// «Чат» — анонимный чат на весь ГУУ: API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
+// «Подслушано» — анонимный чат на весь ГУУ: API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
 //
 //   enter / accept — вход и экран правил; poll — лента (раз в 4 с); send, react, report, delete — чат;
 //   origin — подпись к псевдониму «1 курс, ИУПСиБК» (переключатель в профиле, по умолчанию выключен).
@@ -59,7 +59,7 @@ export function semesterOf(ms: number): string {
   return `${year}-весна`
 }
 
-// все видят одни и те же доски — сейчас это одна, «Чат»
+// все видят одни и те же доски — сейчас это одна, «Подслушано»
 export const visibleBoards = (): BoardId[] => BOARD_IDS
 
 const fail = (status: number, error: string, extra: object = {}) => json({ ok: false, error, ...extra }, status)

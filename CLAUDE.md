@@ -23,7 +23,8 @@
 форма, курс, институт, программа); `schedule/<id>.json` — пары группы + сетка времени по дням (номер
 пары — по ней: у вечерних 18:50 — 1-я); `teachers.json` + `teachers/<id>.json`; `rooms.json` (аудитория →
 занятость, недели битовой маской); `session/<id>.json` — сессия только текущего учебного года;
-`parse_report.json` — что разобрано по файлам/листам и где парсер не уверен; `alerts.json` — тревоги,
+`parse_report.json` — что разобрано по файлам/листам и где парсер не уверен (и «Другое → Документы»);
+`kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `alerts.json` — тревоги,
 бот присылает их владельцу (cron раз в 10 мин, отправленные — KV `alerts-sent`).
 
 **Группы.** id стабильный (`b1-mb-mp-1`: b — бакалавриат ОФО, z — ОЗФО, m — магистратура, a — аспирантура;
@@ -80,17 +81,19 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /board/<enter|accept|poll|send|react|report|delete|origin>` — анонимный чат (`origin` — подпись «курс, институт»);
 - `POST /reviews/<top|teacher|save|delete|report>` — рейтинг преподавателей (`reviews.ts`);
 - `GET /sport` — секции и занятия «Спорта» (`sport.ts`, публично, кэш 60 с); правка — `/admin/sport-*`;
+- `POST /support {text}` — «Написать в поддержку»: владельцу в бот с кнопкой «Ответить» (`sp:reply:N`), ответ
+  владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки);
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
 - `GET /` — setWebhook + меню команд (`?force` — заново) + строка о данных в описании бота;
 - cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
   в :35 — чистка чата, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0012`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0013`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`, 0013 — `support_messages`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
-(приветствия, техработы, объявление), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
+(приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
 
 **Команды бота.** Личка: `/start` (одно из 3 приветствий), `/today`, `/tomorrow`.

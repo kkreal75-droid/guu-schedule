@@ -27,6 +27,7 @@ export function SettingsAdmin() {
         greetings: form.greetings,
         maintenance: form.maintenance,
         notice: { on: form.notice.on, text: form.notice.text },
+        channel: form.channel ?? '',
       })
       setForm(res.settings)
       haptic('light')
@@ -102,6 +103,18 @@ export function SettingsAdmin() {
             maxLength={300}
             value={form.notice.text}
             onChange={(e) => setForm({ ...form, notice: { ...form.notice, text: e.target.value } })}
+          />
+        </div>
+      </Section>
+
+      <Section title="Канал новостей" footer="Пункт «Другое → Канал новостей». Пусто — пункта нет. Ссылка вида https://t.me/имя_канала или @имя_канала.">
+        <div className="row row-form">
+          <input
+            className="input"
+            placeholder="https://t.me/…"
+            maxLength={200}
+            value={form.channel ?? ''}
+            onChange={(e) => setForm({ ...form, channel: e.target.value })}
           />
         </div>
       </Section>

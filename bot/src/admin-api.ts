@@ -161,7 +161,7 @@ async function boardBan({ env, req }: Call): Promise<Response> {
   return userCard(env, id)
 }
 
-// бан в отзывах о преподавателях: days как у бана в чате
+// бан в отзывах о преподавателях: days как у бана в Подслушано
 async function reviewBan({ env, req }: Call): Promise<Response> {
   const id = asInt(req.body.id)
   const days = req.body.days === null ? null : asInt(req.body.days)
@@ -274,7 +274,7 @@ async function broadcast({ env, ctx, req }: Call): Promise<Response> {
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
 
-// ---------- модерация чата ----------
+// ---------- модерация Подслушано ----------
 
 async function reports({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
@@ -461,7 +461,12 @@ async function settings({ env }: Call): Promise<Response> {
 const str = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '')
 
 async function settingsSave({ env, req }: Call): Promise<Response> {
-  const body = req.body as { greetings?: unknown; maintenance?: { on?: unknown; text?: unknown }; notice?: { on?: unknown; text?: unknown } }
+  const body = req.body as {
+    greetings?: unknown
+    maintenance?: { on?: unknown; text?: unknown }
+    notice?: { on?: unknown; text?: unknown }
+    channel?: unknown
+  }
   const greetings = Array.isArray(body.greetings) ? body.greetings.map((g) => str(g, 3500)) : []
   if (greetings.length !== 3 || greetings.some((g) => !g)) return json({ ok: false, error: 'Нужны все три приветствия' }, 400)
   for (const [i, g] of greetings.entries()) {
@@ -469,6 +474,11 @@ async function settingsSave({ env, req }: Call): Promise<Response> {
     if (problem) return json({ ok: false, error: `Приветствие ${i + 1}: ${problem}` }, 400)
   }
   const current = await loadSettings(env, true)
+  // канал новостей: только ссылка на Telegram (её откроет приложение)
+  const channel = str(body.channel, 200).replace(/^@([A-Za-z0-9_]{4,})$/, 'https://t.me/$1')
+  if (channel && !/^https:\/\/t\.me\/[A-Za-z0-9_+/-]{3,}$/.test(channel)) {
+    return json({ ok: false, error: 'Канал новостей: нужна ссылка вида https://t.me/имя_канала или @имя_канала' }, 400)
+  }
   const noticeText = str(body.notice?.text, 300)
   const noticeOn = body.notice?.on === true && Boolean(noticeText)
   const next: Settings = {
@@ -480,6 +490,7 @@ async function settingsSave({ env, req }: Call): Promise<Response> {
       text: noticeText,
       id: noticeOn && (!current.notice.on || noticeText !== current.notice.text) ? Date.now() : current.notice.id,
     },
+    channel,
   }
   await saveSettings(env, next)
   return json({ ok: true, settings: next })

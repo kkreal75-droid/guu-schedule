@@ -101,7 +101,7 @@ export function searchGroups(groups: GroupInfo[], query: string, limit = 20): Gr
 export const groupSubtitle = (g: GroupInfo) =>
   [g.program, g.institute, g.level === 'postgrad' ? `аспирантура, ${g.course} курс` : `${g.course} курс`].join(' · ')
 
-// Подпись к псевдониму в чате (если автор включил): «1 курс, ИУПСиБК», «1 курс маг., ИОМ»,
+// Подпись к псевдониму в Подслушано (если автор включил): «1 курс, ИУПСиБК», «1 курс маг., ИОМ»,
 // «аспирантура, 1 курс» — без группы и программы, чтобы не выдать человека
 export const originLabel = (g: Pick<GroupInfo, 'level' | 'course' | 'institute'>) =>
   g.level === 'postgrad'

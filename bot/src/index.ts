@@ -8,13 +8,14 @@
 //   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts); POST /intro — знакомство просмотрено.
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
-//   POST /board/<действие> — анонимный чат «Чат» (board.ts), жалобы и баны — board-moderation.ts.
+//   POST /board/<действие> — «Подслушано», анонимный чат (board.ts), жалобы и баны — board-moderation.ts.
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
 //   GET  /sport   — секции и занятия «Спорта» (sport.ts), правит владелец в админке.
+//   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
-//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка чата.
+//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка Подслушано.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
@@ -27,6 +28,7 @@ import { sendAlerts } from './alerts'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { handleSportGet } from './sport'
+import { handleSupport, onSupportButton } from './support'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
@@ -72,6 +74,7 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
       else if (query.data?.startsWith('bd:')) await onBoardButton(env, query)
       else if (query.data?.startsWith('rv:')) await onReviewButton(env, query)
+      else if (query.data?.startsWith('sp:')) await onSupportButton(env, query)
       else await answerCallback(env, query.id)
     })
   }
@@ -108,12 +111,13 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
     tags: extras.tags,
     notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
     maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
+    channel: settings.channel || null,
   }
 }
 
 // Открытие мини-приложения. Тело — JSON {initData, group, v} или просто initData (старые версии).
 // group — id группы (старые версии присылают имя «МБ(МП) 1-1»), v — версия формата приложения.
-// В ответе ещё время последнего сообщения в чате (точка «есть новое») и appExtras.
+// В ответе ещё время последнего сообщения в Подслушано (точка «есть новое») и appExtras.
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
@@ -139,8 +143,8 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
     const admin = isOwner(env, profile.id)
     const [{ banned, me }, board, extras] = await Promise.all([
       touchUser(env.DB, profile, 'open', group),
-      // «Чат», правки и настройки не должны мешать открытию приложения
-      boardLatest(env).catch((err) => (console.error('Чат в /seen:', err), {})),
+      // «Подслушано», правки и настройки не должны мешать открытию приложения
+      boardLatest(env).catch((err) => (console.error('Подслушано в /seen:', err), {})),
       appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
     return json({ ok: true, banned: banned && !admin, admin, me, board, ...extras })
@@ -172,6 +176,7 @@ export default {
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
     if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
+    if (url.pathname === '/support' && request.method === 'POST') return guarded(env, 'Поддержка', () => handleSupport(env, request))
     if (url.pathname === '/sport' && request.method === 'GET') return guarded(env, 'Спорт', () => handleSportGet(env))
     if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
     if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
@@ -201,7 +206,7 @@ export default {
     const board = url.pathname.match(/^\/board\/([a-z]+)$/)
     if (board && request.method === 'POST' && isBoardAction(board[1])) {
       const action = board[1]
-      return guarded(env, `Чат: ${action}`, () => handleBoardApi(env, request, action))
+      return guarded(env, `Подслушано: ${action}`, () => handleBoardApi(env, request, action))
     }
 
     const reviews = url.pathname.match(/^\/reviews\/([a-z]+)$/)
@@ -234,7 +239,7 @@ export default {
         used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
       }
       if (new Date(now).getUTCMinutes() === 35) {
-        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка чата', err), 0))
+        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))
       }
       const batch = Math.max(0, BATCH - used)
       if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))

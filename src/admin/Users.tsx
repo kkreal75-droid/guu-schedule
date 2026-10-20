@@ -85,7 +85,7 @@ export function Users() {
         ))}
       </div>
       <p className="section-footer">
-        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в чате · ⭐ бан в отзывах · ⛔ заблокировал бота
+        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в Подслушано · ⭐ бан в отзывах · ⛔ заблокировал бота
       </p>
     </div>
   )
@@ -128,7 +128,7 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
   const reviewBanned = u.review_banned_until && u.review_banned_until > now ? u.review_banned_until : null
 
   const deleteMessage = async (messageId: number) => {
-    if (!(await confirmAction('Удалить сообщение из чата?'))) return
+    if (!(await confirmAction('Удалить сообщение из Подслушано?'))) return
     try {
       await adminApi.moderate(messageId, 'del')
       setCard(await adminApi.user(id))
@@ -252,9 +252,9 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
       )}
 
       {!u.owner && (
-        <Section title="Чат" footer="Забаненный может читать, но не писать.">
+        <Section title="Подслушано" footer="Забаненный может читать, но не писать.">
           <div className="row">
-            <span>Бан в чате</span>
+            <span>Бан в Подслушано</span>
             <span className="row-value">{boardBanned ? (isForever(boardBanned) ? 'навсегда' : `до ${stamp(boardBanned)}`) : 'нет'}</span>
           </div>
           <div className="row row-chips">
@@ -268,13 +268,13 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
                 type="button"
                 className="chip"
                 disabled={busy}
-                onClick={() => run(() => adminApi.boardBan(id, o.days), 'Бан в чате выдан')}
+                onClick={() => run(() => adminApi.boardBan(id, o.days), 'Бан в Подслушано выдан')}
               >
                 {o.label}
               </button>
             ))}
             {boardBanned && (
-              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.boardBan(id, 0), 'Бан в чате снят')}>
+              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.boardBan(id, 0), 'Бан в Подслушано снят')}>
                 Снять
               </button>
             )}
@@ -329,7 +329,7 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
 
       {notice}
 
-      <Section title={`Сообщения в чате (${card.messages.length})`}>
+      <Section title={`Сообщения в Подслушано (${card.messages.length})`}>
         {card.messages.length === 0 && <div className="row row-text">Не писал</div>}
         {card.messages.map((m) => (
           <div key={m.id} className="row admin-msg">

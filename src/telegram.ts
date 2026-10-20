@@ -71,7 +71,7 @@ export type Me = {
   intro: number // какую версию знакомства уже видел (этап 7.1)
 }
 
-// board — время последнего сообщения в чате (для точки «есть новое»);
+// board — время последнего сообщения в Подслушано (для точки «есть новое»);
 // edits — ручные правки расписания; notice — объявление-плашка; maintenance — текст техработ
 export type CheckIn = {
   banned: boolean
@@ -83,6 +83,7 @@ export type CheckIn = {
   tags: LessonTag[]
   notice: { id: number; text: string } | null
   maintenance: string | null
+  channel: string | null // «Другое → Канал новостей» (ссылка из админки)
 }
 
 // При открытии отправляем боту подписанный Telegram initData и выбранную группу
@@ -122,6 +123,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       tags: Array.isArray(data.tags) ? data.tags : [],
       notice: data.notice ?? null,
       maintenance: data.maintenance ?? null,
+      channel: typeof data.channel === 'string' ? data.channel : null,
     }
   } catch {
     return null

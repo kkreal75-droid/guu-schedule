@@ -124,6 +124,7 @@ export type Settings = {
   greetings: string[]
   maintenance: { on: boolean; text: string }
   notice: { on: boolean; id: number; text: string }
+  channel?: string
 }
 
 export const adminApi = {

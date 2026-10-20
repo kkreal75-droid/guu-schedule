@@ -1330,7 +1330,7 @@ p {
   opacity: 0.5;
 }
 
-/* ---------- «Чат» ---------- */
+/* ---------- «Подслушано» ---------- */
 
 .board {
   display: flex;
@@ -3426,4 +3426,266 @@ select.input {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
+}
+
+/* ---------- «Другое» (этап 7.5): группы с цветными иконками ---------- */
+
+.other-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 16px 8px;
+}
+
+.other-group {
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.other-group-title {
+  margin: 0;
+  padding: 14px 16px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hint);
+}
+
+.other-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 14px 9px 16px;
+  text-align: left;
+}
+
+.other-row + .other-row::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 70px;
+  right: 0;
+  height: 0.5px;
+  background: var(--separator);
+}
+
+.other-row:active {
+  background: var(--fill);
+}
+
+.other-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgb(var(--ic) / 0.14);
+  color: rgb(var(--ic));
+}
+
+.other-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.other-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.other-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.other-sub {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.other-chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--hint);
+  opacity: 0.7;
+}
+
+.ic-red { --ic: 229 72 77; }
+.ic-orange { --ic: 236 124 34; }
+.ic-amber { --ic: 214 150 22; }
+.ic-yellow { --ic: 214 170 0; }
+.ic-green { --ic: 38 166 91; }
+.ic-teal { --ic: 20 160 160; }
+.ic-sky { --ic: 30 150 220; }
+.ic-blue { --ic: 42 120 236; }
+.ic-indigo { --ic: 92 96 230; }
+.ic-purple { --ic: 150 84 230; }
+.ic-pink { --ic: 226 72 150; }
+.ic-gray { --ic: 120 126 138; }
+
+:root[data-theme='dark'] .other-icon {
+  background: rgb(var(--ic) / 0.2);
+}
+
+/* календарный учебный график, документы */
+.kug-week {
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.kug-week[data-current] {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.kug-week-no {
+  width: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kug-week-dates {
+  flex: 1;
+}
+
+.kug-row {
+  gap: 10px;
+  text-align: left;
+}
+
+.kug-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kug-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.kug-sub {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hint);
+}
+
+.badge-mine {
+  --k: var(--k-practice);
+}
+
+/* частые вопросы */
+.faq {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.faq-item {
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.faq-q {
+  padding: 14px 16px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.faq-q::-webkit-details-marker {
+  display: none;
+}
+
+.faq-q::after {
+  content: '＋';
+  float: right;
+  color: var(--hint);
+}
+
+.faq-item[open] .faq-q::after {
+  content: '－';
+}
+
+.faq-a {
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hint);
+}
+
+/* установка, поддержка */
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.install-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 8px;
+  text-align: center;
+}
+
+.install-emoji {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 40px;
+}
+
+.install-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.install-text {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hint);
+}
+
+.install-done {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+  font-weight: 600;
+}
+
+.support {
+  padding: 0;
+}
+
+.support-hint {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hint);
 }

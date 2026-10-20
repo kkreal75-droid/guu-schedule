@@ -24,6 +24,7 @@ export type TgMessage = {
   caption?: string
   caption_entities?: TgEntity[]
   photo?: { file_id: string; width: number; height: number }[]
+  reply_to_message?: TgMessage
 }
 export type TgCallbackQuery = { id: string; from: TgUser; message?: TgMessage; data?: string }
 export type TgUpdate = {

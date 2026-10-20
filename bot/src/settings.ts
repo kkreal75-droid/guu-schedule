@@ -1,10 +1,11 @@
-// Настройки, которые админ меняет в панели без передеплоя: приветствия, техработы, объявление.
+// Настройки, которые админ меняет в панели без передеплоя: приветствия, техработы, объявление, канал новостей.
 // Лежат в KV (ключ settings) — пишутся редко; читаем с кэшем в памяти на минуту.
 
 export type Settings = {
   greetings: string[] // HTML, {имя} — имя пользователя
   maintenance: { on: boolean; text: string }
   notice: { on: boolean; id: number; text: string } // плашка над расписанием; новый текст — новый id
+  channel: string // «Другое → Канал новостей»: ссылка https://t.me/…; пусто — пункта нет
 }
 
 export const DEFAULT_GREETINGS = [
@@ -31,6 +32,7 @@ const DEFAULTS: Settings = {
   greetings: DEFAULT_GREETINGS,
   maintenance: { on: false, text: 'Скоро вернёмся — обновляем расписание.' },
   notice: { on: false, id: 0, text: '' },
+  channel: '',
 }
 
 const KEY = 'settings'
@@ -45,6 +47,7 @@ export async function loadSettings(env: Env, fresh = false): Promise<Settings> {
     greetings: stored.greetings?.length === 3 ? stored.greetings : DEFAULTS.greetings,
     maintenance: { ...DEFAULTS.maintenance, ...stored.maintenance },
     notice: { ...DEFAULTS.notice, ...stored.notice },
+    channel: typeof stored.channel === 'string' ? stored.channel : '',
   }
   cached = { at: Date.now(), settings }
   return settings

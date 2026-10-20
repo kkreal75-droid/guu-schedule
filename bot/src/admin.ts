@@ -147,7 +147,7 @@ export async function listBans(env: Env, chatId: number): Promise<void> {
   }
   if (boardBans.length) {
     const lines = boardBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${boardBanTerm(u.board_banned_until!)}`)
-    parts.push(`🔇 <b>Бан в чате (${boardBans.length})</b>\n\n${lines.join('\n')}`)
+    parts.push(`🔇 <b>Бан в Подслушано (${boardBans.length})</b>\n\n${lines.join('\n')}`)
   }
   if (reviewBans.length) {
     const lines = reviewBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${reviewBanTerm(u.review_banned_until!)}`)
