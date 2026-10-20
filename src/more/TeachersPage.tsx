@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { teacherKey } from '../../shared/schedule-core'
 import { botAvailable } from '../api'
-import { useNotice } from '../board/common'
+import { useNotice } from '../notice'
 import { Section } from '../components/Section'
 import { loadTeachers, searchTeachers, type TeacherInfo } from '../data'
 import { ChevronLeft, ChevronRight, SearchIcon } from '../icons'
@@ -359,7 +359,7 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
         </div>
       </div>
 
-      {notice && <p className="board-notice">{notice}</p>}
+      {notice && <p className="notice-toast">{notice}</p>}
       {!botAvailable() && <p className="lead">Отзывы работают в Telegram — откройте расписание там.</p>}
       {error && <p className="lead">{error}</p>}
       {botAvailable() && !card && !error && <p className="lead">Загружаю отзывы…</p>}

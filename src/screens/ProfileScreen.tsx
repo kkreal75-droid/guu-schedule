@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { boardApi, errorText } from '../board/api'
 import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { useGroupNames } from '../data'
@@ -17,7 +16,7 @@ import { useBackButton } from '../useBackButton'
 
 // «Профиль» (этап 7.8, сверено с profile-28): крупный заголовок, карточка «аватар · имя · @ник · группа»,
 // «Параметры аккаунта» (студент / преподаватель + выпадающие списки и «Сохранить»), подгруппы, избранные
-// группы, тема, «Подслушано», календарь, знакомство ещё раз, о приложении. Подписок и платных функций нет.
+// группы, тема, календарь, знакомство ещё раз, о приложении. Подписок и платных функций нет.
 
 const SOURCE_URL = 'https://guu.ru/student/schedule/'
 
@@ -59,48 +58,11 @@ type Props = {
   onSearchGroup: () => void // «Знаю свою группу» — поиск группы
   noteCount: number
   extras: Extras
-  boardOrigin: boolean | null // «Подслушано»: курс и институт у псевдонима; null — вне Telegram
-  onBoardOrigin: (on: boolean) => void
   onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
-// «Подслушано»: показывать у псевдонима курс и институт («Выдра 🦦 · 1 курс, ИУПСиБК»). Решает бот:
-// включить — у новых сообщений, выключить — пропадает и у старых.
-function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const toggle = async () => {
-    haptic()
-    setBusy(true)
-    setError(null)
-    try {
-      onChange((await boardApi.origin(!on)).on)
-    } catch (err) {
-      setError(errorText(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <Section
-      title="Подслушано"
-      footer={
-        error ??
-        (on
-          ? 'Видно у новых сообщений, например: «Выдра 🦦 · 1 курс, ИУПСиБК». Выключишь — пропадёт и у старых.'
-          : 'По умолчанию — только псевдоним. Группа и имя не показываются никогда.')
-      }
-    >
-      <label className="row row-switch">
-        <span className="row-label">Курс и институт у псевдонима</span>
-        <input type="checkbox" className="switch" checked={on} disabled={busy} onChange={toggle} />
-      </label>
-    </Section>
-  )
-}
-
 export function ProfileScreen({
-  prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, boardOrigin, onBoardOrigin, onShowIntro,
+  prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, onShowIntro,
 }: Props) {
   const [sub, setSub] = useState<'calendar' | null>(null)
   const closeSub = useCallback(() => {
@@ -196,8 +158,6 @@ export function ProfileScreen({
           <Segmented label="Тема оформления" value={prefs.theme} options={THEME_OPTIONS} onChange={(theme) => onChange({ theme })} />
         </div>
       </Section>
-
-      {boardOrigin !== null && !teacher && <OriginToggle on={boardOrigin} onChange={onBoardOrigin} />}
 
       {!teacher && (
         <Section title="Календарь" footer="Пары сами появятся в календаре телефона и будут обновляться.">

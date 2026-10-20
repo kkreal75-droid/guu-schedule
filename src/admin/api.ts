@@ -23,7 +23,6 @@ export type Dashboard = {
   opens_by_hour: number[]
   chats: { total: number; g11: number; g12: number; digests: number }
   calendar: { total: number; active: number }
-  board: { members: number; messages_day: number; messages_week: number; reports: number }
   reviews: { reviews: number; teachers: number; week: number; reports: number }
 }
 
@@ -40,7 +39,6 @@ export type AdminUser = {
   blocked_bot: number
   banned: number
   ban_reason: string | null
-  board_banned_until: number | null
   review_banned_until: number | null
   role: 'student' | 'teacher' | null
   teacher_id: string | null
@@ -48,27 +46,10 @@ export type AdminUser = {
   starosta_of: string | null // староста этой группы
 }
 
-export type BoardMessageRow = {
-  id: number
-  board: string
-  alias: string
-  origin?: string | null
-  text: string
-  created_at: number
-  deleted?: number
-  hidden: number
-  user_id?: number
-  name?: string | null
-  username?: string | null
-  reports?: number
-}
-
 export type UserCard = {
   user: AdminUser & { owner: boolean }
   visits: { ts: number; kind: string }[]
   visit_log_total: number
-  board: { rules_accepted_at: number | null } | null
-  messages: BoardMessageRow[]
   calendar: { grp: string; created_at: number; last_fetch_at: number | null; fetch_count: number } | null
   reviews: { id: number; teacher_id: string; rating: number; text: string; discipline: string | null; created_at: number; deleted: number; hidden: number }[]
 }
@@ -134,7 +115,6 @@ export const adminApi = {
   user: (id: number) => callBot<UserCard>('/admin/user', { id }),
   ban: (id: number, reason: string) => callBot<UserCard>('/admin/ban', { id, reason }),
   unban: (id: number) => callBot<UserCard>('/admin/unban', { id }),
-  boardBan: (id: number, days: number | null) => callBot<UserCard>('/admin/board-ban', { id, days }),
   reviewBan: (id: number, days: number | null) => callBot<UserCard>('/admin/review-ban', { id, days }),
   reviews: (reports: boolean, before?: number) =>
     callBot<{ reviews: ReviewRow[]; has_more: boolean }>('/admin/reviews', { reports, before }),
@@ -153,9 +133,6 @@ export const adminApi = {
   starosta: (id: number, group: string | null) => callBot<UserCard>('/admin/starosta', { id, group }),
   broadcast: (text: string, photo: string | null, audience: Audience | null) =>
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
-  reports: () => callBot<{ reports: BoardMessageRow[] }>('/admin/reports'),
-  moderate: (id: number, action: 'del' | 'ban' | 'ign') => callBot<{ result: string }>('/admin/moderate', { id, action }),
-  feed: (before?: number) => callBot<{ messages: BoardMessageRow[]; has_more: boolean }>('/admin/feed', { before }),
   schedule: () => callBot<ScheduleStatus>('/admin/schedule'),
   updateNow: (force: boolean) => callBot('/admin/update-now', { force }),
   editAdd: (edit: { groups: string[]; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }) =>

@@ -1,13 +1,12 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { BuildingIcon, CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, PlanIcon, SendIcon, StarIcon, UserIcon } from '../icons'
+import { BuildingIcon, CalendarIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, PlanIcon, SendIcon, StarIcon, UserIcon } from '../icons'
 import { resetIntro } from '../intro'
 import { confirmAction, haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { adminApi, adminError } from './api'
 import { useFlash } from './common'
 import { Dashboard } from './Dashboard'
-import { Moderation } from './Moderation'
 import { ReviewsAdmin } from './ReviewsAdmin'
 import { AcademicAdmin } from './AcademicAdmin'
 import { PlacesAdmin } from './PlacesAdmin'
@@ -16,14 +15,13 @@ import { SettingsAdmin } from './SettingsAdmin'
 import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
-type SectionId = 'dashboard' | 'users' | 'broadcast' | 'moderation' | 'reviews' | 'schedule' | 'academic' | 'places' | 'settings'
+type SectionId = 'dashboard' | 'users' | 'broadcast' | 'reviews' | 'schedule' | 'academic' | 'places' | 'settings'
 type Item = { id: SectionId; title: string; icon: ComponentType<SVGProps<SVGSVGElement>>; render: () => ReactNode }
 
 const ITEMS: Item[] = [
   { id: 'dashboard', title: 'Дашборд', icon: MoreIcon, render: () => <Dashboard /> },
   { id: 'users', title: 'Пользователи', icon: UserIcon, render: () => <Users /> },
   { id: 'broadcast', title: 'Рассылка', icon: SendIcon, render: () => <BroadcastAdmin /> },
-  { id: 'moderation', title: 'Модерация Подслушано', icon: ChatIcon, render: () => <Moderation /> },
   { id: 'reviews', title: 'Отзывы', icon: StarIcon, render: () => <ReviewsAdmin /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
   { id: 'academic', title: 'Учебный график', icon: PlanIcon, render: () => <AcademicAdmin /> },

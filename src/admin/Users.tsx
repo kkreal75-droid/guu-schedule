@@ -16,7 +16,6 @@ function flags(u: AdminUser) {
   const now = Date.now()
   return [
     u.banned ? '🚫' : '',
-    u.board_banned_until && u.board_banned_until > now ? '🔇' : '',
     u.review_banned_until && u.review_banned_until > now ? '⭐' : '',
     u.blocked_bot ? '⛔' : '',
   ]
@@ -85,7 +84,7 @@ export function Users() {
         ))}
       </div>
       <p className="section-footer">
-        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в Подслушано · ⭐ бан в отзывах · ⛔ заблокировал бота
+        Показано {list.length} из {data.users.length}. 🚫 бан · ⭐ бан в отзывах · ⛔ заблокировал бота
       </p>
     </div>
   )
@@ -124,19 +123,7 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
 
   const u = card.user
   const now = Date.now()
-  const boardBanned = u.board_banned_until && u.board_banned_until > now ? u.board_banned_until : null
   const reviewBanned = u.review_banned_until && u.review_banned_until > now ? u.review_banned_until : null
-
-  const deleteMessage = async (messageId: number) => {
-    if (!(await confirmAction('Удалить сообщение из Подслушано?'))) return
-    try {
-      await adminApi.moderate(messageId, 'del')
-      setCard(await adminApi.user(id))
-      flash('Удалено')
-    } catch (err) {
-      flash(adminError(err))
-    }
-  }
 
   return (
     <div className="page-body">
@@ -252,37 +239,6 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
       )}
 
       {!u.owner && (
-        <Section title="Подслушано" footer="Забаненный может читать, но не писать.">
-          <div className="row">
-            <span>Бан в Подслушано</span>
-            <span className="row-value">{boardBanned ? (isForever(boardBanned) ? 'навсегда' : `до ${stamp(boardBanned)}`) : 'нет'}</span>
-          </div>
-          <div className="row row-chips">
-            {[
-              { label: '1 день', days: 1 },
-              { label: '7 дней', days: 7 },
-              { label: 'Навсегда', days: null },
-            ].map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                className="chip"
-                disabled={busy}
-                onClick={() => run(() => adminApi.boardBan(id, o.days), 'Бан в Подслушано выдан')}
-              >
-                {o.label}
-              </button>
-            ))}
-            {boardBanned && (
-              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.boardBan(id, 0), 'Бан в Подслушано снят')}>
-                Снять
-              </button>
-            )}
-          </div>
-        </Section>
-      )}
-
-      {!u.owner && (
         <Section
           title={`Отзывы о преподавателях (${card.reviews.filter((r) => !r.deleted).length})`}
           footer="Забаненный в отзывах может читать, но не писать и не жаловаться. Удалять отзывы — «Админ-панель → Отзывы»."
@@ -328,26 +284,6 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
       )}
 
       {notice}
-
-      <Section title={`Сообщения в Подслушано (${card.messages.length})`}>
-        {card.messages.length === 0 && <div className="row row-text">Не писал</div>}
-        {card.messages.map((m) => (
-          <div key={m.id} className="row admin-msg">
-            <div className="admin-msg-body">
-              <div className="admin-msg-meta">
-                {m.alias}{m.origin ? ` · ${m.origin}` : ''} · {stamp(m.created_at)}
-                {m.deleted ? ' · удалено' : m.hidden ? ' · скрыто' : ''}
-              </div>
-              <div className={`admin-msg-text${m.deleted ? ' is-deleted' : ''}`}>{m.text}</div>
-            </div>
-            {!m.deleted && (
-              <button type="button" className="link-btn danger" onClick={() => deleteMessage(m.id)}>
-                Удалить
-              </button>
-            )}
-          </div>
-        ))}
-      </Section>
 
       <Section title={`Визиты (последние ${card.visits.length} из ${card.visit_log_total})`}>
         {card.visits.map((v) => (

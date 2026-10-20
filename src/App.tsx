@@ -3,7 +3,6 @@ import { AddGroupSheet } from './components/AddGroupSheet'
 import { loadTeachers } from './data'
 import type { Choice } from './onboarding/Onboarding'
 import { teacherKey } from '../shared/schedule-core'
-import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
 import type { Extras } from './edits'
 import { formatStamp } from './format'
@@ -67,14 +66,6 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
   const [viewGroup, setViewGroup] = useState<string | null>(null)
   const shownGroup = viewGroup && schedule.groups.includes(viewGroup) ? viewGroup : home
   const [cursor, setCursor] = useState<Cursor>(initialCursor)
-  // точка «есть новое» в Подслушано: на «Другом» и на пункте, без счётчиков
-  const [boardNew, setBoardNew] = useState(() => hasNew(status?.board))
-  // «Подслушано»: курс и институт у псевдонима (хранит бот); null — бот недоступен
-  const [boardOrigin, setBoardOrigin] = useState<boolean | null>(status?.me ? Boolean(status.me.origin) : null)
-  const onBoardOpen = useCallback(() => {
-    markSeen(status?.board ?? {})
-    setBoardNew(false)
-  }, [status])
 
   // избранное поменялось — расписание перегрузим, когда человек вернётся на вкладку «Расписание»
   const [favoritesChanged, setFavoritesChanged] = useState(false)
@@ -148,8 +139,6 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           admin={Boolean(status?.admin)}
           group={shownGroup}
           teacherMode={prefs.role === 'teacher'}
-          boardNew={boardNew}
-          onBoardOpen={onBoardOpen}
           prefs={prefs}
           extras={extras}
           starosta={status?.me?.starosta ?? null}
@@ -167,8 +156,6 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           noteCount={Object.keys(notes).length}
           prefs={prefs}
           extras={extras}
-          boardOrigin={boardOrigin}
-          onBoardOrigin={setBoardOrigin}
           onChange={(patch) => {
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)
@@ -195,7 +182,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
         </p>
       )}
 
-      <TabBar tab={tab} onTab={switchTab} dot={boardNew} />
+      <TabBar tab={tab} onTab={switchTab} />
     </div>
   )
 }

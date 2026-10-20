@@ -40,8 +40,7 @@
     { "name": "RL_SEEN", "namespace_id": "4104", "simple": { "limit": 15, "period": 60 } },
     { "name": "RL_BOT", "namespace_id": "4105", "simple": { "limit": 40, "period": 60 } },
     { "name": "RL_PUBLIC", "namespace_id": "4106", "simple": { "limit": 60, "period": 60 } },
-    { "name": "RL_SETUP", "namespace_id": "4107", "simple": { "limit": 3, "period": 60 } },
-    { "name": "RL_SLOW", "namespace_id": "4108", "simple": { "limit": 4, "period": 60 } }
+    { "name": "RL_SETUP", "namespace_id": "4107", "simple": { "limit": 3, "period": 60 } }
   ],
   // раз в минуту: досылает рассылки пачками (лимит 50 подзапросов на вызов)
   "triggers": { "crons": ["* * * * *"] },

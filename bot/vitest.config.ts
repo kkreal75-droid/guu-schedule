@@ -14,7 +14,6 @@ export default defineConfig(async () => {
           bindings: {
             BOT_TOKEN: '123456:TEST-TOKEN-FOR-AUTOTESTS',
             OWNER_ID: '7',
-            BOARD_SALT: 'test-salt',
             WEBAPP_URL: 'https://site.test/',
             TELEGRAM_API: 'https://tg.test',
             TEST_MIGRATIONS: migrations,

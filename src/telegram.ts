@@ -67,17 +67,14 @@ export type Me = {
   access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
   onboarding: boolean
   starosta: string | null // староста этой группы — «Ещё → Правки группы»
-  origin: boolean // «Подслушано»: курс и институт у псевдонима
   intro: number // какую версию знакомства уже видел (этап 7.1)
 }
 
-// board — время последнего сообщения в Подслушано (для точки «есть новое»);
 // edits — ручные правки расписания; notice — объявление-плашка; maintenance — текст техработ
 export type CheckIn = {
   banned: boolean
   admin: boolean
   me: Me | null
-  board: Record<string, number>
   edits: ScheduleEdit[]
   subgroups: Subgroup[]
   tags: LessonTag[]
@@ -117,7 +114,6 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       banned: Boolean(data.banned),
       admin: Boolean(data.admin),
       me: data.me ?? null,
-      board: data.board ?? {},
       edits: Array.isArray(data.edits) ? data.edits : [],
       subgroups: Array.isArray(data.subgroups) ? data.subgroups : [],
       tags: Array.isArray(data.tags) ? data.tags : [],

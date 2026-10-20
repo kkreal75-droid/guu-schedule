@@ -17,19 +17,18 @@ export function Avatar({ size }: { size: number }) {
 }
 
 // Плавающая нижняя панель: Расписание / Другое / Профиль; активная вкладка — подложка
-export function TabBar({ tab, onTab, dot }: { tab: Tab; onTab: (tab: Tab) => void; dot: boolean }) {
-  const item = (id: Tab, label: string, icon: React.ReactNode, mark?: boolean) => (
+export function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
+  const item = (id: Tab, label: string, icon: React.ReactNode) => (
     <button type="button" className="tab" aria-current={tab === id} onClick={() => onTab(id)}>
       {icon}
       <span>{label}</span>
-      {mark && <span className="new-dot" aria-label="есть новое" />}
     </button>
   )
   return (
     <nav className="tabbar">
       <div className="tabbar-inner">
         {item('schedule', 'Расписание', <CalendarIcon />)}
-        {item('more', 'Другое', <MoreIcon />, dot)}
+        {item('more', 'Другое', <MoreIcon />)}
         {item('profile', 'Профиль', <Avatar size={26} />)}
       </div>
     </nav>

@@ -14,8 +14,7 @@
 // Жалоба — владельцу в бот с кнопками rv:del|ban|keep; 3 жалобы от разных людей — отзыв скрыт до решения.
 import { json, readApi, type ApiRequest } from './api'
 import { isOwner } from './auth'
-import { cleanText, passesFilter } from './board-filter'
-import { FOREVER } from './board-moderation'
+import { cleanText, passesFilter } from './text-filter'
 import { getUser, userLabel, type UserRow } from './db'
 import { loadTeacherFile } from './schedule'
 import { answerCallback, sendMessage, tg, type TgCallbackQuery } from './telegram'
@@ -30,6 +29,9 @@ export const REVIEW_LIMITS = {
   reportsToHide: 3,
   perDay: 10, // новых и изменённых отзывов за сутки от одного человека
 }
+
+// бан «навсегда» — дата в 9999 году
+export const FOREVER = 253_402_300_799_000
 
 const DAY_MS = 86_400_000
 

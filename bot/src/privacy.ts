@@ -1,15 +1,15 @@
 // /deleteme — удалить свои данные (только в личке, с подтверждением кнопкой).
-// Удаляется: профиль (группа, роль, имя, ник, подгруппы, староста), подписка на календарь, визиты, реакции,
-// голоса «полезно», обращения в поддержку, очередь рассылок. Сообщения в «Подслушано», отзывы и жалобы остаются,
-// но обезличиваются: вместо id — случайный отрицательный номер (связь с человеком теряется, в том числе для
+// Удаляется: профиль (группа, роль, имя, ник, подгруппы, староста), подписка на календарь, визиты,
+// голоса «полезно», обращения в поддержку, очередь рассылок. Отзывы и жалобы (и последние сообщения бывшего
+// анонимного чата, пока их не стёр cron) остаются, но обезличиваются: вместо id — случайный отрицательный номер (связь с человеком теряется, в том числе для
 // владельца). Если у человека бан — остаётся только строка с баном (иначе /deleteme снимал бы бан).
 // Заметки хранятся в облаке Telegram у самого пользователя — бот их не видит и удалить не может.
 import { sendMessage, tg, type TgCallbackQuery, type TgMessage } from './telegram'
 
 const ASK = `🗑 <b>Удалить твои данные?</b>
 
-Удалятся: профиль (группа, роль, имя и ник), подписка на календарь, подгруппы, история визитов, реакции, обращения в поддержку.
-Сообщения в «Подслушано» и отзывы останутся, но без связи с тобой — даже для администратора.
+Удалятся: профиль (группа, роль, имя и ник), подписка на календарь, подгруппы, история визитов, обращения в поддержку.
+Отзывы о преподавателях останутся, но без связи с тобой — даже для администратора.
 
 Заметки к парам хранятся в облаке Telegram в твоём аккаунте — бот их не видит; удалить их можно в приложении.`
 
@@ -51,7 +51,7 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
     env.DB.prepare('DELETE FROM board_reactions WHERE user_id = ?').bind(id),
     env.DB.prepare('DELETE FROM review_votes WHERE user_id = ?').bind(id),
     env.DB.prepare('DELETE FROM board_members WHERE user_id = ?').bind(id),
-    // обезличиваем: псевдоним за этим «никем» остаётся занят до конца семестра
+    // бывший анонимный чат: сообщения доживают 30 дней (journal.ts) — тоже без автора
     env.DB.prepare('UPDATE board_aliases SET user_id = ? WHERE user_id = ?').bind(anon, id),
     env.DB.prepare('UPDATE board_messages SET user_id = ?, origin = NULL, updated_at = ? WHERE user_id = ?').bind(anon, now, id),
     env.DB.prepare('UPDATE board_reports SET reporter_id = ? WHERE reporter_id = ?').bind(anon, id),
@@ -69,9 +69,8 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
        WHERE id = ?1`,
     ).bind(id),
     env.DB.prepare(
-      `DELETE FROM users WHERE id = ?1 AND banned = 0
-         AND COALESCE(board_banned_until, 0) < ?2 AND COALESCE(review_banned_until, 0) < ?2`,
+      `DELETE FROM users WHERE id = ?1 AND banned = 0 AND COALESCE(review_banned_until, 0) < ?2`,
     ).bind(id, now),
   ])
-  await edit(env, query, '✅ Готово: твои данные удалены. Сообщения в «Подслушано» и отзывы остались без связи с тобой.')
+  await edit(env, query, '✅ Готово: твои данные удалены. Отзывы остались без связи с тобой.')
 }

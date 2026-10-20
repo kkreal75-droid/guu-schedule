@@ -45,7 +45,7 @@ export const tooMany = () =>
 
 // ---------- лимиты ----------
 
-export type Limiter = 'RL_IP' | 'RL_USER' | 'RL_WRITE' | 'RL_SEEN' | 'RL_BOT' | 'RL_PUBLIC' | 'RL_SETUP' | 'RL_SLOW'
+export type Limiter = 'RL_IP' | 'RL_USER' | 'RL_WRITE' | 'RL_SEEN' | 'RL_BOT' | 'RL_PUBLIC' | 'RL_SETUP'
 
 // true — можно. Привязки нет или сбой — пропускаем (лимит не должен ронять приложение)
 export async function allow(env: Env, limiter: Limiter, key: string | number): Promise<boolean> {

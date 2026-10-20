@@ -1,7 +1,6 @@
 // Личные сообщения боту: команды для всех и админские (только OWNER_ID).
 import { banCommand, exportUsers, listBans, sendStats, unbanCommand } from './admin'
 import { isOwner, profileOf } from './auth'
-import { boardBanCommand } from './board-moderation'
 import { listBroadcasts, startBroadcast } from './broadcast'
 import { getUser, touchUser, userSubgroups } from './db'
 import { logAdmin } from './journal'
@@ -67,7 +66,6 @@ const ADMIN: Record<string, Handler> = {
   '/ban': ({ env, message, args }) => banCommand(env, message.chat.id, args),
   '/unban': ({ env, message, args }) => unbanCommand(env, message.chat.id, args),
   '/bans': ({ env, message }) => listBans(env, message.chat.id),
-  '/boardban': ({ env, message, args }) => boardBanCommand(env, message.chat.id, args),
   '/usage': async ({ env, message }) => void (await sendMessage(env, message.chat.id, usageText(await usageToday(env)))),
   '/backup': async ({ env }) => void (await backupToOwner(env)),
 }

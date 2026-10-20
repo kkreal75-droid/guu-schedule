@@ -2,10 +2,9 @@
 // Каждый запрос проверяет подпись Telegram и OWNER_ID (readApi adminOnly) — остальным 403.
 import { exportUsers } from './admin'
 import { json, readApi, type ApiRequest } from './api'
-import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-moderation'
 import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
-import { moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
+import { FOREVER, moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
 import { academicReset, academicSave, loadCalendarEdits } from './academic'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
@@ -35,7 +34,7 @@ const mskDate = (ms: number) => new Date(ms + MSK_OFFSET_MS).toISOString().slice
 async function dashboard({ env }: Call): Promise<Response> {
   const now = Date.now()
   const reviewsPromise = reviewStats(env)
-  const [users, newUsers, hours, calendar, board] = await env.DB.batch([
+  const [users, newUsers, hours, calendar] = await env.DB.batch([
     env.DB.prepare(
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(last_seen >= ?1), 0) AS day, COALESCE(SUM(last_seen >= ?2), 0) AS week,
@@ -57,12 +56,6 @@ async function dashboard({ env }: Call): Promise<Response> {
     env.DB.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(last_fetch_at >= ?), 0) AS active FROM calendar_tokens').bind(
       now - DAY_MS,
     ),
-    env.DB.prepare(
-      `SELECT (SELECT COUNT(*) FROM board_members WHERE rules_accepted_at IS NOT NULL) AS members,
-              (SELECT COUNT(*) FROM board_messages WHERE created_at >= ?1) AS messages_day,
-              (SELECT COUNT(*) FROM board_messages WHERE created_at >= ?2) AS messages_week,
-              (SELECT COUNT(DISTINCT message_id) FROM board_reports WHERE status = 'open') AS reports`,
-    ).bind(now - DAY_MS, now - 7 * DAY_MS),
   ])
   const perDay = new Map((newUsers.results as { day: string; n: number }[]).map((r) => [r.day, r.n]))
   const perHour = new Map((hours.results as { hour: number; n: number }[]).map((r) => [r.hour, r.n]))
@@ -82,7 +75,6 @@ async function dashboard({ env }: Call): Promise<Response> {
       digests: chats.filter((c) => c.group && c.time).length,
     },
     calendar: calendar.results[0],
-    board: board.results[0],
     reviews: await reviewsPromise,
   })
 }
@@ -92,7 +84,7 @@ async function dashboard({ env }: Call): Promise<Response> {
 async function users({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT id, username, name, grp, first_seen, last_seen, visits, starts, can_message,
-            blocked_bot, banned, ban_reason, board_banned_until, review_banned_until, role, teacher_id, access, starosta_of
+            blocked_bot, banned, ban_reason, review_banned_until, role, teacher_id, access, starosta_of
      FROM users ORDER BY last_seen DESC`,
   ).all()
   return json({ ok: true, users: results })
@@ -101,13 +93,9 @@ async function users({ env }: Call): Promise<Response> {
 async function userCard(env: Env, id: number): Promise<Response> {
   const user = await getUser(env.DB, id)
   if (!user) return fail(404, 'not found')
-  const [visits, total, member, messages, calendar, reviews] = await env.DB.batch([
+  const [visits, total, calendar, reviews] = await env.DB.batch([
     env.DB.prepare('SELECT ts, kind FROM visits WHERE user_id = ? ORDER BY ts DESC LIMIT 30').bind(id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM visits WHERE user_id = ?').bind(id),
-    env.DB.prepare('SELECT rules_accepted_at FROM board_members WHERE user_id = ?').bind(id),
-    env.DB.prepare(
-      'SELECT id, board, alias, origin, text, created_at, deleted, hidden FROM board_messages WHERE user_id = ? ORDER BY id DESC LIMIT 50',
-    ).bind(id),
     env.DB.prepare('SELECT grp, created_at, last_fetch_at, fetch_count FROM calendar_tokens WHERE user_id = ?').bind(id),
     env.DB.prepare(
       'SELECT id, teacher_id, rating, text, discipline, created_at, deleted, hidden FROM teacher_reviews WHERE user_id = ? ORDER BY id DESC LIMIT 50',
@@ -118,8 +106,6 @@ async function userCard(env: Env, id: number): Promise<Response> {
     user: { ...user, owner: isOwner(env, id) },
     visits: visits.results,
     visit_log_total: (total.results[0] as { n: number }).n,
-    board: member.results[0] ?? null,
-    messages: messages.results,
     calendar: calendar.results[0] ?? null,
     reviews: reviews.results,
   })
@@ -152,19 +138,7 @@ async function unban({ env, req }: Call): Promise<Response> {
   return userCard(env, id)
 }
 
-// days: null — навсегда, 0 — снять бан, N — на N дней
-async function boardBan({ env, req }: Call): Promise<Response> {
-  const id = asInt(req.body.id)
-  const days = req.body.days === null ? null : asInt(req.body.days)
-  if (id === null || (days !== null && (days < 0 || days > 3650)) || (req.body.days !== null && days === null)) {
-    return fail(400, 'bad request')
-  }
-  if (isOwner(env, id)) return fail(400, 'self')
-  await setBoardBan(env, id, days === 0 ? null : days === null ? FOREVER : Date.now() + days * DAY_MS)
-  return userCard(env, id)
-}
-
-// бан в отзывах о преподавателях: days как у бана в Подслушано
+// бан в отзывах о преподавателях. days: null — навсегда, 0 — снять бан, N — на N дней
 async function reviewBan({ env, req }: Call): Promise<Response> {
   const id = asInt(req.body.id)
   const days = req.body.days === null ? null : asInt(req.body.days)
@@ -277,28 +251,6 @@ async function broadcast({ env, ctx, req }: Call): Promise<Response> {
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
 
-// ---------- модерация Подслушано ----------
-
-async function reports({ env }: Call): Promise<Response> {
-  const { results } = await env.DB.prepare(
-    `SELECT m.id, m.board, m.alias, m.origin, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username,
-            COUNT(r.id) AS reports, MAX(r.created_at) AS last_report
-     FROM board_reports r
-     JOIN board_messages m ON m.id = r.message_id
-     LEFT JOIN users u ON u.id = m.user_id
-     WHERE r.status = 'open' AND m.deleted = 0
-     GROUP BY m.id ORDER BY last_report DESC LIMIT 100`,
-  ).all()
-  return json({ ok: true, reports: results })
-}
-
-async function moderation({ env, req }: Call): Promise<Response> {
-  const id = asInt(req.body.id)
-  const action = req.body.action
-  if (id === null || (action !== 'del' && action !== 'ban' && action !== 'ign')) return fail(400, 'bad request')
-  return json({ ok: true, result: await moderate(env, id, action as ModerationAction) })
-}
-
 // ---------- отзывы о преподавателях ----------
 
 // лента всех отзывов (и скрытых) с авторами и открытыми жалобами; reports — только с жалобами
@@ -329,20 +281,6 @@ async function reviewModerate({ env, req }: Call): Promise<Response> {
   const action = req.body.action
   if (id === null || (action !== 'del' && action !== 'ban' && action !== 'keep')) return fail(400, 'bad request')
   return json({ ok: true, result: await moderateReview(env, id, action as ReviewAction) })
-}
-
-// лента с настоящими авторами
-async function feed({ env, req }: Call): Promise<Response> {
-  const before = asInt(req.body.before) ?? Number.MAX_SAFE_INTEGER
-  const { results } = await env.DB.prepare(
-    `SELECT m.id, m.board, m.alias, m.origin, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username
-     FROM board_messages m LEFT JOIN users u ON u.id = m.user_id
-     WHERE m.deleted = 0 AND m.id < ?1
-     ORDER BY m.id DESC LIMIT 50`,
-  )
-    .bind(before)
-    .all()
-  return json({ ok: true, messages: results, has_more: results.length === 50 })
 }
 
 // ---------- расписание ----------
@@ -520,7 +458,7 @@ async function greetingPreview({ env, req }: Call): Promise<Response> {
 
 // только чтение — в журнал не пишем
 const READ_ONLY = new Set([
-  'dashboard', 'users', 'user', 'reviews', 'schedule', 'reports', 'feed', 'broadcast-info', 'broadcast-count', 'places',
+  'dashboard', 'users', 'user', 'reviews', 'schedule', 'broadcast-info', 'broadcast-count', 'places',
   'academic',
 ])
 
@@ -530,7 +468,6 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   user,
   ban,
   unban,
-  'board-ban': boardBan,
   'review-ban': reviewBan,
   'reset-intro': resetIntro,
   places: async ({ env }) => json({ ok: true, edits: await loadPlaceEdits(env) }),
@@ -545,11 +482,8 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   'broadcast-info': broadcastInfo,
   'broadcast-count': broadcastCount,
   broadcast,
-  reports,
-  moderate: moderation,
   reviews,
   'review-moderate': reviewModerate,
-  feed,
   schedule,
   'update-now': updateNow,
   'edit-add': editAdd,

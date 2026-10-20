@@ -8,7 +8,6 @@
 //   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts); POST /intro — знакомство просмотрено.
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
-//   POST /board/<действие> — «Подслушано», анонимный чат (board.ts), жалобы и баны — board-moderation.ts.
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
 //   GET  /places  — правки мест «Корпусов ГУУ» поверх data/places.json (places.ts), правит владелец в админке.
 //   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
@@ -18,9 +17,9 @@
 //   GET  /health  — жив ли воркер и D1 (для мониторинга, без внутренних данных).
 // Вход защищает guard.ts: лимит тела, CORS только для приложения, лимиты запросов по IP и пользователю.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
-//   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка Подслушано.
+//   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка журнала.
 //
-// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
+// Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
@@ -31,10 +30,8 @@ import { onDeleteMeButton } from './privacy'
 import { checkBudget, countRequest, economyMode, flushUsage, meterEnv } from './usage'
 import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
-import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { sendAlerts } from './alerts'
 import { notifySessions } from './session'
-import { cleanupBoard, onBoardButton } from './board-moderation'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { handleAcademicGet } from './academic'
 import { handlePlacesGet } from './places'
@@ -94,8 +91,8 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
     const query = update.callback_query
     // в беседах ошибку кнопки показывает всплывающий текст, в чат не пишем (в форуме — это General)
     const chatId = query.message?.chat.type === 'private' ? query.message.chat.id : null
-    // кнопки владельца (рассылка, жалобы, отзывы, поддержка) — в журнал действий
-    if (isOwner(env, query.from.id) && /^(bc|bd|rv|sp):/.test(query.data ?? '')) {
+    // кнопки владельца (рассылка, жалобы на отзывы, поддержка) — в журнал действий
+    if (isOwner(env, query.from.id) && /^(bc|rv|sp):/.test(query.data ?? '')) {
       await logAdmin(env, query.from.id, 'кнопка', null, query.data)
     }
     await safely(env, 'Кнопка', chatId, async () => {
@@ -104,7 +101,6 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
       else if (query.data?.startsWith('gs:')) await onGroupSetupButton(env, query)
-      else if (query.data?.startsWith('bd:')) await onBoardButton(env, query)
       else if (query.data?.startsWith('rv:')) await onReviewButton(env, query)
       else if (query.data?.startsWith('sp:')) await onSupportButton(env, query)
       else await answerCallback(env, query.id)
@@ -149,7 +145,7 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
 
 // Открытие мини-приложения. Тело — JSON {initData, group, v} или просто initData (старые версии).
 // group — id группы (старые версии присылают имя «МБ(МП) 1-1»), v — версия формата приложения.
-// В ответе ещё время последнего сообщения в Подслушано (точка «есть новое») и appExtras.
+// В ответе ещё appExtras (правки, объявление, техработы).
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await readBody(request, BODY_LIMIT)
   if (body instanceof Response) return body
@@ -179,13 +175,12 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
     const seen = economyMode()
       ? getUser(env.DB, profile.id).then((row) => ({ banned: Boolean(row?.banned), me: meOf(row) }))
       : touchUser(env.DB, profile, 'open', group)
-    const [{ banned, me }, board, extras] = await Promise.all([
+    const [{ banned, me }, extras] = await Promise.all([
       seen,
-      // «Подслушано», правки и настройки не должны мешать открытию приложения
-      boardLatest(env).catch((err) => (console.error('Подслушано в /seen:', err), {})),
+      // правки и настройки не должны мешать открытию приложения
       appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
-    return json({ ok: true, banned: banned && !admin, admin, me, board, ...extras })
+    return json({ ok: true, banned: banned && !admin, admin, me, ...extras })
   } catch (err) {
     await reportError(env, 'Открытие приложения', err)
     return json({ ok: false }, 500)
@@ -291,12 +286,6 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
     return guarded(env, `Админ-панель: ${action}`, () => handleAdminApi(env, ctx, request, action))
   }
 
-  const board = url.pathname.match(/^\/board\/([a-z]+)$/)
-  if (board && request.method === 'POST' && isBoardAction(board[1])) {
-    const action = board[1]
-    return guarded(env, `Подслушано: ${action}`, () => handleBoardApi(env, request, action))
-  }
-
   const reviews = url.pathname.match(/^\/reviews\/([a-z]+)$/)
   if (reviews && request.method === 'POST' && isReviewAction(reviews[1])) {
     const action = reviews[1]
@@ -338,8 +327,7 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
       used += await backupToOwner(env, now).catch((err) => (reportError(env, 'Бэкап базы', err), 0))
     }
     if (new Date(now).getUTCMinutes() === 35) {
-      used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))
-      used += await cleanupJournal(env, now).catch((err) => (reportError(env, 'Чистка журнала', err), 0))
+        used += await cleanupJournal(env, now).catch((err) => (reportError(env, 'Чистка журнала', err), 0))
     }
     const batch = Math.max(0, BATCH - used)
     if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))

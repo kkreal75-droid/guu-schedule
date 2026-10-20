@@ -2,7 +2,7 @@
 // «Ответить» (sp:reply:<№>). Нажал — бот просит ответ (force_reply); ответ на это сообщение уходит автору.
 import { json, readApi } from './api'
 import { isOwner } from './auth'
-import { cleanText } from './board-filter'
+import { cleanText } from './text-filter'
 import { getUser, userLabel } from './db'
 import { answerCallback, isUnreachable, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'

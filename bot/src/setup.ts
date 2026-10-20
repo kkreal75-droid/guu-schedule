@@ -50,7 +50,6 @@ const ADMIN_COMMANDS = [
   { command: 'ban', description: 'Бан: /ban id|@ник [причина]' },
   { command: 'unban', description: 'Разбан: /unban id' },
   { command: 'bans', description: 'Список банов' },
-  { command: 'boardban', description: 'Бан в Подслушано: /boardban id [дни]' },
   { command: 'usage', description: 'Расход лимитов Cloudflare' },
   { command: 'backup', description: 'Бэкап базы сейчас' },
 ]

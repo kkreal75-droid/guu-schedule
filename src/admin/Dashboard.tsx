@@ -5,7 +5,7 @@ import { BarChart, Loading, Stat, useLoad } from './common'
 export function Dashboard() {
   const { data, error } = useLoad(adminApi.dashboard)
   if (!data) return <Loading error={error ? adminError(error) : null} />
-  const { users, chats, calendar, board, reviews } = data
+  const { users, chats, calendar, reviews } = data
   const noGroup = users.total - users.g11 - users.g12 - (users.other ?? 0) - (users.teachers ?? 0)
 
   return (
@@ -48,14 +48,6 @@ export function Dashboard() {
           <Stat label="со сводками" value={chats.digests} />
           <Stat label="подписок на календарь" value={calendar.total} />
           <Stat label="обновлялись за сутки" value={calendar.active} />
-        </div>
-      </Section>
-
-      <Section title="Подслушано">
-        <div className="stats">
-          <Stat label="участников" value={board.members} />
-          <Stat label="сообщений" value={board.messages_day} hint={`за 7 дней: ${board.messages_week}`} />
-          <Stat label="жалоб ждут" value={board.reports} />
         </div>
       </Section>
 

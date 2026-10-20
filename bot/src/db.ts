@@ -17,7 +17,7 @@ export type UserRow = {
   banned: number
   ban_reason: string | null
   banned_at: number | null
-  board_banned_until: number | null
+  board_banned_until: number | null // бывший анонимный чат: колонка осталась, не используется
   role: 'student' | 'teacher' | null // NULL — ещё не выбирал (старые пользователи — студенты МБ)
   teacher_id: string | null
   access: Access // будущая оплата: только структура, сейчас всё бесплатно (PAYWALL_ENABLED = false)
@@ -25,7 +25,6 @@ export type UserRow = {
   onboarded_at: number | null
   starosta_of: string | null // староста этой группы (назначает владелец)
   subgroups: string | null // JSON: выбранные подгруппы
-  board_origin: number // «Подслушано»: показывать у псевдонима курс и институт
   review_banned_until: number | null // бан в отзывах о преподавателях
   intro_version: number // какую версию знакомства (истории, тур) уже видел
 }
@@ -40,11 +39,10 @@ export type Me = {
   access: Access
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
-  origin: boolean // «Подслушано»: курс и институт у псевдонима (переключатель в профиле)
   intro: number // какую версию знакомства уже видел (приложение покажет новую один раз)
 }
 
-type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'board_origin' | 'intro_version'
+type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'intro_version'
 
 export function meOf(row: Pick<UserRow, MeFields> | null): Me {
   const group = normalizeGroup(row?.grp)
@@ -55,7 +53,6 @@ export function meOf(row: Pick<UserRow, MeFields> | null): Me {
     access: row?.access ?? 'standard',
     onboarding: !row?.legacy && !group && !row?.role,
     starosta: normalizeGroup(row?.starosta_of),
-    origin: Boolean(row?.board_origin),
     intro: row?.intro_version ?? 0,
   }
 }
@@ -108,7 +105,7 @@ export async function touchUser(
             OR users.name IS NOT excluded.name
             OR (excluded.grp IS NOT NULL AND users.grp IS NOT excluded.grp)
             OR (?4 IN (?10, ?11) AND users.access IS NOT 'free_forever')
-         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin, intro_version`,
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1], throttle),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
@@ -119,7 +116,7 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
     // строку не переписали (частое открытие) — берём как есть
-    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin, intro_version FROM users WHERE id = ?').bind(profile.id),
+    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version FROM users WHERE id = ?').bind(profile.id),
   ])
   const row = ((upsert.results[0] ?? current.results[0]) as Pick<UserRow, 'banned' | MeFields> | undefined)
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }

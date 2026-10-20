@@ -63,4 +63,4 @@ export function BarChart({ values, labels, every }: { values: number[]; labels: 
   )
 }
 
-export const Loading = ({ error }: { error?: string | null }) => <p className="board-empty">{error ?? 'Загружаю…'}</p>
+export const Loading = ({ error }: { error?: string | null }) => <p className="empty-note">{error ?? 'Загружаю…'}</p>

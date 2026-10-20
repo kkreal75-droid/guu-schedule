@@ -1,10 +1,9 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { AdminPage } from '../admin/AdminPage'
-import { BoardPage } from '../board/BoardPage'
 import type { TeacherInfo } from '../data'
 import type { Extras } from '../edits'
 import {
-  BuildingIcon, ChatIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GroupChatIcon,
+  BuildingIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GroupChatIcon,
   MegaphoneIcon, MessageIcon, PeopleIcon, PhoneCalendarIcon, PlanIcon, QuestionIcon, ShieldIcon, StarIcon, TableIcon,
   TeacherIcon,
 } from '../icons'
@@ -38,20 +37,16 @@ type Item = {
   color: Color
   render?: () => ReactNode // элемент, а не компонент: иначе при перерисовке страница сбрасывала бы состояние
   action?: () => void // вместо страницы (ссылка)
-  dot?: boolean
   bare?: boolean // страница рисует свою шапку (у админ-панели вложенные разделы)
 }
 type Group = { title?: string; items: Item[] }
 
 // group — группа на экране расписания; teacherMode — роль «Преподаватель» (сессия и календарь — для групп);
-// boardNew — точка «есть новое» в Подслушано; onBoardOpen — человек зашёл туда, точку убрать;
 // prefs / onPrefsChange — избранные группы; channel — ссылка «Канал новостей» из админки
 type Props = {
   admin: boolean
   group: string
   teacherMode: boolean
-  boardNew: boolean
-  onBoardOpen: () => void
   prefs: Prefs
   onPrefsChange: (patch: Partial<Prefs>) => void
   extras: Extras
@@ -67,7 +62,7 @@ type Props = {
 export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget) | { item: 'session' }
 
 export function MoreScreen({
-  admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,
+  admin, group, teacherMode, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,
   onRequestBack,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(request?.item ?? null)
@@ -118,7 +113,6 @@ export function MoreScreen({
             />
           ),
         },
-        { id: 'board', title: 'Подслушано', sub: 'Анонимный чат ГУУ', icon: ChatIcon, color: 'pink', render: () => <BoardPage />, dot: boardNew },
         { id: 'groupbot', title: 'Бот в беседе группы', sub: 'Расписание в чат каждое утро', icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
       ],
     },
@@ -193,7 +187,6 @@ export function MoreScreen({
                   haptic()
                   if (item.action) return item.action()
                   setOpenId(item.id)
-                  if (item.id === 'board') onBoardOpen()
                   window.scrollTo(0, 0)
                 }}
               >
@@ -204,7 +197,6 @@ export function MoreScreen({
                   <span className="other-title">{item.title}</span>
                   {item.sub && <span className="other-sub">{item.sub}</span>}
                 </span>
-                {item.dot && <span className="new-dot" aria-label="есть новое" />}
                 <ChevronRight className="other-chevron" />
               </button>
             ))}

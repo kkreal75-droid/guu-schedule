@@ -9,13 +9,13 @@ import {
 beforeAll(() => mockOutbound())
 
 const PRIVATE = [
-  '/seen', '/profile', '/support', '/intro', '/my-subgroups', '/extras', '/starosta/info', '/cal/status', '/board/enter',
+  '/seen', '/profile', '/support', '/intro', '/my-subgroups', '/extras', '/starosta/info', '/cal/status',
   '/reviews/top', '/admin/dashboard',
 ]
 const ADMIN_ACTIONS = [
-  'dashboard', 'users', 'user', 'ban', 'unban', 'board-ban', 'review-ban', 'reset-intro', 'places', 'academic',
+  'dashboard', 'users', 'user', 'ban', 'unban', 'review-ban', 'reset-intro', 'places', 'academic',
   'academic-save', 'academic-reset', 'place-save', 'place-reset', 'access', 'starosta', 'export', 'broadcast-info',
-  'broadcast-count', 'broadcast', 'reports', 'moderate', 'reviews', 'review-moderate', 'feed', 'schedule', 'update-now',
+  'broadcast-count', 'broadcast', 'reviews', 'review-moderate', 'schedule', 'update-now',
   'edit-add', 'edit-delete', 'settings', 'settings-save', 'greeting-preview', 'nonexistent',
 ]
 const PAYLOADS = [
@@ -113,18 +113,6 @@ describe('отзывы — только своему преподавателю'
 })
 
 describe('SQL- и XSS-нагрузки сохраняются как текст', () => {
-  it.each(PAYLOADS)('Подслушано: %s', async (payload) => {
-    const u = newUser()
-    await postAs(u, '/board/accept')
-    const sent = await postAs(u, '/board/send', { board: 'all', text: payload })
-    expect(sent.status).toBe(200)
-    const poll = (await (await postAs(newUser(), '/board/poll', { board: 'all', mode: 'chat', since: 0 })).json()) as { messages?: { text: string }[] }
-    // читатель без принятых правил получает 403 — читаем через автора
-    const mine = (await (await postAs(u, '/board/poll', { board: 'all', mode: 'chat', since: 0 })).json()) as { messages: { text: string }[] }
-    expect(mine.messages.some((m) => m.text === payload)).toBe(true)
-    expect(poll).toBeTruthy()
-    expect((await sql('SELECT COUNT(*) AS n FROM users').first<{ n: number }>())!.n).toBeGreaterThan(0)
-  })
   it.each(PAYLOADS)('отзыв: %s', async (payload) => {
     const u = newUser()
     await postAs(u, '/profile', { role: 'student', group: 'b1-mb-mp-1' })
@@ -152,7 +140,7 @@ describe('SQL- и XSS-нагрузки сохраняются как текст'
 
 describe('размер тела', () => {
   const big = 'x'.repeat(70 * 1024)
-  it.each(['/seen', '/support', '/board/send', '/profile'])('%s: 70 КБ — 413', async (path) => {
+  it.each(['/seen', '/support', '/reviews/save', '/profile'])('%s: 70 КБ — 413', async (path) => {
     expect((await post(path, { initData: await initData(newUser()), text: big })).status).toBe(413)
   })
   it('вебхук: 2 МБ — 413', async () => {
@@ -173,30 +161,39 @@ describe('лимиты запросов', () => {
   })
   it('частые записи — 429 до базы', async () => {
     const u = newUser()
-    await postAs(u, '/board/accept')
     const codes = []
-    for (let i = 0; i < 40; i++) codes.push((await postAs(u, '/board/react', { id: 1, emoji: '👍' })).status)
+    for (let i = 0; i < 40; i++) codes.push((await postAs(u, '/reviews/vote', { id: 1, value: 1 })).status)
     expect(codes).toContain(429)
   })
 })
 
-describe('анонимность «Подслушано»', () => {
+describe('анонимность отзывов', () => {
   it('обычный читатель не видит id, имени и ника автора; владелец видит', async () => {
     const author = newUser()
-    await post('/board/accept', { initData: await initData(author, { name: 'Секретное Имя' }) })
-    await post('/board/send', { initData: await initData(author, { name: 'Секретное Имя' }), board: 'all', text: 'анонимное сообщение' })
-    const reader = newUser()
-    await postAs(reader, '/board/accept')
-    const raw = await (await postAs(reader, '/board/poll', { board: 'all', mode: 'chat', since: 0 })).text()
-    expect(raw).toContain('анонимное сообщение')
+    const signed = { initData: await initData(author, { name: 'Секретное Имя' }) }
+    await post('/profile', { ...signed, role: 'student', group: 'b1-mb-mp-1' })
+    const text = 'Анонимный отзыв: объясняет понятно и спокойно.'
+    const saved = await post('/reviews/save', { ...signed, teacher: MINE_TEACHER, clarity: 5, competence: 5, communication: 5, recommend: true, text, confirm: true })
+    expect(saved.status).toBe(200)
+    const raw = await (await postAs(newUser(), '/reviews/teacher', { teacher: MINE_TEACHER })).text()
+    expect(raw).toContain(text)
     expect(raw).not.toContain('Секретное')
     expect(raw).not.toContain(String(author))
-    expect(raw).not.toContain(`u${author}`)
     expect(raw).not.toContain('"author"')
     expect(raw).not.toContain('user_id')
-    await postAs(OWNER, '/board/accept')
-    const admin = await (await postAs(OWNER, '/board/poll', { board: 'all', mode: 'chat', since: 0 })).text()
+    const admin = await (await postAs(OWNER, '/reviews/teacher', { teacher: MINE_TEACHER })).text()
     expect(admin).toContain(String(author))
+  })
+})
+
+describe('анонимного чата больше нет', () => {
+  it.each(['enter', 'accept', 'poll', 'send', 'react'])('/board/%s — 404', async (action) => {
+    expect((await postAs(newUser(), `/board/${action}`, { board: 'all', text: 'привет' })).status).toBe(404)
+  })
+  it('/seen не отдаёт поле чата', async () => {
+    const body = (await (await postAs(newUser(), '/seen', { v: 2 })).json()) as Record<string, unknown>
+    expect(body.ok).toBe(true)
+    expect(body).not.toHaveProperty('board')
   })
 })
 
@@ -231,10 +228,11 @@ describe('CORS', () => {
 })
 
 describe('/deleteme', () => {
-  it('удаляет профиль и обезличивает сообщения; чужой кнопкой — нельзя', async () => {
+  it('удаляет профиль и обезличивает отзыв; чужой кнопкой — нельзя', async () => {
     const u = newUser()
-    await postAs(u, '/board/accept')
-    await postAs(u, '/board/send', { board: 'all', text: 'до удаления' })
+    await postAs(u, '/profile', { role: 'student', group: 'b1-mb-mp-1' })
+    const text = 'Отзыв до удаления: семинары полезные.'
+    await postAs(u, '/reviews/save', { teacher: MINE_TEACHER, clarity: 4, competence: 4, communication: 4, recommend: true, text, confirm: true })
     const victim = newUser()
     await postAs(victim, '/seen', { v: 2 })
     // кнопка «Да, удалить» в чужом чате — не срабатывает
@@ -242,8 +240,9 @@ describe('/deleteme', () => {
     await sendUpdate({ update_id: 778_002, callback_query: { id: 'y', from: { id: u, first_name: 'У' }, data: 'dm:yes', message: { message_id: 1, chat: { id: u, type: 'private' } } } })
     await eventually(async () => !(await sql('SELECT id FROM users WHERE id = ?', u).first()))
     expect(await sql('SELECT id FROM users WHERE id = ?', victim).first()).not.toBeNull()
-    const msg = await sql(`SELECT user_id FROM board_messages WHERE text = 'до удаления'`).first<{ user_id: number }>()
-    expect(msg!.user_id).toBeLessThan(0)
+    const review = await sql('SELECT user_id, grp FROM teacher_reviews WHERE text = ?', text).first<{ user_id: number; grp: string | null }>()
+    expect(review!.user_id).toBeLessThan(0)
+    expect(review!.grp).toBeNull()
   })
 })
 

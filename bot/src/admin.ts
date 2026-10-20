@@ -1,6 +1,5 @@
 // Админские команды бота про пользователей: /stats, /export, /ban, /unban, /bans.
 import { isOwner } from './auth'
-import { boardBanTerm } from './board-moderation'
 import { reviewBanTerm, reviewStats } from './reviews'
 import { mbName, normalizeGroup } from '../../shared/groups'
 import { allUsers, findUserByUsername, getUser, userLabel, type UserRow } from './db'
@@ -55,7 +54,7 @@ export async function exportUsers(env: Env, chatId: number): Promise<void> {
   const now = Date.now()
   const yesNo = (flag: unknown) => (flag ? 'да' : 'нет')
   const rows = [
-    ['id', 'имя', 'username', 'группа', 'роль', 'доступ', 'первый визит', 'последний визит', 'визитов', 'blocked_bot', 'banned', 'board_banned'],
+    ['id', 'имя', 'username', 'группа', 'роль', 'доступ', 'первый визит', 'последний визит', 'визитов', 'blocked_bot', 'banned'],
     ...users.map((u) => [
       u.id,
       u.name,
@@ -68,7 +67,6 @@ export async function exportUsers(env: Env, chatId: number): Promise<void> {
       u.visits,
       yesNo(u.blocked_bot),
       yesNo(u.banned),
-      yesNo(u.board_banned_until && u.board_banned_until > now),
     ]),
   ]
   const date = formatMskFull(now).slice(0, 10).replace(/\./g, '-') // ДД-ММ-ГГГГ
@@ -128,15 +126,13 @@ export async function unbanCommand(env: Env, chatId: number, args: string): Prom
 }
 
 export async function listBans(env: Env, chatId: number): Promise<void> {
-  const [banned, boardBanned, reviewBanned] = await env.DB.batch([
+  const [banned, reviewBanned] = await env.DB.batch([
     env.DB.prepare('SELECT * FROM users WHERE banned = 1 ORDER BY banned_at DESC'),
-    env.DB.prepare('SELECT * FROM users WHERE board_banned_until > ? ORDER BY board_banned_until DESC').bind(Date.now()),
     env.DB.prepare('SELECT * FROM users WHERE review_banned_until > ? ORDER BY review_banned_until DESC').bind(Date.now()),
   ])
   const bans = banned.results as UserRow[]
-  const boardBans = boardBanned.results as UserRow[]
   const reviewBans = reviewBanned.results as UserRow[]
-  if (!bans.length && !boardBans.length && !reviewBans.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
+  if (!bans.length && !reviewBans.length) return void (await sendMessage(env, chatId, 'Банов нет.'))
   const parts: string[] = []
   if (bans.length) {
     const lines = bans.map(
@@ -144,10 +140,6 @@ export async function listBans(env: Env, chatId: number): Promise<void> {
         `${i + 1}. ${targetLabel(u)} · ${u.banned_at ? formatMsk(u.banned_at) : '—'}${u.ban_reason ? `\n    ${escapeHtml(u.ban_reason)}` : ''}`,
     )
     parts.push(`🚫 <b>Забанены (${bans.length})</b>\n\n${lines.join('\n')}`)
-  }
-  if (boardBans.length) {
-    const lines = boardBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${boardBanTerm(u.board_banned_until!)}`)
-    parts.push(`🔇 <b>Бан в Подслушано (${boardBans.length})</b>\n\n${lines.join('\n')}`)
   }
   if (reviewBans.length) {
     const lines = reviewBans.map((u, i) => `${i + 1}. ${targetLabel(u)} · ${reviewBanTerm(u.review_banned_until!)}`)
