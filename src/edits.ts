@@ -1,31 +1,27 @@
-// Ручные правки расписания из админ-панели: «пара отменена» и пометки (к паре или ко всему дню).
-// Приходят от бота при открытии (POST /seen); последнюю копию держим локально — на случай,
-// если бот не ответил.
+// Ручные правки расписания (владелец и старосты), подгруппы и пометки пар подгрупп.
+// Приходят от бота при открытии (POST /seen) — только для групп, которые показывает приложение;
+// последнюю копию держим локально — на случай, если бот не ответил. Логика — shared/edits-core.ts.
+import { NO_EXTRAS, type Extras } from '../shared/edits-core'
 import { readLocal, writeLocal } from './storage'
 
-export type ScheduleEdit = {
-  id: number
-  group: string
-  date: string // ГГГГ-ММ-ДД
-  start: string | null
-  kind: 'cancel' | 'note'
-  text: string
+export type { DayLesson, Extras, ScheduleEdit, Subgroup } from '../shared/edits-core'
+
+const KEY = 'extras_cache'
+
+export function rememberExtras(extras: Extras) {
+  writeLocal(KEY, JSON.stringify(extras))
 }
 
-const KEY = 'edits_cache'
-
-export function rememberEdits(edits: ScheduleEdit[]) {
-  writeLocal(KEY, JSON.stringify(edits))
-}
-
-export function cachedEdits(): ScheduleEdit[] {
+export function cachedExtras(): Extras {
   try {
-    const list = JSON.parse(readLocal(KEY) ?? '[]') as unknown
-    return Array.isArray(list) ? (list as ScheduleEdit[]) : []
+    const saved = JSON.parse(readLocal(KEY) ?? 'null') as Partial<Extras> | null
+    if (!saved) return NO_EXTRAS
+    return {
+      edits: Array.isArray(saved.edits) ? saved.edits : [],
+      subgroups: Array.isArray(saved.subgroups) ? saved.subgroups : [],
+      tags: Array.isArray(saved.tags) ? saved.tags : [],
+    }
   } catch {
-    return []
+    return NO_EXTRAS
   }
 }
-
-// Что показать у пары: отмена и пометки
-export type LessonEdit = { cancel: ScheduleEdit | null; notes: string[] }

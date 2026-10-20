@@ -1,7 +1,8 @@
 import { formatDuration } from '../format'
 import { NoteIcon, PersonIcon, PinIcon } from '../icons'
-import type { LessonEdit } from '../edits'
-import { toMinutes, type Lesson } from '../schedule'
+import { shortWhen } from '../../shared/edits-core'
+import type { DayLesson } from '../edits'
+import { toMinutes } from '../schedule'
 
 const KIND_CLASS: Record<string, string> = {
   Лекция: 'k-lecture',
@@ -10,21 +11,19 @@ const KIND_CLASS: Record<string, string> = {
 }
 
 type Props = {
-  lesson: Lesson
+  lesson: DayLesson // пара с правками: отменена, перенесена, добавлена, подгруппа, пометки
   // минуты от полуночи, если карточка показывается за сегодня; иначе null
   nowMinutes: number | null
   isNext: boolean
-  // правка из админ-панели: пара отменена и/или пометка
-  edit?: LessonEdit
-  pair: number // номер пары по сетке группы
+  pair: number | null // номер пары по сетке группы; у добавленной правкой — нет
   note: string | undefined
   onEditNote?: () => void // нет — чужое расписание, без заметок
 }
 
-export function LessonCard({ lesson, nowMinutes, isNext, edit, pair, note, onEditNote }: Props) {
+export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote }: Props) {
   const start = toMinutes(lesson.start)
   const end = toMinutes(lesson.end)
-  const cancelled = Boolean(edit?.cancel)
+  const cancelled = Boolean(lesson.cancel || lesson.movedTo)
   const live = !cancelled && nowMinutes !== null && nowMinutes >= start && nowMinutes < end
   const past = nowMinutes !== null && nowMinutes >= end
   const kindClass = (lesson.kind && KIND_CLASS[lesson.kind]) || 'k-other'
@@ -43,7 +42,9 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, pair, note, onEdi
       <div className="lesson-body">
         <div className="lesson-top">
           {lesson.kind && <span className="badge">{lesson.kind}</span>}
-          <span className="lesson-pair">{pair} пара</span>
+          {pair ? <span className="lesson-pair">{pair} пара</span> : null}
+          {lesson.added && <span className="badge badge-edit">добавлена</span>}
+          {lesson.subgroup && <span className="badge badge-sub">{lesson.subgroup.name}</span>}
           {onEditNote && (
             <button
               type="button"
@@ -82,10 +83,16 @@ export function LessonCard({ lesson, nowMinutes, isNext, edit, pair, note, onEdi
             </div>
           </div>
         )}
-        {edit?.cancel && (
-          <div className="lesson-cancel">Пара отменена{edit.cancel.text ? `: ${edit.cancel.text}` : ''}</div>
+        {lesson.cancel && (
+          <div className="lesson-cancel">Пара отменена{lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}</div>
         )}
-        {edit?.notes.map((text, i) => (
+        {lesson.movedTo && (
+          <div className="lesson-cancel">Перенесена на {shortWhen(lesson.movedTo.date, lesson.movedTo.start)}</div>
+        )}
+        {lesson.movedFrom && (
+          <div className="edit-note edit-note-lesson">↩️ Перенос с {shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}</div>
+        )}
+        {lesson.notes.map((text, i) => (
           <div key={i} className="edit-note edit-note-lesson">
             📌 {text}
           </div>

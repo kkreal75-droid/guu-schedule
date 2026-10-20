@@ -2661,3 +2661,46 @@ select.input {
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- старосты, подгруппы ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.tag-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.tag-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 0.5px solid var(--separator);
+  font-size: 14px;
+}
+
+.badge-edit {
+  background: rgb(var(--note) / 0.18);
+  color: var(--text);
+}
+
+.badge-sub {
+  background: var(--fill);
+  color: var(--hint);
+}
+
+.admin-msg.is-reverted {
+  opacity: 0.45;
+}
+
+.section-body .form .row-chips {
+  justify-content: flex-start;
+}

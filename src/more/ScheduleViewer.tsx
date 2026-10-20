@@ -1,13 +1,25 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Timetable } from '../../shared/schedule-core'
-import type { ScheduleEdit } from '../edits'
+import { callBot, botAvailable } from '../api'
+import { NO_EXTRAS, type Extras } from '../../shared/edits-core'
 import { ScheduleScreen, initialCursor, type Cursor } from '../screens/ScheduleScreen'
 import { buildTimetable, fetchGroup } from '../schedule'
 
 // Чужое расписание — любая группа ГУУ или преподаватель («t-<id>»): по неделям, как главный экран,
 // только без заметок. Своё расписание (главный экран) не трогает.
-export function ScheduleViewer({ id, edits, actions }: { id: string; edits: ScheduleEdit[]; actions?: ReactNode }) {
+export function ScheduleViewer({ id, actions }: { id: string; actions?: ReactNode }) {
   const [tt, setTt] = useState<Timetable | null>(null)
+  // правки старост и подгруппы этой группы (у преподавателя — нет)
+  const [extras, setExtras] = useState<Extras>(NO_EXTRAS)
+  useEffect(() => {
+    setExtras(NO_EXTRAS)
+    if (id.startsWith('t-') || !botAvailable()) return
+    let alive = true
+    callBot<Extras>('/extras', { groups: [id] }).then((x) => alive && setExtras(x), () => {})
+    return () => {
+      alive = false
+    }
+  }, [id])
   const [error, setError] = useState(false)
   const [cursor, setCursor] = useState<Cursor | null>(null)
 
@@ -37,7 +49,7 @@ export function ScheduleViewer({ id, edits, actions }: { id: string; edits: Sche
       <ScheduleScreen
         tt={tt}
         readOnly
-        edits={edits}
+        extras={extras}
         group={tt.schedule.groups[0]}
         groups={tt.schedule.groups}
         onGroupChange={() => {}}

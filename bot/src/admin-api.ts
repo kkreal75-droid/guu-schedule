@@ -9,9 +9,10 @@ import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBr
 import { loadChats } from './chats'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
-import { addEdits, deleteEdit, editProblem, type NewEdit, type ScheduleEdit } from './edits'
+import { cleanEditData, editProblem, type EditKind, type NewEdit, type ScheduleEdit } from '../../shared/edits-core'
+import { addEdits, editFromRow, revertEdit } from './edits'
 import { isOwner } from './auth'
-import { loadTimetable } from './schedule'
+import { loadGroupFile, loadTimetable } from './schedule'
 import { htmlProblem, loadSettings, renderGreeting, saveSettings, type Settings } from './settings'
 import { TelegramError, sendMessage } from './telegram'
 import { escapeHtml } from './util'
@@ -88,7 +89,7 @@ async function dashboard({ env }: Call): Promise<Response> {
 async function users({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT id, username, name, grp, first_seen, last_seen, visits, starts, can_message,
-            blocked_bot, banned, ban_reason, board_banned_until, role, teacher_id, access
+            blocked_bot, banned, ban_reason, board_banned_until, role, teacher_id, access, starosta_of
      FROM users ORDER BY last_seen DESC`,
   ).all()
   return json({ ok: true, users: results })
@@ -162,6 +163,17 @@ async function access({ env, req }: Call): Promise<Response> {
   const value = req.body.access
   if (id === null || (value !== 'free_forever' && value !== 'standard')) return fail(400, 'bad request')
   const { meta } = await env.DB.prepare('UPDATE users SET access = ? WHERE id = ?').bind(value, id).run()
+  if (!meta.changes) return fail(404, 'not found')
+  return userCard(env, id)
+}
+
+// Староста: группа (правки только её) или null — снять
+async function starosta({ env, req }: Call): Promise<Response> {
+  const id = asInt(req.body.id)
+  if (id === null) return fail(400, 'bad request')
+  const group = req.body.group === null ? null : normalizeGroup(req.body.group)
+  if (req.body.group !== null && (!group || !(await loadGroupFile(env, group)))) return fail(400, 'Нет такой группы')
+  const { meta } = await env.DB.prepare('UPDATE users SET starosta_of = ? WHERE id = ?').bind(group, id).run()
   if (!meta.changes) return fail(404, 'not found')
   return userCard(env, id)
 }
@@ -348,11 +360,18 @@ async function workflowRuns(env: Env): Promise<{ runs: Run[] | null; error: stri
   }
 }
 
-async function editList(env: Env): Promise<ScheduleEdit[]> {
+// Все правки (и старост) — с автором; откаченные — с отметкой, последние 300
+async function editList(env: Env): Promise<(ScheduleEdit & { created_at: number; reverted_at: number | null; author_id: number | null })[]> {
   const { results } = await env.DB.prepare(
-    'SELECT id, grp AS "group", date, start, kind, text, created_at FROM schedule_edits ORDER BY date DESC, start, id',
-  ).all<ScheduleEdit>()
-  return results.map((e) => ({ ...e, group: normalizeGroup(e.group) ?? e.group }))
+    `SELECT e.id, e.grp, e.date, e.start, e.kind, e.text, e.data, e.created_at, e.author_id, e.reverted_at, u.name, u.username
+     FROM schedule_edits e LEFT JOIN users u ON u.id = e.author_id
+     ORDER BY e.reverted_at IS NOT NULL, e.date DESC, e.start, e.id LIMIT 300`,
+  ).all<Parameters<typeof editFromRow>[0] & { name: string | null; username: string | null }>()
+  return results.map((r) => ({
+    ...editFromRow(r, r.author_id ? (r.username ? `@${r.username}` : (r.name ?? `id ${r.author_id}`)) : null),
+    reverted_at: r.reverted_at,
+    author_id: r.author_id,
+  }))
 }
 
 async function schedule({ env }: Call): Promise<Response> {
@@ -398,17 +417,19 @@ async function updateNow({ env, req }: Call): Promise<Response> {
 async function editAdd({ env, req }: Call): Promise<Response> {
   const body = req.body as Partial<NewEdit>
   // старая админ-панель присылает имена групп («МБ(МП) 1-1») — переводим в id
-  const edit = { ...body, groups: Array.isArray(body.groups) ? body.groups.map((g) => normalizeGroup(g) ?? String(g)) : body.groups }
+  const groups = Array.isArray(body.groups) ? body.groups.map((g) => normalizeGroup(g)).filter((g): g is string => Boolean(g)) : []
+  const kind = (body.kind ?? 'note') as EditKind
+  const edit = { ...body, groups, kind, data: cleanEditData(kind, body.data), text: typeof body.text === 'string' ? body.text : '' }
   const problem = editProblem(edit)
   if (problem) return json({ ok: false, error: problem }, 400)
-  await addEdits(env, { ...(edit as NewEdit), text: (edit.text as string | undefined) ?? '' })
+  await addEdits(env, edit as NewEdit, null)
   return json({ ok: true, edits: await editList(env) })
 }
 
 async function editDelete({ env, req }: Call): Promise<Response> {
   const id = asInt(req.body.id)
   if (id === null) return fail(400, 'bad request')
-  await deleteEdit(env, id)
+  await revertEdit(env, id) // «откатить»: правка перестаёт действовать, в истории остаётся
   return json({ ok: true, edits: await editList(env) })
 }
 
@@ -472,6 +493,7 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   unban,
   'board-ban': boardBan,
   access,
+  starosta,
   export: exportCsv,
   'broadcast-info': broadcastInfo,
   'broadcast-count': broadcastCount,

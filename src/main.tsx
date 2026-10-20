@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
-import { cachedEdits, rememberEdits, type ScheduleEdit } from './edits'
+import { cachedExtras, rememberExtras, type Extras } from './edits'
 import { Onboarding, type Choice } from './onboarding/Onboarding'
 import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from './prefs'
 import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
@@ -35,7 +35,7 @@ type Phase = { kind: 'app'; version: number; tab?: Tab } | { kind: 'onboarding';
 
 let versions = 0
 
-function Root({ checked, edits, initial }: { checked: CheckIn | null; edits: ScheduleEdit[]; initial: Phase }) {
+function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: Extras; initial: Phase }) {
   const [phase, setPhase] = useState<Phase>(initial)
   const [lastApp, setLastApp] = useState(0) // версия App до онбординга — «Отмена» возвращает его как был
 
@@ -69,7 +69,7 @@ function Root({ checked, edits, initial }: { checked: CheckIn | null; edits: Sch
     <AppLazy
       key={phase.version}
       status={checked}
-      edits={edits}
+      extras={extras}
       startTab={phase.tab}
       onReload={reload}
       onChangeProfile={() => {
@@ -104,9 +104,10 @@ async function boot() {
     )
     return
   }
-  // правки расписания: свежие от бота, а если он не ответил — последние сохранённые
-  if (checked) rememberEdits(checked.edits)
-  const edits = checked ? checked.edits : cachedEdits()
+  // правки расписания и подгруппы: свежие от бота, а если он не ответил — последние сохранённые
+  const fresh: Extras | null = checked ? { edits: checked.edits, subgroups: checked.subgroups, tags: checked.tags } : null
+  if (fresh) rememberExtras(fresh)
+  const extras = fresh ?? cachedExtras()
 
   // Чьё расписание показывать. Порядок: настройки на устройстве / в облаке Telegram → выбор, который
   // помнит бот (другое устройство) → онбординг для новых → МБ(МП) 1-1 по умолчанию (как раньше)
@@ -135,7 +136,7 @@ async function boot() {
   AppLazy = (await import('./App')).default
   root.render(
     <StrictMode>
-      <Root checked={checked} edits={edits} initial={initial} />
+      <Root checked={checked} extras={extras} initial={initial} />
     </StrictMode>,
   )
 }

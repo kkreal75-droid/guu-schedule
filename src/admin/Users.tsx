@@ -3,7 +3,9 @@ import { Section } from '../components/Section'
 import { ChevronLeft } from '../icons'
 import { confirmAction, haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
-import { useGroupNames } from '../data'
+import { loadGroups, useGroupNames } from '../data'
+import type { GroupInfo } from '../../shared/groups'
+import { GroupSearch } from '../onboarding/GroupSearch'
 import { BOARD_TITLES, adminApi, adminError, stamp, userName, type AdminUser, type UserCard } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
@@ -185,6 +187,13 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
         </div>
       </Section>
 
+      <StarostaRow
+        value={u.starosta_of}
+        groupName={groupName}
+        busy={busy}
+        onSet={(group) => run(() => adminApi.starosta(id, group), group ? 'Назначен старостой' : 'Больше не староста')}
+      />
+
       <Section
         title="Доступ"
         footer="На будущее: сейчас всё бесплатно для всех, доступ ни на что не влияет. free_forever — навсегда бесплатно (МБ(МП) 1-1/1-2 и все, кто был до онбординга)."
@@ -298,5 +307,56 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
         ))}
       </Section>
     </div>
+  )
+}
+
+// Староста группы: может править расписание только этой группы («Ещё → Правки группы»)
+function StarostaRow({
+  value,
+  groupName,
+  busy,
+  onSet,
+}: {
+  value: string | null
+  groupName: (id: string | null) => string
+  busy: boolean
+  onSet: (group: string | null) => void
+}) {
+  const [picking, setPicking] = useState(false)
+  const [groups, setGroups] = useState<GroupInfo[] | null>(null)
+  useEffect(() => {
+    if (picking && !groups) loadGroups().then((i) => setGroups(i.groups), () => {})
+  }, [picking, groups])
+  return (
+    <Section title="Староста" footer="Староста видит «Ещё → Правки группы» и правит только свою группу. Все правки — у вас в «Расписании» с автором.">
+      <div className="row">
+        <span>Группа</span>
+        <span className="row-value">{value ? groupName(value) : 'не староста'}</span>
+      </div>
+      {value && (
+        <button type="button" className="row row-btn row-link" disabled={busy} onClick={() => onSet(null)}>
+          Снять со старост
+        </button>
+      )}
+      {picking ? (
+        groups ? (
+          <div className="row row-plain">
+            <GroupSearch
+              groups={groups}
+              onPick={(g) => {
+                setPicking(false)
+                onSet(g.id)
+              }}
+            />
+          </div>
+        ) : (
+          <div className="row row-text">Загружаю группы…</div>
+        )
+      ) : (
+        <button type="button" className="row row-btn row-link" disabled={busy} onClick={() => setPicking(true)}>
+          {value ? 'Сделать старостой другой группы' : 'Назначить старостой группы…'}
+        </button>
+      )}
+    </Section>
   )
 }

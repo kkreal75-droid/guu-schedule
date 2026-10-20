@@ -23,6 +23,8 @@ export type UserRow = {
   access: Access // будущая оплата: только структура, сейчас всё бесплатно (PAYWALL_ENABLED = false)
   legacy: number // был в базе до онбординга — его не показываем
   onboarded_at: number | null
+  starosta_of: string | null // староста этой группы (назначает владелец)
+  subgroups: string | null // JSON: выбранные подгруппы
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -34,9 +36,10 @@ export type Me = {
   teacher: string | null
   access: Access
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
+  starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
 }
 
-export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy'> | null): Me {
+export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of'> | null): Me {
   const group = normalizeGroup(row?.grp)
   return {
     role: row?.role ?? null,
@@ -44,6 +47,7 @@ export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access'
     teacher: row?.teacher_id ?? null,
     access: row?.access ?? 'standard',
     onboarding: !row?.legacy && !group && !row?.role,
+    starosta: normalizeGroup(row?.starosta_of),
   }
 }
 
@@ -84,7 +88,7 @@ export async function touchUser(
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
            access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
-         RETURNING banned, grp, role, teacher_id, access, legacy`,
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1]),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
@@ -95,7 +99,7 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
   ])
-  const row = (upsert.results as (Pick<UserRow, 'banned' | 'grp' | 'role' | 'teacher_id' | 'access' | 'legacy'>)[])[0]
+  const row = (upsert.results as (Pick<UserRow, 'banned' | 'grp' | 'role' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of'>)[])[0]
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }
 }
 
@@ -114,4 +118,15 @@ export function userLabel(user: Pick<UserRow, 'id' | 'username' | 'name'>, escap
   return user.username
     ? `@${escape(user.username)}`
     : `<a href="tg://user?id=${user.id}">${escape(user.name || `id ${user.id}`)}</a>`
+}
+
+// Подгруппы, которые человек выбрал в профиле (только свои пары); null — не выбирал
+export async function userSubgroups(db: D1Database, id: number): Promise<number[] | null> {
+  const row = await db.prepare('SELECT subgroups FROM users WHERE id = ?').bind(id).first<{ subgroups: string | null }>()
+  try {
+    const list = row?.subgroups ? (JSON.parse(row.subgroups) as unknown) : null
+    return Array.isArray(list) ? list.filter((x): x is number => Number.isSafeInteger(x)) : null
+  } catch {
+    return null
+  }
 }

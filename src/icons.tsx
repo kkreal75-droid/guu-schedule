@@ -188,3 +188,11 @@ export const DoorIcon = (p: P) => (
     <path d="M14 12h.01" />
   </svg>
 )
+
+// карандаш: правки группы (староста)
+export const EditIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 20h4L19 9l-4-4L4 16z" />
+    <path d="m13.5 6.5 4 4" />
+  </svg>
+)

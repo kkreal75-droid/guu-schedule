@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { groupSubtitle, isMbGroup, type GroupInfo } from '../../shared/groups'
 import { loadGroups } from '../data'
-import type { ScheduleEdit } from '../edits'
 import { GroupSearch } from '../onboarding/GroupSearch'
 import { MAX_FAVORITES, type Prefs } from '../prefs'
 import { haptic } from '../telegram'
@@ -12,11 +11,9 @@ import { ScheduleViewer } from './ScheduleViewer'
 export function GroupSchedulePage({
   prefs,
   onPrefsChange,
-  edits,
 }: {
   prefs: Prefs
   onPrefsChange: (patch: Partial<Prefs>) => void
-  edits: ScheduleEdit[]
 }) {
   const [groups, setGroups] = useState<GroupInfo[] | null>(null)
   const [error, setError] = useState(false)
@@ -42,7 +39,6 @@ export function GroupSchedulePage({
   return (
     <ScheduleViewer
       id={picked.id}
-      edits={edits}
       actions={
         <div className="viewer-head">
           <div className="viewer-title">

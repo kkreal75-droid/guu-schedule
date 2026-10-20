@@ -2,16 +2,17 @@ import { useCallback, useState, type ComponentType, type ReactNode, type SVGProp
 import { Section } from '../components/Section'
 import { AdminPage } from '../admin/AdminPage'
 import { BoardPage } from '../board/BoardPage'
-import type { ScheduleEdit } from '../edits'
+import type { Extras } from '../edits'
 import {
-  BoardIcon, ChevronLeft, ChevronRight, DoorIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon, ShieldIcon,
-  TeacherIcon,
+  BoardIcon, ChevronLeft, ChevronRight, DoorIcon, EditIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon,
+  ShieldIcon, TeacherIcon,
 } from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
 import { FreeRoomsPage } from '../more/FreeRoomsPage'
 import { GroupBotPage } from '../more/GroupBotPage'
 import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { SessionPage } from '../more/SessionPage'
+import { StarostaPage } from '../more/StarostaPage'
 import { TeacherSchedulePage } from '../more/TeacherSchedulePage'
 import type { Prefs } from '../prefs'
 import { haptic } from '../telegram'
@@ -38,16 +39,21 @@ type Props = {
   onBoardOpen: () => void
   prefs: Prefs
   onPrefsChange: (patch: Partial<Prefs>) => void
-  edits: ScheduleEdit[]
+  extras: Extras
+  starosta: string | null // староста этой группы — «Правки группы»
+  onGroupExtras: (group: string, extras: Extras) => void
 }
 
-export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, edits }: Props) {
+export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras }: Props) {
   const items: Item[] = [
+    ...(starosta
+      ? [{ id: 'starosta', title: 'Правки группы', icon: EditIcon, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
+      : []),
     {
       id: 'group-schedule',
       title: 'Расписание группы',
       icon: SearchIcon,
-      render: () => <GroupSchedulePage prefs={prefs} onPrefsChange={onPrefsChange} edits={edits} />,
+      render: () => <GroupSchedulePage prefs={prefs} onPrefsChange={onPrefsChange} />,
     },
     { id: 'teacher-schedule', title: 'Расписание преподавателя', icon: TeacherIcon, render: () => <TeacherSchedulePage /> },
     { id: 'rooms', title: 'Свободные аудитории', icon: DoorIcon, render: () => <FreeRoomsPage /> },

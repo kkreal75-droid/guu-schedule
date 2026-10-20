@@ -6,7 +6,8 @@
 // к которым привязаны беседы. Снимки «пары на 7 дней» — в D1 (group_snapshots): групп много,
 // а у KV всего 1000 записей в сутки.
 import { WEEKDAYS_FULL, formatDate } from '../../shared/format-core'
-import { isoFromDay, moscowNow, toMinutes, type Lesson, type Timetable } from '../../shared/schedule-core'
+import { dayLessons, type DayLesson } from '../../shared/edits-core'
+import { isoFromDay, moscowNow, toMinutes } from '../../shared/schedule-core'
 import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
 import { reportError } from './errors'
 import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
@@ -32,7 +33,7 @@ function dueSlots(day: number, minutes: number, weekday: number, chats: Record<s
         chats: enabled.filter(([, c]) => c.time === time),
         text: (tt, group) => {
           if (!tt.inSemester(tt.weekOf(day))) return null // каникулы — молчим
-          const lessons = tt.lessonsOn(group, tt.weekOf(day), weekday)
+          const lessons = dayLessons(tt, group, day, tt.extras).lessons
           return lessons.length
             ? `☀️ ${formatDay(tt, day, group)}`
             : `☀️ <b>${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}</b> · ${escapeHtml(group)}\nСегодня пар нет 🎉`
@@ -105,12 +106,16 @@ export async function runDigests(env: Env, now: number): Promise<number> {
 
 type Snapshot = Record<string, string[]> // дата → пары строками
 
-const lessonLine = (lesson: Lesson) => formatLesson(lesson) // HTML, тот же вид, что в сводке
+const lessonLine = (lesson: DayLesson) => formatLesson(lesson) // HTML, тот же вид, что в сводке
 
-function snapshot(tt: Timetable, group: string, today: number): Snapshot {
+// Пары на 7 дней с правками (отменённые и перенесённые отсюда — не считаются): правка старосты
+// тоже даёт «Изменение в расписании»
+function snapshot(tt: BotTimetable, group: string, today: number): Snapshot {
   const result: Snapshot = {}
   for (let day = today; day < today + 7; day++) {
-    result[isoFromDay(day)] = tt.lessonsOn(group, tt.weekOf(day), tt.weekdayOf(day)).map(lessonLine)
+    result[isoFromDay(day)] = dayLessons(tt, group, day, tt.extras)
+      .lessons.filter((l) => !l.cancel && !l.movedTo)
+      .map(lessonLine)
   }
   return result
 }

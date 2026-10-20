@@ -1,13 +1,11 @@
 // Живой календарь: подписка по ссылке /cal/<токен>.ics (Apple, Google и др.).
 // Токен — случайный; «Отключить» удаляет его, и старая ссылка перестаёт работать.
-import type { Lesson, Timetable } from '../../shared/schedule-core'
+import { dayLessons, shortWhen } from '../../shared/edits-core'
 import { isoFromDay } from '../../shared/schedule-core'
 import { MB_IDS, normalizeGroup, shortName } from '../../shared/groups'
 import { json, readApi } from './api'
-import { loadGroupFile, loadTimetable } from './schedule'
-
-// Ручная правка из админ-панели (edits.ts): отменённая пара или пометка (start null — ко всему дню)
-export type CalendarEdit = { group: string; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }
+import { loadGroupFile, loadTimetable, type BotTimetable } from './schedule'
+import { userSubgroups } from './db'
 
 type TokenRow = { token: string; user_id: number; grp: string; created_at: number } // grp — id группы
 
@@ -71,7 +69,9 @@ const MOSCOW_TZ = [
   'END:VTIMEZONE',
 ]
 
-export function buildIcs(tt: Timetable, group: string, edits: CalendarEdit[] = []): string {
+// .ics одной группы на весь семестр — с правками (отмена → STATUS:CANCELLED, перенос, добавленные пары)
+// и подгруппами владельца ссылки (mine: чужие пары подгрупп не показываем)
+export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null = null): string {
   const stamp = utcStamp(tt.schedule.updated_at)
   const lines = [
     'BEGIN:VCALENDAR',
@@ -85,30 +85,41 @@ export function buildIcs(tt: Timetable, group: string, edits: CalendarEdit[] = [
     'X-PUBLISHED-TTL:PT1H',
     ...MOSCOW_TZ,
   ]
-  const lessons: Lesson[] = tt.schedule.lessons.filter((l) => l.group === group)
-  for (const lesson of lessons) {
-    for (const week of lesson.weeks) {
-      if (!tt.inSemester(week)) continue
-      const iso = isoFromDay(tt.dayOf(week, lesson.weekday))
-      const related = edits.filter((e) => e.group === group && e.date === iso && (e.start === lesson.start || e.start === null))
-      const cancelled = related.some((e) => e.kind === 'cancel' && e.start === lesson.start)
-      const notes = related.map((e) => (e.kind === 'cancel' ? `Отменена${e.text ? `: ${e.text}` : ''}` : e.text)).filter(Boolean)
-      const description = [
-        ...notes.map((n) => `⚠️ ${n}`),
-        [lesson.kind, lesson.teachers?.join(', ') ?? lesson.teacher, `${tt.pairNumber(lesson)} пара`].filter(Boolean).join(' · '),
-      ].join('\n')
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:${uidPrefix(group)}-${iso}-${lesson.start.replace(':', '')}-${hash(lesson.subject)}@guu-schedule-bot`,
-        `DTSTAMP:${stamp}`,
-        `DTSTART;TZID=Europe/Moscow:${localStamp(iso, lesson.start)}`,
-        `DTEND;TZID=Europe/Moscow:${localStamp(iso, lesson.end)}`,
-        `SUMMARY:${escapeText(lesson.subject)}`,
-        ...(lesson.room ? [`LOCATION:${escapeText(lesson.room)}`] : []),
-        `DESCRIPTION:${escapeText(description)}`,
-        ...(cancelled ? ['STATUS:CANCELLED'] : ['STATUS:CONFIRMED']),
-        'END:VEVENT',
-      )
+  for (let week = 1; week <= tt.maxWeek; week++) {
+    for (let weekday = 0; weekday < 6; weekday++) {
+      const day = tt.dayOf(week, weekday)
+      const iso = isoFromDay(day)
+      const view = dayLessons(tt, group, day, tt.extras, mine)
+      for (const lesson of view.lessons) {
+        const status = lesson.cancel
+          ? `Отменена${lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}`
+          : lesson.movedTo
+            ? `Перенесена на ${shortWhen(lesson.movedTo.date, lesson.movedTo.start)}`
+            : lesson.movedFrom
+              ? `Перенос с ${shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}`
+              : lesson.added
+                ? 'Добавлена'
+                : null
+        const pair = lesson.pair ?? (lesson.added || lesson.movedFrom ? null : tt.pairNumber(lesson))
+        const description = [
+          ...[status, ...view.notes, ...lesson.notes].filter(Boolean).map((n) => `⚠️ ${n}`),
+          [lesson.kind, lesson.teachers?.join(', ') ?? lesson.teacher, lesson.subgroup?.name, pair ? `${pair} пара` : null]
+            .filter(Boolean)
+            .join(' · '),
+        ].join('\n')
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:${uidPrefix(group)}-${iso}-${lesson.start.replace(':', '')}-${hash(lesson.subject)}@guu-schedule-bot`,
+          `DTSTAMP:${stamp}`,
+          `DTSTART;TZID=Europe/Moscow:${localStamp(iso, lesson.start)}`,
+          `DTEND;TZID=Europe/Moscow:${localStamp(iso, lesson.end)}`,
+          `SUMMARY:${escapeText(lesson.subject)}`,
+          ...(lesson.room ? [`LOCATION:${escapeText(lesson.room)}`] : []),
+          `DESCRIPTION:${escapeText(description)}`,
+          ...(lesson.cancel || lesson.movedTo ? ['STATUS:CANCELLED'] : ['STATUS:CONFIRMED']),
+          'END:VEVENT',
+        )
+      }
     }
   }
   lines.push('END:VCALENDAR')
@@ -170,8 +181,8 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
       .run(),
   )
   const group = normalizeGroup(row.grp) ?? row.grp
-  const tt = await loadTimetable(env, [group])
-  const ics = buildIcs(tt, group, tt.edits)
+  const [tt, mine] = await Promise.all([loadTimetable(env, [group]), userSubgroups(env.DB, row.user_id)])
+  const ics = buildIcs(tt, group, mine)
   return new Response(ics, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',

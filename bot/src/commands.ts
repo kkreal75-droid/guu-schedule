@@ -3,7 +3,7 @@ import { banCommand, exportUsers, listBans, sendStats, unbanCommand } from './ad
 import { isOwner, profileOf } from './auth'
 import { boardBanCommand } from './board-moderation'
 import { listBroadcasts, startBroadcast } from './broadcast'
-import { getUser, touchUser } from './db'
+import { getUser, touchUser, userSubgroups } from './db'
 import { reportError, safely } from './errors'
 import { formatDay, groupsFor, loadTimetable, personalKey, todayMsk } from './schedule'
 import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
@@ -42,8 +42,8 @@ const dayCommand =
   async ({ env, message }) => {
     const user = await getUser(env.DB, message.from!.id)
     const group = personalKey(user)
-    const tt = await loadTimetable(env, groupsFor(group))
-    await sendMessage(env, message.chat.id, formatDay(tt, todayMsk() + offset, group))
+    const [tt, mine] = await Promise.all([loadTimetable(env, groupsFor(group)), userSubgroups(env.DB, message.from!.id)])
+    await sendMessage(env, message.chat.id, formatDay(tt, todayMsk() + offset, group, mine))
   }
 
 const PUBLIC: Record<string, Handler> = {

@@ -3,7 +3,7 @@
 import { WEEKDAYS_FULL, dateOf, formatDate, pluralPairs } from '../../shared/format-core'
 import type { Timetable } from '../../shared/schedule-core'
 import { profileOf } from './auth'
-import { touchUser } from './db'
+import { touchUser, userSubgroups } from './db'
 import { reportError } from './errors'
 import { formatDay, formatWeek, groupsFor, loadTimetable, personalKey, todayMsk, type BotTimetable } from './schedule'
 import { tg, type TgUser } from './telegram'
@@ -62,7 +62,10 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
     return
   }
 
-  const tt = await loadTimetable(env, groupsFor(group))
+  const [tt, mine] = await Promise.all([
+    loadTimetable(env, groupsFor(group)),
+    userSubgroups(env.DB, query.from.id).catch(() => null),
+  ])
   const today = todayMsk()
   const target = parseQuery(query.query, today, tt)
   const appLink = `https://t.me/${env.BOT_USERNAME}/schedule`
@@ -72,7 +75,7 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
     title: `${target.title} · ${tt.nameOf(g)}`,
     description: summary(tt, target, g),
     input_message_content: {
-      message_text: target.kind === 'day' ? formatDay(tt, target.day, g) : formatWeek(tt, target.monday, g),
+      message_text: target.kind === 'day' ? formatDay(tt, target.day, g, mine) : formatWeek(tt, target.monday, g, mine),
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
     },

@@ -27,13 +27,14 @@ import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
-import { mbName } from '../../shared/groups'
+import { mbName, normalizeGroup } from '../../shared/groups'
 import { touchUser } from './db'
 import { detectChanges, runDigests } from './digest'
-import { loadEdits } from './edits'
+import { extrasFor, loadExtras } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
 import { handleProfile } from './profile'
+import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { loadSettings } from './settings'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
@@ -84,14 +85,22 @@ async function guarded(env: Env, where: string, run: () => Promise<Response>): P
 // Что приложению показать при открытии: ручные правки расписания (за 2 недели назад и вперёд),
 // объявление-плашку и режим техработ (админу — никогда). Старые версии приложения (без v) ждут
 // в правках имя группы («МБ(МП) 1-1»), новые — id.
-async function appExtras(env: Env, admin: boolean, version: number) {
-  const [settings, edits] = await Promise.all([loadSettings(env), loadEdits(env)])
+// groups — какие группы приложение показывает (своя, избранные; v2): правки и подгруппы только их.
+async function appExtras(env: Env, admin: boolean, version: number, groups: string[] | null) {
+  const [settings, all] = await Promise.all([loadSettings(env), loadExtras(env)])
+  const extras = groups ? extrasFor(all, groups) : all
   const since = new Date(Date.now() + 3 * 3_600_000 - 14 * 86_400_000).toISOString().slice(0, 10)
   const groupOut = (group: string) => (version >= 2 ? group : (mbName(group) ?? group))
   return {
-    edits: edits
-      .filter((e) => e.date >= since)
-      .map(({ id, group, date, start, kind, text }) => ({ id, group: groupOut(group), date, start, kind, text })),
+    edits:
+      version >= 2
+        ? extras.edits.map(({ author: _, ...e }) => e)
+        : // старые версии знают только отмену и пометку
+          extras.edits
+            .filter((e) => e.date >= since && (e.kind === 'cancel' || e.kind === 'note'))
+            .map(({ id, group, date, start, kind, text }) => ({ id, group: groupOut(group), date, start, kind, text })),
+    subgroups: extras.subgroups,
+    tags: extras.tags,
     notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
     maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
   }
@@ -104,13 +113,17 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
   let group: string | null = null
+  let groups: string[] | null = null
   let version = 1
   if (body.startsWith('{')) {
     try {
-      const parsed = JSON.parse(body) as { initData?: string; group?: string; v?: number }
+      const parsed = JSON.parse(body) as { initData?: string; group?: string; groups?: unknown; v?: number }
       initData = parsed.initData ?? ''
       group = parsed.group ?? null
       version = typeof parsed.v === 'number' ? parsed.v : 1
+      if (Array.isArray(parsed.groups)) {
+        groups = parsed.groups.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, 10)
+      }
     } catch {
       return json({ ok: false }, 400)
     }
@@ -123,7 +136,7 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
       touchUser(env.DB, profile, 'open', group),
       // доска, правки и настройки не должны мешать открытию приложения
       boardLatest(env).catch((err) => (console.error('Доска в /seen:', err), {})),
-      appExtras(env, admin, version).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
+      appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
     return json({ ok: true, banned: banned && !admin, admin, me, board, ...extras })
   } catch (err) {
@@ -154,6 +167,13 @@ export default {
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
     if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
+    if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
+    if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
+    const starosta = url.pathname.match(/^\/starosta\/([a-z-]+)$/)
+    if (starosta && request.method === 'POST') {
+      const action = starosta[1]
+      return guarded(env, `Староста: ${action}`, () => handleStarostaApi(env, request, action))
+    }
 
     // календарь: подписка из приложения и сам .ics для Apple/Google
     const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)

@@ -3,7 +3,9 @@ import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
 import { isMbGroup } from '../../shared/groups'
 import { useGroupNames } from '../data'
-import { ChevronRight, CloseIcon, ExternalIcon } from '../icons'
+import type { Extras } from '../edits'
+import { botAvailable, callBot } from '../api'
+import { CheckIcon, ChevronRight, CloseIcon, ExternalIcon } from '../icons'
 import type { Prefs, ThemeMode } from '../prefs'
 import { MAX_WEEK, START_DAY, groupName, inSemester, moscowNow, schedule, weekOf } from '../schedule'
 import { cloudAvailable } from '../storage'
@@ -51,9 +53,19 @@ type Props = {
   onChange: (patch: Partial<Prefs>) => void
   onChangeProfile: () => void // «Сменить группу / роль» — снова онбординг
   noteCount: number
+  extras: Extras
 }
 
-export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount }: Props) {
+export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras }: Props) {
+  // подгруппы своей группы (их заводит староста): выбранные — только свои пары
+  const ownSubgroups = prefs.role === 'student' ? extras.subgroups.filter((s) => s.group === prefs.group) : []
+  const toggleSubgroup = (id: number) => {
+    haptic()
+    const next = prefs.subgroups.includes(id) ? prefs.subgroups.filter((x) => x !== id) : [...prefs.subgroups, id]
+    onChange({ subgroups: next })
+    // боту — чтобы /today, inline и календарь тоже показывали только свои пары
+    if (botAvailable()) callBot('/my-subgroups', { group: prefs.group, ids: next }).catch(() => {})
+  }
   const teacher = prefs.role === 'teacher' && prefs.teacher
   const favorites = prefs.favorites
   const nameOf = useGroupNames()
@@ -91,6 +103,27 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount }: P
           <ChevronRight className="row-check" />
         </button>
       </Section>
+
+      {ownSubgroups.length > 0 && (
+        <Section
+          title="Мои подгруппы"
+          footer="Пары чужих подгрупп (например, другого преподавателя английского) не будут показываться. Ничего не выбрано — видно всё."
+        >
+          {ownSubgroups.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="row row-btn"
+              role="checkbox"
+              aria-checked={prefs.subgroups.includes(s.id)}
+              onClick={() => toggleSubgroup(s.id)}
+            >
+              <span>{s.name}</span>
+              {prefs.subgroups.includes(s.id) && <CheckIcon className="row-check" />}
+            </button>
+          ))}
+        </Section>
+      )}
 
       {favorites.length > 0 && (
         <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «Ещё → Расписание группы».">

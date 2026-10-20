@@ -5,6 +5,8 @@ import { Section } from '../components/Section'
 import { WEEKDAYS_FULL, formatDate, formatStamp } from '../format'
 import { dayFromIso, inSemester, isoFromDay, lessonsOn, moscowNow, weekOf, weekdayOf } from '../schedule'
 import { confirmAction, haptic, openLink } from '../telegram'
+import { describeEdit } from '../../shared/edits-core'
+import { useGroupNames } from '../data'
 import { adminApi, adminError, shortGroup, type FileEdit, type Run } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
@@ -64,6 +66,7 @@ function pairsOn(iso: string, choice: GroupChoice): { start: string; label: stri
 
 export function ScheduleAdmin() {
   const { data, setData } = useLoad(adminApi.schedule)
+  const groupLabel = useGroupNames()
   const [force, setForce] = useState(false)
   const [busy, setBusy] = useState(false)
   const [group, setGroup] = useState<GroupChoice>(MB_IDS[0])
@@ -113,7 +116,7 @@ export function ScheduleAdmin() {
   }
 
   const remove = async (id: number) => {
-    if (!(await confirmAction('Удалить правку?'))) return
+    if (!(await confirmAction('Откатить правку? Она перестанет действовать везде.'))) return
     try {
       const res = await adminApi.editDelete(id)
       setData({ ...data, edits: res.edits })
@@ -220,24 +223,28 @@ export function ScheduleAdmin() {
         </div>
       </Section>
 
-      <Section title={`Ручные правки (${data.edits.length + (data.file_edits?.length ?? 0)})`}>
+      <Section
+        title={`Ручные правки (${data.edits.length + (data.file_edits?.length ?? 0)})`}
+        footer="Правки старост — с автором. «Откатить» — правка перестаёт действовать, но остаётся в истории."
+      >
         {data.file_edits?.map((f) => (
           <FileEditRow key={f.file} edit={f} />
         ))}
         {data.edits.length === 0 && !data.file_edits?.length && <div className="row row-text">Правок нет</div>}
         {data.edits.map((e) => (
-          <div key={e.id} className="row admin-msg">
+          <div key={e.id} className={`row admin-msg${e.reverted_at ? ' is-reverted' : ''}`}>
             <div className="admin-msg-body">
               <div className="admin-msg-meta">
-                {formatDate(dayFromIso(e.date))} · {shortGroup(e.group)} · {e.start ?? 'весь день'}
+                {formatDate(dayFromIso(e.date))} · {groupLabel(e.group)} · {e.author ? `староста ${e.author}` : 'вы'}
+                {e.reverted_at ? ' · откачена' : ''}
               </div>
-              <div className="admin-msg-text">
-                {e.kind === 'cancel' ? `❌ Пара отменена${e.text ? `: ${e.text}` : ''}` : `📌 ${e.text}`}
-              </div>
+              <div className="admin-msg-text">{describeEdit(e)}</div>
             </div>
-            <button type="button" className="link-btn danger" onClick={() => remove(e.id)}>
-              Удалить
-            </button>
+            {!e.reverted_at && (
+              <button type="button" className="link-btn danger" onClick={() => remove(e.id)}>
+                Откатить
+              </button>
+            )}
           </div>
         ))}
       </Section>

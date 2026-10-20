@@ -16,6 +16,7 @@ export type Prefs = {
   teacher: string | null
   teacherName: string | null
   favorites: string[]
+  subgroups: number[] // свои подгруппы (языки и т. п.) — чужие пары подгрупп не показываем
   at: number
 }
 
@@ -30,6 +31,7 @@ export const defaultPrefs = (): Prefs => ({
   teacher: null,
   teacherName: null,
   favorites: [],
+  subgroups: [],
   at: 0,
 })
 
@@ -50,6 +52,7 @@ export function parsePrefs(value: string | null): (Prefs & { groupless: boolean 
       favorites: Array.isArray(p.favorites)
         ? p.favorites.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, MAX_FAVORITES)
         : [],
+      subgroups: Array.isArray(p.subgroups) ? p.subgroups.filter((x): x is number => Number.isSafeInteger(x)) : [],
       at: typeof p.at === 'number' ? p.at : 0,
       groupless: !group && !(p.role === 'teacher' && p.teacher),
     }

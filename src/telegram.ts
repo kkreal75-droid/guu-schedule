@@ -1,4 +1,7 @@
-import type { ScheduleEdit } from './edits'
+import type { ScheduleEdit, Subgroup } from './edits'
+import type { LessonTag } from '../shared/edits-core'
+import { groupsToLoad } from './schedule'
+import { readPrefs } from './prefs'
 
 // Обёртка над window.Telegram.WebApp (скрипт подключён в index.html).
 // Вне Telegram объект тоже существует, но initData пустой и версия 6.0 —
@@ -57,6 +60,7 @@ export type Me = {
   teacher: string | null
   access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
   onboarding: boolean
+  starosta: string | null // староста этой группы — «Ещё → Правки группы»
 }
 
 // board — время последнего сообщения на каждой видимой доске (для точки «есть новое»);
@@ -67,6 +71,8 @@ export type CheckIn = {
   me: Me | null
   board: Record<string, number>
   edits: ScheduleEdit[]
+  subgroups: Subgroup[]
+  tags: LessonTag[]
   notice: { id: number; text: string } | null
   maintenance: string | null
 }
@@ -77,10 +83,13 @@ export type CheckIn = {
 export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
   if (!inTelegram || !BOT_URL) return null
   let group: string | null = null
+  let groups: string[] = []
   try {
     const prefs = JSON.parse(localStorage.getItem('prefs') ?? '{}') as { group?: string; role?: string }
     // у преподавателя группы нет (в настройках — значение по умолчанию), не передаём
     group = prefs.role === 'teacher' ? null : (prefs.group ?? null)
+    // правки и подгруппы — только групп на экране (своя, избранные)
+    if (prefs.group || prefs.role) groups = groupsToLoad(readPrefs()).filter((g) => !g.startsWith('t-'))
   } catch {
     // нет сохранённых настроек — группу не передаём
   }
@@ -90,7 +99,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
     const res = await fetch(`${BOT_URL}/seen`, {
       method: 'POST',
       // v: 2 — группа и правки по id («b1-mb-mp-1»), а не по имени
-      body: JSON.stringify({ initData: tg!.initData, group, v: 2 }),
+      body: JSON.stringify({ initData: tg!.initData, group, groups: groups.length ? groups : undefined, v: 2 }),
       signal: controller.signal,
     })
     if (!res.ok) return null
@@ -101,6 +110,8 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       me: data.me ?? null,
       board: data.board ?? {},
       edits: Array.isArray(data.edits) ? data.edits : [],
+      subgroups: Array.isArray(data.subgroups) ? data.subgroups : [],
+      tags: Array.isArray(data.tags) ? data.tags : [],
       notice: data.notice ?? null,
       maintenance: data.maintenance ?? null,
     }

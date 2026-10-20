@@ -6,9 +6,10 @@ import {
   WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, formatRange, pluralPairs, weekTitle,
 } from '../format'
 import { ChevronLeft, ChevronRight, NoteIcon, PlusIcon } from '../icons'
-import type { LessonEdit, ScheduleEdit } from '../edits'
+import { dayLessons } from '../../shared/edits-core'
+import type { Extras } from '../edits'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
-import { getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
+import { getTimetable, moscowNow, toMinutes } from '../schedule'
 import type { Timetable } from '../../shared/schedule-core'
 import { haptic } from '../telegram'
 
@@ -39,7 +40,8 @@ function useNow() {
 const GAP_MIN = 60 // показываем «окно», если между парами час и больше
 
 type Props = {
-  edits: ScheduleEdit[]
+  extras: Extras // правки (владелец, старосты), подгруппы
+  mine?: number[] | null // выбранные подгруппы: чужие пары подгрупп не показываем
   group: string
   groups: string[] // своя группа и избранные — для переключателя
   onGroupChange: (group: string) => void
@@ -53,12 +55,11 @@ type Props = {
 }
 
 export function ScheduleScreen({
-  edits, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote, tt, readOnly,
+  extras, mine = null, group, groups, onGroupChange, cursor, onCursorChange, notes, onSaveNote, tt, readOnly,
 }: Props) {
   const T = tt ?? getTimetable()
   const { dayOf, weekOf, weekdayOf, inSemester } = T
   const MAX_WEEK = T.maxWeek
-  const lessonsOn = T.lessonsOn
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
@@ -70,10 +71,12 @@ export function ScheduleScreen({
   const todayWeek = weekOf(now.day)
   const isToday = day === now.day
 
-  const lessons = useMemo(() => lessonsOn(group, week, weekday), [group, week, weekday])
+  // пары дня со всеми правками и подгруппами (shared/edits-core.ts)
+  const view = useMemo(() => dayLessons(T, group, day, extras, mine), [T, group, day, extras, mine])
+  const lessons = view.lessons
   const busyDays = useMemo(
-    () => WEEKDAYS_SHORT.map((_, i) => lessonsOn(group, week, i).length > 0),
-    [group, week],
+    () => WEEKDAYS_SHORT.map((_, i) => dayLessons(T, group, monday + i, extras, mine).lessons.length > 0),
+    [T, group, monday, extras, mine],
   )
 
   const go = (next: Cursor) => {
@@ -102,24 +105,11 @@ export function ScheduleScreen({
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftDay(dx < 0 ? 1 : -1)
   }
 
-  // правки из админ-панели: отмена пары, пометки к паре и ко всему дню
-  const dayEdits = useMemo(() => {
-    const iso = isoFromDay(day)
-    return edits.filter((e) => e.group === group && e.date === iso)
-  }, [edits, group, day])
-  const lessonEdit = (start: string): LessonEdit | undefined => {
-    const own = dayEdits.filter((e) => e.start === start)
-    if (!own.length) return undefined
-    return { cancel: own.find((e) => e.kind === 'cancel') ?? null, notes: own.filter((e) => e.kind === 'note').map((e) => e.text) }
-  }
-  const starts = new Set(lessons.map((l) => l.start))
-  // ко всему дню — и пометки ко времени, где пары уже нет (расписание поменялось)
-  const dayWide = dayEdits.filter((e) => e.kind === 'note' && (e.start === null || !starts.has(e.start)))
-  const cancelled = new Set(dayEdits.filter((e) => e.kind === 'cancel').map((e) => e.start))
-
   const nowMinutes = isToday ? now.minutes : null
   const nextIndex =
-    nowMinutes === null ? -1 : lessons.findIndex((l) => !cancelled.has(l.start) && toMinutes(l.start) > nowMinutes)
+    nowMinutes === null
+      ? -1
+      : lessons.findIndex((l) => !l.cancel && !l.movedTo && toMinutes(l.start) > nowMinutes)
 
   const dayHint = [
     day === now.day + 1 ? 'Завтра' : day === now.day - 1 ? 'Вчера' : null,
@@ -210,10 +200,9 @@ export function ScheduleScreen({
         </div>
 
         <div key={`${group}|${day}`} className={`day-list${direction ? ` slide-${direction}` : ''}`}>
-          {dayWide.map((e) => (
-            <div key={e.id} className="edit-note">
-              📌 {e.start ? `${e.start} — ` : ''}
-              {e.text}
+          {view.notes.map((text, i) => (
+            <div key={i} className="edit-note">
+              📌 {text}
             </div>
           ))}
           {readOnly ? null : dayNote ? (
@@ -244,8 +233,7 @@ export function ScheduleScreen({
                     lesson={lesson}
                     nowMinutes={nowMinutes}
                     isNext={i === nextIndex}
-                    edit={lessonEdit(lesson.start)}
-                    pair={T.pairNumber(lesson)}
+                    pair={lesson.pair ?? (lesson.added || lesson.movedFrom ? null : T.pairNumber(lesson))}
                     note={readOnly ? undefined : notes[noteKey]}
                     onEditNote={readOnly ? undefined : () =>
                       setEditing({

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { teacherKey } from '../shared/schedule-core'
 import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
-import type { ScheduleEdit } from './edits'
+import type { Extras } from './edits'
 import { formatStamp } from './format'
 import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
@@ -22,14 +22,23 @@ export type Tab = 'schedule' | 'more' | 'profile'
 // после смены избранного (см. main.tsx); startTab — какую вкладку открыть после перезагрузки
 type Props = {
   status: CheckIn | null
-  edits: ScheduleEdit[]
+  extras: Extras
   startTab?: Tab
   onReload: (tab: Tab) => Promise<void>
   onChangeProfile: () => void
 }
 
-export default function App({ status, edits, startTab, onReload, onChangeProfile }: Props) {
+export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile }: Props) {
   const [prefs, updatePrefs] = usePrefs()
+  // правки и подгруппы; староста меняет их — обновляем сразу, без перезапуска
+  const [extras, setExtras] = useState(initialExtras)
+  const onGroupExtras = useCallback((group: string, next: Extras) => {
+    setExtras((cur) => ({
+      edits: [...cur.edits.filter((e) => e.group !== group), ...next.edits],
+      subgroups: [...cur.subgroups.filter((s) => s.group !== group), ...next.subgroups],
+      tags: [...cur.tags.filter((t) => t.group !== group), ...next.tags],
+    }))
+  }, [])
   const { notes, setNote } = useNotes()
   useTheme(prefs.theme)
 
@@ -64,7 +73,8 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
       {tab === 'schedule' && status?.notice && <NoticeBar notice={status.notice} />}
       {tab === 'schedule' ? (
         <ScheduleScreen
-          edits={edits}
+          extras={extras}
+          mine={shownGroup === prefs.group ? prefs.subgroups : null}
           group={shownGroup}
           groups={schedule.groups}
           onGroupChange={setViewGroup}
@@ -81,7 +91,9 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
           boardNew={boardNew}
           onBoardOpen={onBoardOpen}
           prefs={prefs}
-          edits={edits}
+          extras={extras}
+          starosta={status?.me?.starosta ?? null}
+          onGroupExtras={onGroupExtras}
           onPrefsChange={(patch) => {
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)
@@ -91,6 +103,7 @@ export default function App({ status, edits, startTab, onReload, onChangeProfile
         <ProfileScreen
           noteCount={Object.keys(notes).length}
           prefs={prefs}
+          extras={extras}
           onChange={(patch) => {
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)

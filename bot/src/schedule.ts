@@ -4,7 +4,6 @@
 import { WEEKDAYS_FULL, formatDate, weekTitle } from '../../shared/format-core'
 import { MB_IDS, normalizeGroup, type GroupsIndex } from '../../shared/groups'
 import {
-  isoFromDay,
   makeTimetable,
   moscowNow,
   scheduleFromGroups,
@@ -17,11 +16,13 @@ import {
   type Overrides,
   type Timetable,
 } from '../../shared/schedule-core'
-import { loadEdits, type ScheduleEdit } from './edits'
+import { NO_EXTRAS, dayLessons, shortWhen, type DayLesson, type Extras } from '../../shared/edits-core'
+import { loadExtras } from './edits'
 import { escapeHtml } from './util'
 
-// replacements — замены дней целиком из файлов репозитория (их показывает админ-панель)
-export type BotTimetable = Timetable & { edits: ScheduleEdit[]; replacements: FileReplacement[] }
+// extras — ручные правки, подгруппы, метки пар (edits.ts); replacements — замены дней целиком из файлов
+// репозитория (их показывает админ-панель)
+export type BotTimetable = Timetable & { extras: Extras; replacements: FileReplacement[] }
 export type FileReplacement = DayReplacement & { file: string }
 
 // Замены дней целиком: файлы лежат на сайте рядом с данными (см. vite.config.ts)
@@ -87,7 +88,7 @@ export async function loadGroupsIndex(env: Env): Promise<GroupsIndex> {
 export const personalKey = (user: { role?: string | null; teacher_id?: string | null; grp?: string | null } | null) =>
   user?.role === 'teacher' && user.teacher_id ? teacherKey(user.teacher_id) : normalizeGroup(user?.grp)
 
-async function loadExtras(env: Env): Promise<NonNullable<typeof extras>> {
+async function loadFileExtras(env: Env): Promise<NonNullable<typeof extras>> {
   if (extras && Date.now() - extras.at < MEMORY_TTL_MS) return extras
   const [overrides, ...files] = await Promise.all([
     fetchJson<Overrides>(env, 'overrides.json').catch(() => ({}) as Overrides),
@@ -119,44 +120,46 @@ export async function loadTimetable(env: Env, groups: string[]): Promise<BotTime
     const teacher = await loadTeacherFile(env, id.slice(2))
     return teacher ? teacherAsGroup(teacher) : null
   }
-  const [files, extra, edits] = await Promise.all([
+  const [files, extra, extras] = await Promise.all([
     Promise.all(ids.map(load)),
-    loadExtras(env),
-    loadEdits(env).catch((err) => (console.error('Правки расписания:', err), [] as ScheduleEdit[])),
+    loadFileExtras(env),
+    loadExtras(env).catch((err) => (console.error('Правки расписания:', err), NO_EXTRAS)),
   ])
   const found = files.filter((f): f is GroupFile => f !== null)
   const timetable = makeTimetable(scheduleFromGroups(found), extra.overrides, extra.replacements)
-  return { ...timetable, edits, replacements: extra.replacements }
+  return { ...timetable, extras, replacements: extra.replacements }
 }
 
-// Пары дня с правками: отменённая — зачёркнута, пометки — 📌. Пометки ко всему дню — сверху.
-function dayLines(tt: BotTimetable, group: string, day: number, lessons: Lesson[]): string[] {
-  const iso = isoFromDay(day)
-  const edits = tt.edits.filter((e) => e.group === group && e.date === iso)
-  const lines = edits.filter((e) => e.start === null).map((e) => `📌 ${escapeHtml(e.text)}`)
-  for (const lesson of lessons) {
-    const own = edits.filter((e) => e.start === lesson.start)
-    const cancel = own.find((e) => e.kind === 'cancel')
-    const line = `${tt.pairNumber(lesson)}. ${formatLesson(lesson)}`
-    lines.push(cancel ? `<s>${line}</s>\n   ❌ Отменена${cancel.text ? `: ${escapeHtml(cancel.text)}` : ''}` : line)
-    for (const note of own.filter((e) => e.kind === 'note')) lines.push(`   📌 ${escapeHtml(note.text)}`)
+// Пары дня с правками: отменённая — зачёркнута, перенесённая — «перенесена на …», добавленная — ➕,
+// пометки — 📌, подгруппа — в скобках. Пометки ко всему дню — сверху. mine — выбранные подгруппы.
+function dayLines(tt: BotTimetable, group: string, day: number, mine: number[] | null): { lines: string[]; count: number } {
+  const view = dayLessons(tt, group, day, tt.extras, mine)
+  const lines = view.notes.map((n) => `📌 ${escapeHtml(n)}`)
+  for (const lesson of view.lessons) {
+    const pair = lesson.pair ?? (lesson.added || lesson.movedFrom ? null : tt.pairNumber(lesson))
+    const line = `${pair ? `${pair}. ` : '• '}${formatLesson(lesson)}`
+    if (lesson.cancel) lines.push(`<s>${line}</s>\n   ❌ Отменена${lesson.cancel.text ? `: ${escapeHtml(lesson.cancel.text)}` : ''}`)
+    else if (lesson.movedTo) lines.push(`<s>${line}</s>\n   ↪️ Перенесена на ${shortWhen(lesson.movedTo.date, lesson.movedTo.start)}`)
+    else lines.push(line)
+    if (lesson.added) lines.push('   ➕ Добавлена')
+    if (lesson.movedFrom) lines.push(`   ↩️ Перенос с ${shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}`)
+    for (const note of lesson.notes) lines.push(`   📌 ${escapeHtml(note)}`)
   }
-  // пометка ко времени, где пары уже нет (расписание поменялось), — не теряем
-  const starts = new Set(lessons.map((l) => l.start))
-  for (const e of edits) if (e.kind === 'note' && e.start && !starts.has(e.start)) lines.push(`📌 ${e.start} — ${escapeHtml(e.text)}`)
-  return lines
+  return { lines, count: view.lessons.length }
 }
 
 // «09:00–10:30 · Математика (Лекция) · У-349 · Дадашов Ч.М.»
-export function formatLesson(lesson: Lesson): string {
-  const title = `<b>${escapeHtml(lesson.subject)}</b>${lesson.kind ? ` (${escapeHtml(lesson.kind)})` : ''}`
+export function formatLesson(lesson: Lesson | DayLesson): string {
+  const sub = 'subgroup' in lesson && lesson.subgroup ? ` [${escapeHtml(lesson.subgroup.name)}]` : ''
+  const title = `<b>${escapeHtml(lesson.subject)}</b>${lesson.kind ? ` (${escapeHtml(lesson.kind)})` : ''}${sub}`
   const teacher = lesson.teachers?.join(', ') ?? lesson.teacher
   const extra = [lesson.room, teacher].filter(Boolean).map((s) => escapeHtml(s!))
   return [`${lesson.start}–${lesson.end}`, title, ...extra].join(' · ')
 }
 
-// Пары на день для одной группы или для всех загруженных (если группа не выбрана) — HTML
-export function formatDay(tt: BotTimetable, day: number, group: string | null): string {
+// Пары на день для одной группы или для всех загруженных (если группа не выбрана) — HTML.
+// mine — подгруппы человека (личные /today, inline): чужие пары подгрупп не показываем.
+export function formatDay(tt: BotTimetable, day: number, group: string | null, mine: number[] | null = null): string {
   const week = tt.weekOf(day)
   const weekday = tt.weekdayOf(day)
   const header = `📅 <b>${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}</b>`
@@ -166,27 +169,26 @@ export function formatDay(tt: BotTimetable, day: number, group: string | null): 
   if (!tt.inSemester(week)) return `${header}\nВне учебного семестра.`
   const lines = [`${header} · ${weekTitle(week).toLowerCase()}`]
   for (const g of group ? [group] : tt.schedule.groups) {
-    const lessons = tt.lessonsOn(g, week, weekday)
     if (!group) lines.push('', `<b>${escapeHtml(tt.nameOf(g))}</b>`)
-    const withEdits = dayLines(tt, g, day, lessons)
-    if (!lessons.length) lines.push(weekday === 6 ? 'Воскресенье — выходной 🌿' : 'Пар нет 🎉')
-    lines.push(...withEdits)
+    const day_ = dayLines(tt, g, day, mine)
+    if (!day_.count) lines.push(weekday === 6 ? 'Воскресенье — выходной 🌿' : 'Пар нет 🎉')
+    lines.push(...day_.lines)
   }
   return lines.join('\n')
 }
 
 // Неделя одной группы: Пн–Сб по дням — HTML
-export function formatWeek(tt: BotTimetable, monday: number, group: string): string {
+export function formatWeek(tt: BotTimetable, monday: number, group: string, mine: number[] | null = null): string {
   const week = tt.weekOf(monday)
   const range = `${formatDate(monday)} – ${formatDate(monday + 5)}`
   const header = `🗓 <b>Неделя ${range}</b>`
   if (!tt.inSemester(week)) return `${header}\nВне учебного семестра.`
   const lines = [`${header} · ${weekTitle(week).toLowerCase()}`, `<b>${escapeHtml(tt.nameOf(group))}</b>`]
   for (let weekday = 0; weekday < 6; weekday++) {
-    const lessons = tt.lessonsOn(group, week, weekday)
+    const day_ = dayLines(tt, group, monday + weekday, mine)
     lines.push('', `<b>${WEEKDAYS_FULL[weekday]}, ${formatDate(monday + weekday)}</b>`)
-    if (!lessons.length) lines.push('Пар нет 🎉')
-    lines.push(...dayLines(tt, group, monday + weekday, lessons))
+    if (!day_.count) lines.push('Пар нет 🎉')
+    lines.push(...day_.lines)
   }
   const text = lines.join('\n')
   // Telegram не примет больше 4096 символов — режем по строке

@@ -2,7 +2,7 @@
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot, callBotBlob } from '../api'
 import type { BoardId, Stroke } from '../board/api'
-import type { ScheduleEdit } from '../edits'
+import type { ScheduleEdit } from '../../shared/edits-core'
 
 export type Dashboard = {
   users: {
@@ -42,6 +42,7 @@ export type AdminUser = {
   role: 'student' | 'teacher' | null
   teacher_id: string | null
   access: 'free_forever' | 'standard' // будущая оплата: только структура, сейчас всё бесплатно
+  starosta_of: string | null // староста этой группы
 }
 
 export type BoardMessageRow = {
@@ -88,7 +89,7 @@ export type ScheduleStatus = {
   source_file: string | null
   source_sha256: string | null
   lessons: number
-  edits: (ScheduleEdit & { created_at: number })[]
+  edits: (ScheduleEdit & { created_at: number; reverted_at: number | null; author_id: number | null })[]
   // замены дней целиком из файлов репозитория (overrides/thursday.json) — только просмотр
   file_edits: FileEdit[]
   github: { token: boolean; runs: Run[] | null; error: string | null }
@@ -116,6 +117,7 @@ export const adminApi = {
   broadcastInfo: () => callBot<{ counts: Record<'all' | '1-1' | '1-2', number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
   broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),
   access: (id: number, access: AdminUser['access']) => callBot<UserCard>('/admin/access', { id, access }),
+  starosta: (id: number, group: string | null) => callBot<UserCard>('/admin/starosta', { id, group }),
   broadcast: (text: string, photo: string | null, audience: Audience | null) =>
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
   reports: () => callBot<{ reports: BoardMessageRow[] }>('/admin/reports'),

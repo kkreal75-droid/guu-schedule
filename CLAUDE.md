@@ -68,6 +68,8 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /seen` — открытие приложения: initData → визит; ответ `{banned, admin, me, board, edits, notice, maintenance}`
   (`me` — роль, группа, преподаватель, access, нужен ли онбординг);
 - `POST /profile` — выбор из онбординга `{role, group | teacher}` (группа/преподаватель должны быть на сайте);
+- `POST /starosta/<info|edit-add|edit-delete|subgroup-add|subgroup-delete|tag-add|tag-delete>` — староста своей группы;
+  `POST /my-subgroups` — свои подгруппы; `POST /extras {groups}` — правки и подгруппы групп (просмотр чужой);
 - `POST /cal/status|connect|disconnect`, `GET /cal/<токен>.ics`, `GET /cal/<токен>/apple` (страница webcal для iPhone);
 - `POST /board/<enter|accept|poll|send|react|report|delete|stroke|undo|erase|clear>` — доска;
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
@@ -76,9 +78,9 @@ LibreOffice ставится, только если изменился .doc (н�
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
   в :35 — чистка доски, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0006`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0007`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
-`board_strokes`, `board_snapshots`, `schedule_edits`, `group_snapshots`. Группа (`users.grp` и т. п.) — id.
+`board_strokes`, `board_snapshots`, `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги), `board-snapshot:<id>` (PNG холста перед очисткой).
@@ -134,8 +136,11 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   (remove/add пар) → замены дня целиком (`overrides/thursday.json` — **четверг МБ(МП) 1-1**, `overrides/thursday-1-2.json` — **четверг 1-2**; все пары ГУУ
   заменяются, `even`/`odd` по чётности, тип «Практика», весь семестр). Новый файл замены — добавить в
   `DATA_FILES` (vite.config.ts), импорт в `src/schedule.ts` и `REPLACEMENT_FILES` в `bot/src/schedule.ts`.
-- Разовые правки из админки (отмена пары / пометка) — D1 `schedule_edits`; видны в приложении (зачёркнуто /
-  жёлтая пометка), `/today`, inline, беседах, календаре; файловые правки там же с пометкой «из файла».
+- Разовые правки — D1 `schedule_edits` (отмена, пометка, перенос, добавить пару): владелец (админка) и старосты
+  (`users.starosta_of`, «Ещё → Правки группы», `bot/src/starosta.ts`, только своя группа); владелец видит автора
+  и откатывает (`reverted_at`). Вся отрисовка дня — `shared/edits-core.ts → dayLessons` (приложение, `/today`,
+  inline, беседы и «Изменения», календарь). Подгруппы (`subgroups`, `lesson_tags`): студент выбирает свои в
+  «Профиле» (prefs + `users.subgroups`) — чужие пары подгрупп скрыты. Файловые правки — с пометкой «из файла».
 - Доска: **одна общая** (чат + рисовалка), доски групп убраны (старые записи `g11`/`g12` скрыты, крон
   дочищает). Псевдонимы «Выдра 🦦» = HMAC(id + доска + семестр, BOARD_SALT), уникальны; обычным
   пользователям — ни id, ни имён; админ видит авторов. Экран входа — только «Для других ты аноним.»

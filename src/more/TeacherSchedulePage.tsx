@@ -11,7 +11,6 @@ export function TeacherSchedulePage({ initial }: { initial?: { id: string; name:
   return (
     <ScheduleViewer
       id={teacherKey(picked.id)}
-      edits={[]}
       actions={
         <div className="viewer-head">
           <div className="viewer-title">
