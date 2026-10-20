@@ -248,7 +248,7 @@ async function broadcast({ env, ctx, req }: Call): Promise<Response> {
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
 
-// ---------- модерация «Подслушано» ----------
+// ---------- модерация чата ----------
 
 async function reports({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(

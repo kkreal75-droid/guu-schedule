@@ -4,7 +4,7 @@ import { haptic } from '../telegram'
 import { boardApi, errorText, type Entered, type EnterResult } from './api'
 import { BoardChat } from './BoardChat'
 
-// «Ещё → Подслушано»: анонимный чат на весь ГУУ; при первом входе — правила
+// «Ещё → Чат»: анонимный чат на весь ГУУ; при первом входе — правила
 export function BoardPage() {
   const [state, setState] = useState<EnterResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +18,7 @@ export function BoardPage() {
       .catch((err) => setError(errorText(err)))
   }, [])
 
-  if (!botAvailable()) return <p className="lead">Откройте расписание в Telegram — «Подслушано» работает только там.</p>
+  if (!botAvailable()) return <p className="lead">Откройте расписание в Telegram — чат работает только там.</p>
   if (error) return <p className="board-empty">{error}</p>
   if (!state) return <p className="board-empty">Загружаю…</p>
 

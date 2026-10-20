@@ -50,7 +50,7 @@ const ADMIN_COMMANDS = [
   { command: 'ban', description: 'Бан: /ban id|@ник [причина]' },
   { command: 'unban', description: 'Разбан: /unban id' },
   { command: 'bans', description: 'Список банов' },
-  { command: 'boardban', description: 'Бан в «Подслушано»: /boardban id [дни]' },
+  { command: 'boardban', description: 'Бан в чате: /boardban id [дни]' },
 ]
 
 export async function setupBot(env: Env, origin: string, force: boolean) {

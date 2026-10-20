@@ -1,4 +1,4 @@
-// Фильтр мата для доски. Списки — в board-config.ts.
+// Фильтр мата (чат, отзывы о преподавателях). Списки — в board-config.ts.
 import { BAD_EXACT, BAD_LATIN, BAD_WORDS } from './board-config'
 
 // латинские буквы и цифры, похожие на русские: «xyй», «6лять», «пи3да»
@@ -46,3 +46,14 @@ export function passesFilter(text: string): boolean {
   }
   return true
 }
+
+// убираем невидимые и управляющие символы, лишние пустые строки (эмодзи с ZWJ не трогаем)
+export const cleanText = (text: unknown) =>
+  typeof text === 'string'
+    ? text
+        .replace(/[\u0000-\u0008\u000b-\u001f\u007f​‎‏‪-‮⁦-⁩﻿]/g, '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[ \t]+$/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : ''

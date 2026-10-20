@@ -1,4 +1,4 @@
-// Запросы «Подслушано» к боту (bot/src/board.ts). Обычный пользователь получает только псевдонимы.
+// Запросы чата к боту (bot/src/board.ts). Обычный пользователь получает только псевдонимы.
 import { ApiError, callBot } from '../api'
 
 // одна доска на весь ГУУ; в базе её id — «all» (бывшая «Общая»)
@@ -68,13 +68,13 @@ export function errorText(err: unknown): string {
     case 'too-long':
       return 'Слишком длинное сообщение'
     case 'board-banned':
-      return 'Тебе запрещено писать в «Подслушано»'
+      return 'Тебе запрещено писать в чат'
     case 'no-group':
       return 'Сначала выбери группу в профиле'
     case 'gone':
       return 'Сообщение уже удалено'
     case 'not-configured':
-      return '«Подслушано» скоро заработает'
+      return 'Чат скоро заработает'
     default:
       return 'Что-то сломалось 🛠'
   }

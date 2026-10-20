@@ -49,9 +49,9 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
   const [viewGroup, setViewGroup] = useState<string | null>(null)
   const shownGroup = viewGroup && schedule.groups.includes(viewGroup) ? viewGroup : home
   const [cursor, setCursor] = useState<Cursor>(initialCursor)
-  // точка «есть новое» в «Подслушано»: на «Ещё» и на пункте, без счётчиков
+  // точка «есть новое» в чате: на «Ещё» и на пункте, без счётчиков
   const [boardNew, setBoardNew] = useState(() => hasNew(status?.board))
-  // «Подслушано»: курс и институт у псевдонима (хранит бот); null — бот недоступен
+  // «Чат»: курс и институт у псевдонима (хранит бот); null — бот недоступен
   const [boardOrigin, setBoardOrigin] = useState<boolean | null>(status?.me ? Boolean(status.me.origin) : null)
   const onBoardOpen = useCallback(() => {
     markSeen(status?.board ?? {})

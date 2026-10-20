@@ -1,4 +1,4 @@
-// «Подслушано» — анонимный чат на весь ГУУ: API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
+// «Чат» — анонимный чат на весь ГУУ: API мини-приложения, POST /board/<действие>, тело — {initData, ...}.
 //
 //   enter / accept — вход и экран правил; poll — лента (раз в 4 с); send, react, report, delete — чат;
 //   origin — подпись к псевдониму «1 курс, ИУПСиБК» (переключатель в профиле, по умолчанию выключен).
@@ -8,7 +8,7 @@
 // Псевдоним: HMAC(id + доска + семестр, BOARD_SALT) → имя из списка; выданный хранится в D1.
 import { json, readApi, type ApiRequest } from './api'
 import { ALIASES, BOARDS, BOARD_IDS, LIMITS, REACTIONS, type BoardId } from './board-config'
-import { passesFilter } from './board-filter'
+import { cleanText, passesFilter } from './board-filter'
 import { deleteMessage, notifyReport } from './board-moderation'
 import { normalizeGroup, originLabel } from '../../shared/groups'
 import { loadGroupsIndex } from './schedule'
@@ -59,7 +59,7 @@ export function semesterOf(ms: number): string {
   return `${year}-весна`
 }
 
-// все видят одни и те же доски — сейчас это одна, «Подслушано»
+// все видят одни и те же доски — сейчас это одна, «Чат»
 export const visibleBoards = (): BoardId[] => BOARD_IDS
 
 const fail = (status: number, error: string, extra: object = {}) => json({ ok: false, error, ...extra }, status)
@@ -210,17 +210,6 @@ function messageOut(row: MessageRow, viewerId: number, admin: boolean, reactions
       : {}),
   }
 }
-
-// убираем невидимые и управляющие символы, лишние пустые строки (эмодзи с ZWJ не трогаем)
-const cleanText = (text: unknown) =>
-  typeof text === 'string'
-    ? text
-        .replace(/[\u0000-\u0008\u000b-\u001f\u007f​‎‏‪-‮⁦-⁩﻿]/g, '')
-        .replace(/\r\n?/g, '\n')
-        .replace(/[ \t]+$/gm, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-    : ''
 
 // ---------- действия ----------
 

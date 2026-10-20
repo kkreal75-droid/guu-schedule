@@ -102,8 +102,8 @@ export const PhoneCalendarIcon = (p: P) => (
   </svg>
 )
 
-// «Подслушано»: облачко с многоточием — анонимный чат
-export const WhisperIcon = (p: P) => (
+// «Чат»: облачко с многоточием — анонимный чат
+export const ChatIcon = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 20l1-3.6C4.5 15 3.5 13.1 3.5 11c0-3.9 3.8-7 8.5-7Z" />
     <path d="M8.5 11h.01M12 11h.01M15.5 11h.01" strokeWidth="2.6" />

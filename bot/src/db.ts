@@ -25,7 +25,7 @@ export type UserRow = {
   onboarded_at: number | null
   starosta_of: string | null // староста этой группы (назначает владелец)
   subgroups: string | null // JSON: выбранные подгруппы
-  board_origin: number // «Подслушано»: показывать у псевдонима курс и институт
+  board_origin: number // «Чат»: показывать у псевдонима курс и институт
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -38,7 +38,7 @@ export type Me = {
   access: Access
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
-  origin: boolean // «Подслушано»: курс и институт у псевдонима (переключатель в профиле)
+  origin: boolean // «Чат»: курс и институт у псевдонима (переключатель в профиле)
 }
 
 type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'board_origin'

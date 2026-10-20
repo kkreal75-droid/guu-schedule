@@ -8,11 +8,11 @@
 //   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts).
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
-//   POST /board/<действие> — «Подслушано», анонимный чат (board.ts), жалобы и баны — board-moderation.ts.
+//   POST /board/<действие> — анонимный чат «Чат» (board.ts), жалобы и баны — board-moderation.ts.
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
-//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка «Подслушано».
+//   раз в 10 минут — тревоги автообновления (alerts.ts), раз в час — чистка чата.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, BOARD_SALT, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
@@ -108,7 +108,7 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
 
 // Открытие мини-приложения. Тело — JSON {initData, group, v} или просто initData (старые версии).
 // group — id группы (старые версии присылают имя «МБ(МП) 1-1»), v — версия формата приложения.
-// В ответе ещё время последнего сообщения в «Подслушано» (точка «есть новое») и appExtras.
+// В ответе ещё время последнего сообщения в чате (точка «есть новое») и appExtras.
 async function handleSeen(env: Env, request: Request): Promise<Response> {
   const body = await request.text()
   let initData = body
@@ -134,8 +134,8 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
     const admin = isOwner(env, profile.id)
     const [{ banned, me }, board, extras] = await Promise.all([
       touchUser(env.DB, profile, 'open', group),
-      // «Подслушано», правки и настройки не должны мешать открытию приложения
-      boardLatest(env).catch((err) => (console.error('Подслушано в /seen:', err), {})),
+      // «Чат», правки и настройки не должны мешать открытию приложения
+      boardLatest(env).catch((err) => (console.error('Чат в /seen:', err), {})),
       appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
     ])
     return json({ ok: true, banned: banned && !admin, admin, me, board, ...extras })
@@ -194,7 +194,7 @@ export default {
     const board = url.pathname.match(/^\/board\/([a-z]+)$/)
     if (board && request.method === 'POST' && isBoardAction(board[1])) {
       const action = board[1]
-      return guarded(env, `Подслушано: ${action}`, () => handleBoardApi(env, request, action))
+      return guarded(env, `Чат: ${action}`, () => handleBoardApi(env, request, action))
     }
 
     if (url.pathname === '/' && request.method === 'GET') {
@@ -221,7 +221,7 @@ export default {
         used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
       }
       if (new Date(now).getUTCMinutes() === 35) {
-        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка «Подслушано»', err), 0))
+        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка чата', err), 0))
       }
       const batch = Math.max(0, BATCH - used)
       if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))

@@ -1,4 +1,4 @@
-// Модерация «Подслушано»: жалобы приходят владельцу с кнопками, /boardban, чистка старого.
+// Модерация чата: жалобы приходят владельцу с кнопками, /boardban, чистка старого.
 import { resolveTarget, targetLabel } from './admin'
 import { isOwner } from './auth'
 import { BOARD_IDS, LIMITS } from './board-config'
@@ -7,7 +7,7 @@ import { answerCallback, sendMessage, tg, type TgCallbackQuery } from './telegra
 import { escapeHtml, formatMsk } from './util'
 
 const DAY_MS = 86_400_000
-export const FOREVER = 253_402_300_799_000 // 31.12.9999 — «навсегда» для бана в «Подслушано»
+export const FOREVER = 253_402_300_799_000 // 31.12.9999 — «навсегда» для бана в чате
 
 type ReportedMessage = { id: number; board: string; user_id: number; alias: string; text: string }
 
@@ -18,7 +18,7 @@ export async function notifyReport(env: Env, message: ReportedMessage, count: nu
   const who = author ? `${userLabel(author, escapeHtml)} (id ${author.id})` : `id ${message.user_id}`
   const title = hidden
     ? `🙈 <b>Скрыто после ${count} жалоб</b> — ждёт решения`
-    : '🚩 <b>Жалоба на сообщение в «Подслушано»</b>'
+    : '🚩 <b>Жалоба на сообщение в чате</b>'
   const text = `${title}
 Автор: ${who} · ${escapeHtml(message.alias)}
 Жалоб: ${count}
@@ -28,7 +28,7 @@ export async function notifyReport(env: Env, message: ReportedMessage, count: nu
     reply_markup: {
       inline_keyboard: [
         [{ text: '🗑 Удалить', callback_data: `bd:del:${message.id}` }],
-        [{ text: '🔇 Удалить и забанить в «Подслушано»', callback_data: `bd:ban:${message.id}` }],
+        [{ text: '🔇 Удалить и забанить в чате', callback_data: `bd:ban:${message.id}` }],
         [{ text: 'Игнорировать', callback_data: `bd:ign:${message.id}` }],
       ],
     },
@@ -67,7 +67,7 @@ export async function moderate(env: Env, id: number, action: ModerationAction): 
   if (action === 'ban') {
     await deleteMessage(env, id, now)
     if (!isOwner(env, message.user_id)) await setBoardBan(env, message.user_id, FOREVER)
-    return '✅ Удалено, автор забанен в «Подслушано»'
+    return '✅ Удалено, автор забанен в чате'
   }
   await env.DB.batch([
     env.DB.prepare("UPDATE board_reports SET status = 'ignored' WHERE message_id = ? AND status = 'open'").bind(id),
@@ -109,13 +109,13 @@ export async function boardBanCommand(env: Env, chatId: number, args: string): P
 
   if (days === '0') {
     await setBoardBan(env, user.id, null)
-    await sendMessage(env, chatId, `✅ Бан в «Подслушано» снят: ${targetLabel(user)}`)
+    await sendMessage(env, chatId, `✅ Бан в чате снят: ${targetLabel(user)}`)
     return
   }
   const until = days ? Date.now() + Number(days) * DAY_MS : FOREVER
   await setBoardBan(env, user.id, until)
   const term = days ? `до ${formatMsk(until)} МСК` : 'навсегда'
-  await sendMessage(env, chatId, `🔇 Бан в «Подслушано» ${term}: ${targetLabel(user)}\nЧитать может, писать — нет.`)
+  await sendMessage(env, chatId, `🔇 Бан в чате ${term}: ${targetLabel(user)}\nЧитать может, писать — нет.`)
 }
 
 export const boardBanTerm = (until: number) => (until >= FOREVER ? 'навсегда' : `до ${formatMsk(until)}`)
