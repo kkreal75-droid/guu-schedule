@@ -89,25 +89,33 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /reviews/<top|teacher|save|delete|report|vote>` — рейтинг преподавателей (`reviews.ts`);
 - `GET /places` — правки мест «Корпусов ГУУ» поверх `data/places.json` (`places.ts`, D1 `place_edits`), кэш 60 с;
 - `GET /academic` — правки учебного графика (`academic.ts`, D1 `calendar_edits`), кэш 60 с;
+- `GET /health` — жив ли воркер и D1 (для мониторинга);
+- вход защищает `guard.ts`: лимит тела (64 КБ, вебхук 1 МБ, админка 12 МБ), CORS только для origin `WEBAPP_URL`,
+  лимиты Workers Rate Limiting (`RL_*` в wrangler.jsonc: по IP щедро, по пользователю, строже на запись) — 429 до D1;
+  публичное (`/places`, `/academic`, `.ics`) — из памяти изолята с ETag;
 - `POST /support {text}` — «Написать в поддержку»: владельцу в бот с кнопкой «Ответить» (`sp:reply:N`), ответ
   владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки);
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
 - `GET /` — setWebhook + меню команд (`?force` — заново) + строка о данных в описании бота;
 - cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
+  в :x3 — сверка расхода лимитов (`usage.ts`: на 80% — тревога владельцу и режим экономии: визиты не пишутся,
+  опрос чата реже, .ics из кэша), в 00:20 UTC — бэкап D1 владельцу в личку (`backup.ts`, `docs/backup.md`),
   в :x7 — рассылка «📚 Опубликовано расписание сессии» группам, у которых она появилась (`session.ts`, KV
   `session-notified`, кнопка мини-приложения `?open=session`), в :35 — чистка чата, остаток лимита — досылка
   рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0017`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0019`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
-`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`. Группа (`users.grp` и т. п.) — id.
+`schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`, `tg_updates` (повторы обновлений Telegram), `admin_log` (действия владельца,
+в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии). Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
 
 **Команды бота.** Личка: `/start` (одно из 3 приветствий), `/today`, `/tomorrow`.
-Владелец (у остальных молчат): `/stats`, `/broadcast`, `/broadcasts`, `/export`, `/ban`, `/unban`, `/bans`,
+Личка, всем: `/deleteme` — удалить свои данные (с подтверждением; Подслушано и отзывы обезличиваются, бан остаётся).
+Владелец (у остальных молчат): `/stats`, `/usage` (расход лимитов), `/backup` (бэкап D1 сейчас), `/broadcast`, `/broadcasts`, `/export`, `/ban`, `/unban`, `/bans`,
 `/boardban id [дни]` (без дней — навсегда, 0 — снять). Беседы: `/setup` (админы: кнопки 1-1/1-2 или `/setup название`
 — поиск по всем группам; потом время 7:00/7:30/8:00/выкл),
 `/today`, `/tomorrow`, `/here` (рассылка в эту тему форума), `/off`. Inline: `@GUU_Scheduule_bot сегодня|завтра|пн…сб|неделя`.
