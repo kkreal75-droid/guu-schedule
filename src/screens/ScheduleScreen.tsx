@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { DayStrip } from '../components/DayStrip'
 import { GroupChips } from '../components/GroupChips'
 import { LessonCard } from '../components/LessonCard'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
 import { WeekCard } from '../components/WeekCard'
-import { WEEKDAYS_FULL, WEEKDAYS_SHORT, dateOf, formatDate, formatDuration, pluralPairs } from '../format'
+import { WEEKDAYS_FULL, WEEKDAYS_SHORT, formatDate, formatDuration, pluralPairs } from '../format'
 import { CalendarIcon, NoteIcon } from '../icons'
 import { dayLessons } from '../../shared/edits-core'
 import type { Extras } from '../edits'
@@ -182,27 +183,14 @@ export function ScheduleScreen({
         onNext={() => go({ week: week + 1, weekday })}
       />
 
-      <div className="day-strip" role="tablist" aria-label="Дни недели">
-        {WEEKDAYS_SHORT.map((label, i) => (
-          <button
-            key={label}
-            type="button"
-            role="tab"
-            className="day"
-            aria-selected={i === weekday}
-            aria-label={`${WEEKDAYS_FULL[i]}, ${formatDate(monday + i)}`}
-            data-today={monday + i === now.day || undefined}
-            onClick={() => go({ week, weekday: i })}
-          >
-            <span className="day-wd">{label}</span>
-            <span className="day-num">{dateOf(monday + i).date}</span>
-            <span className="day-dots">
-              <span className="day-dot" data-on={busyDays[i] || undefined} />
-              {!readOnly && dayHasNotes(notes, monday + i, group) && <span className="day-dot day-dot-note" />}
-            </span>
-          </button>
-        ))}
-      </div>
+      <DayStrip
+        monday={monday}
+        weekday={weekday}
+        today={now.day}
+        busy={busyDays}
+        notes={readOnly ? undefined : WEEKDAYS_SHORT.map((_, i) => dayHasNotes(notes, monday + i, group))}
+        onPick={(i) => go({ week, weekday: i })}
+      />
 
       <div className="day-sub">
         <span className="day-sub-text">

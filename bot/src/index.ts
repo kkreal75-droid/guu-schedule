@@ -10,6 +10,7 @@
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимный чат «Чат» (board.ts), жалобы и баны — board-moderation.ts.
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
+//   GET  /sport   — секции и занятия «Спорта» (sport.ts), правит владелец в админке.
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
@@ -25,6 +26,7 @@ import { boardLatest, handleBoardApi, isBoardAction } from './board'
 import { sendAlerts } from './alerts'
 import { cleanupBoard, onBoardButton } from './board-moderation'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
+import { handleSportGet } from './sport'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
@@ -170,6 +172,7 @@ export default {
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
     if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
+    if (url.pathname === '/sport' && request.method === 'GET') return guarded(env, 'Спорт', () => handleSportGet(env))
     if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
     if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
     if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))

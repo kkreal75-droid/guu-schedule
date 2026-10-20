@@ -1,6 +1,7 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot } from '../api'
+import type { SportData, SportSection, SportSession } from '../../shared/sport-core'
 import type { ScheduleEdit } from '../../shared/edits-core'
 
 export type Dashboard = {
@@ -136,6 +137,12 @@ export const adminApi = {
   reviews: (reports: boolean, before?: number) =>
     callBot<{ reviews: ReviewRow[]; has_more: boolean }>('/admin/reviews', { reports, before }),
   reviewModerate: (id: number, action: 'del' | 'ban' | 'keep') => callBot<{ result: string }>('/admin/review-moderate', { id, action }),
+  sport: () => callBot<SportData>('/admin/sport'),
+  sportSectionSave: (section: Partial<SportSection>) => callBot<SportData>('/admin/sport-section-save', section),
+  sportSectionDelete: (id: number) => callBot<SportData>('/admin/sport-section-delete', { id }),
+  sportSessionSave: (session: Partial<SportSession>) => callBot<SportData>('/admin/sport-session-save', session),
+  sportSessionDelete: (id: number) => callBot<SportData>('/admin/sport-session-delete', { id }),
+  sportImport: (rows: object[]) => callBot<SportData & { imported: number }>('/admin/sport-import', { rows }),
   exportCsv: () => callBot('/admin/export'),
   broadcastInfo: () => callBot<{ counts: Record<'all' | '1-1' | '1-2', number>; history: BroadcastRow[] }>('/admin/broadcast-info'),
   broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),
