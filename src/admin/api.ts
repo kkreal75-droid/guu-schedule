@@ -1,7 +1,6 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
 import { callBot } from '../api'
-import type { SportData, SportSection, SportSession } from '../../shared/sport-core'
 import type { PlaceEdit } from '../places'
 import type { ScheduleEdit } from '../../shared/edits-core'
 
@@ -139,12 +138,6 @@ export const adminApi = {
   reviews: (reports: boolean, before?: number) =>
     callBot<{ reviews: ReviewRow[]; has_more: boolean }>('/admin/reviews', { reports, before }),
   reviewModerate: (id: number, action: 'del' | 'ban' | 'keep') => callBot<{ result: string }>('/admin/review-moderate', { id, action }),
-  sport: () => callBot<SportData>('/admin/sport'),
-  sportSectionSave: (section: Partial<SportSection>) => callBot<SportData>('/admin/sport-section-save', section),
-  sportSectionDelete: (id: number) => callBot<SportData>('/admin/sport-section-delete', { id }),
-  sportSessionSave: (session: Partial<SportSession>) => callBot<SportData>('/admin/sport-session-save', session),
-  sportSessionDelete: (id: number) => callBot<SportData>('/admin/sport-session-delete', { id }),
-  sportImport: (rows: object[]) => callBot<SportData & { imported: number }>('/admin/sport-import', { rows }),
   places: () => callBot<{ edits: PlaceEdit[] }>('/admin/places'),
   placeSave: (id: string | null, place: object) => callBot<{ id: string; edits: PlaceEdit[] }>('/admin/place-save', { id, place }),
   placeReset: (id: string) => callBot<{ edits: PlaceEdit[] }>('/admin/place-reset', { id }),

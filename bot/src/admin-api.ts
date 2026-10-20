@@ -7,7 +7,6 @@ import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBr
 import { loadChats } from './chats'
 import { moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
-import { loadSport, sportImport, sportSectionDelete, sportSectionSave, sportSessionDelete, sportSessionSave } from './sport'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
 import { cleanEditData, editProblem, type EditKind, type NewEdit, type ScheduleEdit } from '../../shared/edits-core'
@@ -525,12 +524,6 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   'board-ban': boardBan,
   'review-ban': reviewBan,
   'reset-intro': resetIntro,
-  sport: async ({ env }) => json({ ok: true, ...(await loadSport(env)) }),
-  'sport-section-save': ({ env, req }) => sportSectionSave(env, req.body as Record<string, unknown>),
-  'sport-section-delete': ({ env, req }) => sportSectionDelete(env, req.body as Record<string, unknown>),
-  'sport-session-save': ({ env, req }) => sportSessionSave(env, req.body as Record<string, unknown>),
-  'sport-session-delete': ({ env, req }) => sportSessionDelete(env, req.body as Record<string, unknown>),
-  'sport-import': ({ env, req }) => sportImport(env, req.body as Record<string, unknown>),
   places: async ({ env }) => json({ ok: true, edits: await loadPlaceEdits(env) }),
   'place-save': ({ env, req }) => placeSave(env, req.body as Record<string, unknown>),
   'place-reset': ({ env, req }) => placeReset(env, req.body as Record<string, unknown>),

@@ -412,7 +412,7 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
             ))}
           </div>
           {others.length > limit && (
-            <button type="button" className="sport-more reviews-more" onClick={() => setLimit((l) => l + 10)}>
+            <button type="button" className="reviews-more" onClick={() => setLimit((l) => l + 10)}>
               Ещё {others.length - limit}
             </button>
           )}

@@ -116,18 +116,6 @@ export function placeForRoom(places: Place[], room: string): Place | null {
   )
 }
 
-// место секции «Спорта» по тексту («Спортивный комплекс, зал 2», «Бассейн ГУУ») — если в админке не выбрано
-export function guessPlace(places: Place[], text: string): Place | null {
-  const t = squash(text)
-  if (!t) return null
-  const names = (p: Place) => [p.name, ...p.aliases].map(squash).filter((a) => a.length >= 4)
-  return (
-    places.find((p) => p.group === 'sport' && names(p).some((a) => t.includes(a))) ??
-    places.find((p) => names(p).some((a) => t.includes(a))) ??
-    placeForRoom(places, text)
-  )
-}
-
 // номер аудитории: «У-432» → «432» (этаж не обещаем — не проверено, см. todo в places.json)
 export const roomNumber = (room: string) => room.match(/[-–]\s*(\S+)$/)?.[1] ?? null
 

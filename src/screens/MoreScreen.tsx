@@ -63,8 +63,7 @@ type Props = {
   onRequestBack?: () => void
 }
 
-// откуда пришли: «Назад» ведёт на расписание (pair) или в «Спорт» (sport)
-export type MoreRequest = ({ item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget)) & { from?: 'sport' }
+export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget)
 
 export function MoreScreen({
   admin, group, teacherMode, boardNew, onBoardOpen, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,
@@ -166,7 +165,7 @@ export function MoreScreen({
       <div className="screen more">
         <header className="page-head">
           <button type="button" className="page-back" onClick={close} aria-label="Назад">
-            <ChevronLeft /> {request ? (request.from === 'sport' ? 'Спорт' : 'Расписание') : 'Другое'}
+            <ChevronLeft /> {request ? 'Расписание' : 'Другое'}
           </button>
           <h2 className="page-title">{open.title}</h2>
         </header>

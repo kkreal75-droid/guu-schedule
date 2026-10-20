@@ -11,7 +11,6 @@ import { useNotes } from './notes'
 import { MAX_FAVORITES, usePrefs } from './prefs'
 import { TabBar, type Tab } from './components/TabBar'
 import { MoreScreen, type MoreRequest } from './screens/MoreScreen'
-import { SportScreen } from './screens/SportScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleScreen'
 import { fromCache, schedule } from './schedule'
@@ -89,19 +88,18 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     setTab('more')
     window.scrollTo(0, 0)
   }, [])
-  // нажатие на аудиторию в паре — карточка корпуса в «Другое → Корпуса ГУУ»; из «Спорта» — место секции
-  const openPlace = useCallback((target: { room?: string; place?: string }, from?: 'sport') => {
+  // нажатие на аудиторию в паре — карточка корпуса в «Другое → Корпуса ГУУ»; «Назад» — сюда
+  const openRoom = useCallback((room: string) => {
     haptic()
-    setMoreRequest({ item: 'places', ...target, from })
+    setMoreRequest({ item: 'places', room })
     setTab('more')
     window.scrollTo(0, 0)
   }, [])
-  const openRoom = useCallback((room: string) => openPlace({ room }), [openPlace])
   const backToSchedule = useCallback(() => {
-    setTab(moreRequest?.from === 'sport' ? 'sport' : 'schedule')
     setMoreRequest(null)
+    setTab('schedule')
     window.scrollTo(0, 0)
-  }, [moreRequest])
+  }, [])
 
   // «+» у чипов групп: добавить в избранное и перегрузить расписание с ней
   const [addingGroup, setAddingGroup] = useState(false)
@@ -132,8 +130,6 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           notes={notes}
           onSaveNote={setNote}
         />
-      ) : tab === 'sport' ? (
-        <SportScreen onPlace={(place) => openPlace({ place }, 'sport')} />
       ) : tab === 'more' ? (
         <MoreScreen
           admin={Boolean(status?.admin)}
