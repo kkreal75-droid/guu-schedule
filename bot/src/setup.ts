@@ -51,6 +51,7 @@ const ADMIN_COMMANDS = [
   { command: 'unban', description: 'Разбан: /unban id' },
   { command: 'bans', description: 'Список банов' },
   { command: 'boardban', description: 'Бан в Подслушано: /boardban id [дни]' },
+  { command: 'usage', description: 'Расход лимитов Cloudflare' },
 ]
 
 export async function setupBot(env: Env, origin: string, force: boolean) {

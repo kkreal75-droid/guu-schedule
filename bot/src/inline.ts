@@ -3,7 +3,8 @@
 import { WEEKDAYS_FULL, dateOf, formatDate, pluralPairs } from '../../shared/format-core'
 import type { Timetable } from '../../shared/schedule-core'
 import { profileOf } from './auth'
-import { touchUser, userSubgroups } from './db'
+import { getUser, meOf, touchUser, userSubgroups } from './db'
+import { economyMode } from './usage'
 import { reportError } from './errors'
 import { formatDay, formatWeek, groupsFor, loadTimetable, personalKey, todayMsk, type BotTimetable } from './schedule'
 import { tg, type TgUser } from './telegram'
@@ -46,11 +47,24 @@ function summary(tt: BotTimetable, target: Target, group: string): string {
     : `${when} · пар нет`
 }
 
+// Inline-запрос летит на каждую букву: отмечаем человека (запись в D1) не чаще раза в минуту в этом изоляте,
+// в остальное время и в режиме экономии — только читаем профиль (группа могла смениться в приложении)
+const TOUCH_MS = 60_000
+const touchedAt = new Map<number, number>()
+
 export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise<void> {
   let group: string | null = null
   let banned = false
   try {
-    const user = await touchUser(env.DB, profileOf(query.from), 'inline')
+    const recent = Date.now() - (touchedAt.get(query.from.id) ?? 0) < TOUCH_MS
+    const user =
+      recent || economyMode()
+        ? await getUser(env.DB, query.from.id).then((row) => ({ banned: Boolean(row?.banned), me: meOf(row), grp: row?.grp ?? null }))
+        : await touchUser(env.DB, profileOf(query.from), 'inline')
+    if (!recent) {
+      touchedAt.set(query.from.id, Date.now())
+      if (touchedAt.size > 2000) touchedAt.delete(touchedAt.keys().next().value!)
+    }
     banned = user.banned
     // преподавателю — его пары, студенту — его группы
     group = personalKey({ role: user.me.role, teacher_id: user.me.teacher, grp: user.grp })

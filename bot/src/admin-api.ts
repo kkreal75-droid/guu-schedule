@@ -11,6 +11,7 @@ import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
 import { ADMIN_LIMIT } from './guard'
+import { logAdmin } from './journal'
 import { cleanEditData, editProblem, type EditKind, type NewEdit, type ScheduleEdit } from '../../shared/edits-core'
 import { addEdits, editFromRow, revertEdit } from './edits'
 import { isOwner } from './auth'
@@ -517,6 +518,12 @@ async function greetingPreview({ env, req }: Call): Promise<Response> {
 
 // ---------- маршрутизация ----------
 
+// только чтение — в журнал не пишем
+const READ_ONLY = new Set([
+  'dashboard', 'users', 'user', 'reviews', 'schedule', 'reports', 'feed', 'broadcast-info', 'broadcast-count', 'places',
+  'academic',
+])
+
 const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   dashboard,
   users,
@@ -558,5 +565,11 @@ export async function handleAdminApi(env: Env, ctx: ExecutionContext, request: R
   if (req instanceof Response) return req
   const handler = HANDLERS[action]
   if (!handler) return fail(404, 'not found')
-  return handler({ env, ctx, req })
+  const response = await handler({ env, ctx, req })
+  // изменения — в журнал действий (что и с какими полями; фото рассылки и длинные тексты — обрезаны)
+  if (!READ_ONLY.has(action) && response.ok) {
+    const { photo: _, ...fields } = req.body as Record<string, unknown>
+    await logAdmin(env, req.profile.id, `admin/${action}`, (fields.id ?? fields.scope ?? null) as string | number | null, fields)
+  }
+  return response
 }

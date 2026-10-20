@@ -11,6 +11,8 @@ import { ALIASES, BOARDS, BOARD_IDS, LIMITS, REACTIONS, type BoardId } from './b
 import { cleanText, passesFilter } from './board-filter'
 import { deleteMessage, notifyReport } from './board-moderation'
 import { normalizeGroup, originLabel } from '../../shared/groups'
+import { allow, tooMany } from './guard'
+import { economyMode } from './usage'
 import { loadGroupsIndex } from './schedule'
 
 const DAY_MS = 86_400_000
@@ -492,6 +494,8 @@ export async function handleBoardApi(env: Env, request: Request, action: Action)
 
   const board = req.body.board as BoardId
   if (!visibleBoards().includes(board)) return fail(403, 'board')
+  // режим экономии: опрос не чаще ~раза в 15 с (приложение молча повторит позже — интерфейс тот же)
+  if (action === 'poll' && economyMode() && !req.admin && !(await allow(env, 'RL_SLOW', req.profile.id))) return tooMany()
   return action === 'poll' ? poll(call, board) : send(call, board)
 }
 

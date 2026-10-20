@@ -6,6 +6,7 @@ import { MB_IDS, normalizeGroup, shortName } from '../../shared/groups'
 import { json, readApi } from './api'
 import { loadGroupFile, loadTimetable, type BotTimetable } from './schedule'
 import { userSubgroups } from './db'
+import { economyMode } from './usage'
 
 type TokenRow = { token: string; user_id: number; grp: string; created_at: number } // grp — id группы
 
@@ -182,7 +183,8 @@ const FETCH_MARK_MS = 60 * 60_000 // last_fetch_at обновляем не ча�
 // GET /cal/<токен>.ics — забирают сами календари
 export async function handleIcs(env: Env, ctx: ExecutionContext, token: string): Promise<Response> {
   let hit = icsCache.get(token)
-  if (!hit || Date.now() - hit.at > ICS_TTL_MS) {
+  // режим экономии (лимиты на исходе) — календари из кэша до часа
+  if (!hit || Date.now() - hit.at > (economyMode() ? 6 * ICS_TTL_MS : ICS_TTL_MS)) {
     const row = await env.DB.prepare('SELECT * FROM calendar_tokens WHERE token = ?').bind(token).first<TokenRow>()
     if (!row) {
       icsCache.delete(token)

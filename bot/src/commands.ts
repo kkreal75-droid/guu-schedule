@@ -4,6 +4,8 @@ import { isOwner, profileOf } from './auth'
 import { boardBanCommand } from './board-moderation'
 import { listBroadcasts, startBroadcast } from './broadcast'
 import { getUser, touchUser, userSubgroups } from './db'
+import { logAdmin } from './journal'
+import { economyMode, usageText, usageToday } from './usage'
 import { reportError, safely } from './errors'
 import { formatDay, groupsFor, loadTimetable, personalKey, todayMsk } from './schedule'
 import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
@@ -64,6 +66,7 @@ const ADMIN: Record<string, Handler> = {
   '/unban': ({ env, message, args }) => unbanCommand(env, message.chat.id, args),
   '/bans': ({ env, message }) => listBans(env, message.chat.id),
   '/boardban': ({ env, message, args }) => boardBanCommand(env, message.chat.id, args),
+  '/usage': async ({ env, message }) => void (await sendMessage(env, message.chat.id, usageText(await usageToday(env)))),
 }
 
 export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, message: TgMessage): Promise<void> {
@@ -78,7 +81,11 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
   // учёт не должен мешать ответу: база недоступна — сообщаем владельцу и отвечаем как обычно
   let banned = false
   try {
-    banned = (await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')).banned
+    // режим экономии: пишем только /start, остальное — чтение
+    banned =
+      economyMode() && command !== '/start'
+        ? Boolean((await getUser(env.DB, from.id))?.banned)
+        : (await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')).banned
   } catch (err) {
     await reportError(env, 'Учёт пользователя', err)
   }
@@ -96,6 +103,9 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
   // админские команды у остальных — как несуществующие: ни ответа, ни намёка
   const handler = PUBLIC[command] ?? (owner ? ADMIN[command] : undefined)
   if (!handler) return
+  if (owner && ADMIN[command] && command !== '/usage' && command !== '/stats' && command !== '/bans' && command !== '/broadcasts') {
+    await logAdmin(env, from.id, command, null, args.slice(0, 300))
+  }
   await safely(env, `Команда ${command}`, message.chat.id, () => handler({ env, ctx, message, args }))
 }
 

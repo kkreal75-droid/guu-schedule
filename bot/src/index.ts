@@ -25,6 +25,8 @@
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
 import { BODY_LIMIT, WEBHOOK_LIMIT, allow, clientIp, readBody, safeEqual, tooMany, withCors } from './guard'
+import { cleanupJournal, firstDelivery, logAdmin } from './journal'
+import { checkBudget, countRequest, economyMode, flushUsage, meterEnv } from './usage'
 import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
@@ -40,7 +42,7 @@ import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
 import { handleBannedCallback, handlePrivateMessage } from './commands'
 import { mbName, normalizeGroup } from '../../shared/groups'
-import { touchUser } from './db'
+import { getUser, meOf, touchUser } from './db'
 import { detectChanges, runDigests } from './digest'
 import { extrasFor, loadExtras } from './edits'
 import { reportError, safely } from './errors'
@@ -66,6 +68,8 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
   // флуд одного человека — молча пропускаем, до базы и до Telegram (владельца не ограничиваем)
   const sender = updateSender(update)
   if (sender !== null && !isOwner(env, sender) && !(await allow(env, 'RL_BOT', sender))) return
+  // Telegram повторил обновление (не дождался ответа) — второй раз не выполняем
+  if (!(await firstDelivery(env, update.update_id))) return
   if (update.message) {
     const message = update.message
     if (message.chat.type === 'private') await handlePrivateMessage(env, ctx, message)
@@ -88,6 +92,10 @@ async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): 
     const query = update.callback_query
     // в беседах ошибку кнопки показывает всплывающий текст, в чат не пишем (в форуме — это General)
     const chatId = query.message?.chat.type === 'private' ? query.message.chat.id : null
+    // кнопки владельца (рассылка, жалобы, отзывы, поддержка) — в журнал действий
+    if (isOwner(env, query.from.id) && /^(bc|bd|rv|sp):/.test(query.data ?? '')) {
+      await logAdmin(env, query.from.id, 'кнопка', null, query.data)
+    }
     await safely(env, 'Кнопка', chatId, async () => {
       if (await handleBannedCallback(env, query)) return
       if (query.data?.startsWith('bc:')) await onBroadcastButton(env, ctx, query)
@@ -163,8 +171,12 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   if (!(await allow(env, 'RL_SEEN', profile.id))) return tooMany()
   try {
     const admin = isOwner(env, profile.id)
+    // режим экономии (лимиты на исходе): визит не пишем — только читаем профиль
+    const seen = economyMode()
+      ? getUser(env.DB, profile.id).then((row) => ({ banned: Boolean(row?.banned), me: meOf(row) }))
+      : touchUser(env.DB, profile, 'open', group)
     const [{ banned, me }, board, extras] = await Promise.all([
-      touchUser(env.DB, profile, 'open', group),
+      seen,
       // «Подслушано», правки и настройки не должны мешать открытию приложения
       boardLatest(env).catch((err) => (console.error('Подслушано в /seen:', err), {})),
       appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
@@ -213,8 +225,12 @@ async function handleWebhook(env: Env, ctx: ExecutionContext, request: Request):
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (!env.BOT_TOKEN) return new Response('not configured', { status: 500 })
+  async fetch(request: Request, rawEnv: Env, ctx: ExecutionContext): Promise<Response> {
+    if (!rawEnv.BOT_TOKEN) return new Response('not configured', { status: 500 })
+    // учёт расхода лимитов: запросы, строки D1, операции KV (usage.ts) — в D1 раз в 5 минут
+    const env = meterEnv(rawEnv)
+    countRequest()
+    ctx.waitUntil(flushUsage(env))
     const url = new URL(request.url)
     // вебхук — с IP Telegram, свой секрет; его не ограничиваем по IP
     if (url.pathname === '/webhook') return handleWebhook(env, ctx, request)
@@ -225,7 +241,9 @@ export default {
 
   // Раз в минуту. Лимит — 50 подзапросов на вызов: сначала то, что привязано ко времени
   // (сводки, изменения), рассылкам — что осталось; недосланное подхватит следующая минута.
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
+    const env = meterEnv(rawEnv)
+    countRequest()
     await runCron(controller, env, ctx)
   },
 } satisfies ExportedHandler<Env>
@@ -307,11 +325,17 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
     if (new Date(now).getUTCMinutes() % 10 === 7) {
       used += await notifySessions(env).catch((err) => (reportError(env, 'Рассылка о сессии', err), 0))
     }
+    // расход лимитов: тревога владельцу и режим экономии на 80% (usage.ts)
+    if (new Date(now).getUTCMinutes() % 10 === 3) {
+      used += await checkBudget(env).catch((err) => (reportError(env, 'Учёт лимитов', err), 0))
+    }
     if (new Date(now).getUTCMinutes() === 35) {
       used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))
+      used += await cleanupJournal(env, now).catch((err) => (reportError(env, 'Чистка журнала', err), 0))
     }
     const batch = Math.max(0, BATCH - used)
     if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))
+    await flushUsage(env)
   }
   ctx.waitUntil(run())
 }
