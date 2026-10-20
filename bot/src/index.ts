@@ -5,7 +5,7 @@
 //                   inline-запросы — inline.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin, me, …}.
-//   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts).
+//   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts); POST /intro — знакомство просмотрено.
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /board/<действие> — анонимный чат «Чат» (board.ts), жалобы и баны — board-moderation.ts.
@@ -35,7 +35,7 @@ import { detectChanges, runDigests } from './digest'
 import { extrasFor, loadExtras } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
-import { handleProfile } from './profile'
+import { handleIntro, handleProfile } from './profile'
 import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { loadSettings } from './settings'
 import { setupBot } from './setup'
@@ -170,6 +170,7 @@ export default {
 
     if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
     if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
+    if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
     if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
     if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
     const starosta = url.pathname.match(/^\/starosta\/([a-z-]+)$/)

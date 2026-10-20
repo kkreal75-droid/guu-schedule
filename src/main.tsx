@@ -4,17 +4,22 @@ import { saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
 import { cachedExtras, rememberExtras, type Extras } from './edits'
+import { INTRO_VERSION, introSeen, markIntroDone } from './intro'
+import { IntroFlow, type Current } from './onboarding/Intro'
 import { Onboarding, type Choice } from './onboarding/Onboarding'
 import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from './prefs'
 import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
 import { readCloud, readLocal } from './storage'
 import { checkIn, initTelegram, type CheckIn } from './telegram'
+import { useTheme } from './theme'
 
 if (import.meta.env.DEV) installTelegramMock()
 initTelegram()
-// параллельно: визит для статистики и проверка бана, настройки из облака Telegram
+// параллельно: визит для статистики и проверка бана, настройки и «знакомство видел» из облака Telegram
 const status = checkIn()
-const cloudPrefs = Promise.race([readCloud('prefs'), new Promise<null>((r) => setTimeout(() => r(null), 1500))])
+const fromCloud = (key: string) => Promise.race([readCloud(key), new Promise<null>((r) => setTimeout(() => r(null), 1500))])
+const cloudPrefs = fromCloud('prefs')
+const cloudIntro = fromCloud('intro')
 
 const root = createRoot(document.getElementById('root')!)
 root.render(<p className="boot">Загружаю расписание…</p>)
@@ -31,12 +36,25 @@ function applyChoice(prefs: Prefs, choice: Choice): Prefs {
 }
 
 type Tab = 'schedule' | 'more' | 'profile'
-type Phase = { kind: 'app'; version: number; tab?: Tab } | { kind: 'onboarding'; first: boolean; reason?: string }
+// app — расписание; intro — знакомство (этап 7.1: всем один раз, «Показать знакомство ещё раз»);
+// onboarding — только выбор группы / роли («Сменить группу / роль», группа пропала из расписания)
+type Phase =
+  | { kind: 'app'; version: number; tab?: Tab }
+  | { kind: 'intro'; registered: boolean }
+  | { kind: 'onboarding'; first: boolean; reason?: string }
+
+// что уже выбрано — для «Это твоя группа?» в знакомстве
+function currentChoice(prefs: Prefs): Current {
+  if (prefs.role === 'teacher' && prefs.teacher) return { role: 'teacher', teacher: prefs.teacher, name: prefs.teacherName ?? 'Преподаватель' }
+  return { role: 'student', group: prefs.group }
+}
 
 let versions = 0
 
 function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: Extras; initial: Phase }) {
   const [phase, setPhase] = useState<Phase>(initial)
+  // тема из настроек — и для знакомства (в приложении её дальше ведёт App)
+  useTheme(readPrefs().theme)
   const [lastApp, setLastApp] = useState(0) // версия App до онбординга — «Отмена» возвращает его как был
 
   // настройки поменялись (избранное) — заново грузим расписание и перерисовываем приложение
@@ -45,15 +63,35 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
     setPhase({ kind: 'app', version: ++versions, tab })
   }
 
-  const finish = async (choice: Choice) => {
+  // выбор группы / роли → настройки (устройство + облако Telegram) и боту
+  const choose = async (choice: Choice) => {
     const prefs = applyChoice(readPrefs(), choice)
     savePrefs(prefs)
     // боту — для /today, inline и рассылок; не получилось — расписание всё равно откроем
     saveProfile(choice.role === 'teacher' ? { role: 'teacher', teacher: choice.teacher } : choice).catch((err) =>
       console.warn('Не удалось сохранить выбор в боте', err),
     )
-    await loadSchedule(groupsToLoad(prefs))
-    setPhase({ kind: 'app', version: ++versions })
+  }
+  const openApp = async (tab?: Tab) => {
+    await loadSchedule(groupsToLoad(readPrefs()))
+    setPhase({ kind: 'app', version: ++versions, tab })
+  }
+  const finish = async (choice: Choice) => {
+    await choose(choice)
+    await openApp()
+  }
+
+  if (phase.kind === 'intro') {
+    return (
+      <IntroFlow
+        current={phase.registered ? currentChoice(readPrefs()) : null}
+        onChoice={choose}
+        onFinish={async () => {
+          markIntroDone()
+          await openApp()
+        }}
+      />
+    )
   }
 
   if (phase.kind === 'onboarding') {
@@ -76,6 +114,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
         setLastApp(phase.version)
         setPhase({ kind: 'onboarding', first: false })
       }}
+      onShowIntro={() => setPhase({ kind: 'intro', registered: true })}
     />
   )
 }
@@ -84,7 +123,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
 let AppLazy: typeof import('./App').default
 
 async function boot() {
-  const [checked, cloud] = await Promise.all([status, cloudPrefs])
+  const [checked, cloud, cloudIntroSeen] = await Promise.all([status, cloudPrefs, cloudIntro])
   if (checked?.banned) {
     root.render(
       <div className="boot">
@@ -120,17 +159,23 @@ async function boot() {
     } else if (me?.group) {
       savePrefs({ ...(merged ?? defaultPrefs()), role: 'student', group: me.group, at: Date.now() })
     } else if (me?.onboarding || (!checked && !hasLocalTraces())) {
-      initial = { kind: 'onboarding', first: true }
+      initial = { kind: 'intro', registered: false }
     }
   }
+  // знакомство новой версии — всем один раз, включая старых пользователей и МБ (им — «Это твоя группа?»)
+  const needIntro = introSeen(cloudIntroSeen, me?.intro) < INTRO_VERSION
+  if (initial.kind === 'app' && needIntro) initial = { kind: 'intro', registered: true }
 
-  if (initial.kind === 'app') {
+  // своё расписание грузим сразу (и для знакомства — к его концу оно уже будет готово)
+  if (initial.kind === 'app' || (initial.kind === 'intro' && initial.registered)) {
     try {
       await loadSchedule(groupsToLoad(readPrefs()))
     } catch (err) {
       // группы больше нет в расписании ГУУ — выбрать заново
       if (!(err instanceof GroupMissingError)) throw err
-      initial = { kind: 'onboarding', first: true, reason: 'Твоей группы больше нет в расписании ГУУ — выбери заново.' }
+      initial = needIntro
+        ? { kind: 'intro', registered: false }
+        : { kind: 'onboarding', first: true, reason: 'Твоей группы больше нет в расписании ГУУ — выбери заново.' }
     }
   }
   AppLazy = (await import('./App')).default

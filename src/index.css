@@ -2760,3 +2760,255 @@ select.input {
   color: var(--text);
   text-align: left;
 }
+
+/* ---------- знакомство (этап 7.1): истории, тур, подтверждение группы ---------- */
+
+.ob-stories {
+  overflow: hidden;
+}
+
+.ob-skip {
+  flex: none;
+  padding: 4px 0 4px 8px;
+  font-size: 15px;
+  color: var(--hint);
+}
+
+.ob-story {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 16px 8px;
+  text-align: center;
+  animation: ob-story-in 0.28s ease-out;
+}
+
+.ob-story-back {
+  animation-name: ob-story-in-back;
+}
+
+@keyframes ob-story-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes ob-story-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-story {
+    animation: none;
+  }
+}
+
+.ob-story-visual {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.ob-story .ob-title {
+  max-width: 360px;
+}
+
+.ob-story .ob-text {
+  max-width: 360px;
+}
+
+.ob-story .ob-text p + p {
+  margin-top: 10px;
+}
+
+.ob-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--accent-ink);
+}
+
+.ob-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ob-role {
+  margin-top: 8vh;
+  text-align: center;
+}
+
+.ob-role .ob-cards {
+  text-align: left;
+}
+
+.ob-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 24px 20px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 8px 24px rgb(0 0 0 / 0.06);
+  text-align: center;
+}
+
+.ob-confirm .ob-emoji {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 20px;
+  background: var(--fill);
+  box-shadow: none;
+  font-size: 32px;
+}
+
+.ob-confirm-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.ob-chip-auto {
+  padding-right: 12px;
+  color: var(--hint);
+}
+
+.tour-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+  pointer-events: none;
+}
+
+.tour-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+}
+
+.tour-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.tour-item-emoji {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 22px;
+}
+
+.tour-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tour-item-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tour-item-sub {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+/* ---------- карточка недели (главный экран, тур) ---------- */
+
+.week-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.week-card-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.week-card-month {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.week-card-parity {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.week-card-range {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.round-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--text);
+  transition: transform 0.1s;
+}
+
+.round-btn:active {
+  transform: scale(0.94);
+}
+
+.round-btn:disabled {
+  opacity: 0.35;
+}
+
+.round-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ob-foot .button-primary,
+.ob-foot .button-secondary {
+  min-height: 52px;
+  border-radius: 16px;
+}

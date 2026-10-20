@@ -1,7 +1,8 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
 import { CalendarIcon, ChatIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, StarIcon, UserIcon } from '../icons'
-import { haptic } from '../telegram'
+import { resetIntro } from '../intro'
+import { confirmAction, haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { adminApi, adminError } from './api'
 import { useFlash } from './common'
@@ -47,6 +48,17 @@ export function AdminPage({ onExit }: { onExit: () => void }) {
     }
   }
 
+  // для проверки: знакомство (истории, «Это твоя группа?», тур) покажется снова — сразу, после перезапуска
+  const resetMyIntro = async () => {
+    if (!(await confirmAction('Сбросить онбординг и перезапустить приложение?'))) return
+    try {
+      await resetIntro()
+      window.location.reload()
+    } catch (err) {
+      flash(adminError(err))
+    }
+  }
+
   return (
     <div className="screen more admin">
       <header className="page-head">
@@ -81,6 +93,9 @@ export function AdminPage({ onExit }: { onExit: () => void }) {
           </Section>
           <button type="button" className="button-secondary" onClick={exportCsv}>
             Экспорт CSV
+          </button>
+          <button type="button" className="button-secondary" onClick={resetMyIntro}>
+            Сбросить мой онбординг
           </button>
           {notice}
         </div>

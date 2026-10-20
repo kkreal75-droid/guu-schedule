@@ -58,6 +58,7 @@ type Props = {
   extras: Extras
   boardOrigin: boolean | null // «Чат»: курс и институт у псевдонима; null — вне Telegram
   onBoardOrigin: (on: boolean) => void
+  onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
 // «Чат»: показывать у псевдонима курс и институт («Выдра 🦦 · 1 курс, ИУПСиБК»). Решает бот:
@@ -95,7 +96,7 @@ function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) =
   )
 }
 
-export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras, boardOrigin, onBoardOrigin }: Props) {
+export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras, boardOrigin, onBoardOrigin, onShowIntro }: Props) {
   // подгруппы своей группы (их заводит староста): выбранные — только свои пары
   const ownSubgroups = prefs.role === 'student' ? extras.subgroups.filter((s) => s.group === prefs.group) : []
   const toggleSubgroup = (id: number) => {
@@ -239,6 +240,13 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
         <button type="button" className="row row-btn row-link" onClick={() => openLink(SOURCE_URL)}>
           <span>Расписание на guu.ru</span>
           <ExternalIcon className="row-check" />
+        </button>
+      </Section>
+
+      <Section>
+        <button type="button" className="row row-btn row-link" onClick={() => (haptic(), onShowIntro())}>
+          <span>Показать знакомство ещё раз</span>
+          <ChevronRight className="row-check" />
         </button>
       </Section>
     </div>

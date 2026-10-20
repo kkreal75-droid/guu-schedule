@@ -27,6 +27,7 @@ export type UserRow = {
   subgroups: string | null // JSON: выбранные подгруппы
   board_origin: number // «Чат»: показывать у псевдонима курс и институт
   review_banned_until: number | null // бан в отзывах о преподавателях
+  intro_version: number // какую версию знакомства (истории, тур) уже видел
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -40,9 +41,10 @@ export type Me = {
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
   origin: boolean // «Чат»: курс и институт у псевдонима (переключатель в профиле)
+  intro: number // какую версию знакомства уже видел (приложение покажет новую один раз)
 }
 
-type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'board_origin'
+type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'board_origin' | 'intro_version'
 
 export function meOf(row: Pick<UserRow, MeFields> | null): Me {
   const group = normalizeGroup(row?.grp)
@@ -54,6 +56,7 @@ export function meOf(row: Pick<UserRow, MeFields> | null): Me {
     onboarding: !row?.legacy && !group && !row?.role,
     starosta: normalizeGroup(row?.starosta_of),
     origin: Boolean(row?.board_origin),
+    intro: row?.intro_version ?? 0,
   }
 }
 
@@ -94,7 +97,7 @@ export async function touchUser(
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
            access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
-         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin`,
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin, intro_version`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1]),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано

@@ -172,6 +172,12 @@ async function reviewBan({ env, req }: Call): Promise<Response> {
   return userCard(env, id)
 }
 
+// «Сбросить мой онбординг» — владелец снова увидит знакомство (для проверки); CloudStorage чистит приложение
+async function resetIntro({ env, req }: Call): Promise<Response> {
+  await env.DB.prepare('UPDATE users SET intro_version = 0 WHERE id = ?').bind(req.profile.id).run()
+  return json({ ok: true })
+}
+
 // Доступ (будущая оплата, сейчас не влияет ни на что): выдать / забрать free_forever вручную
 async function access({ env, req }: Call): Promise<Response> {
   const id = asInt(req.body.id)
@@ -505,6 +511,7 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   unban,
   'board-ban': boardBan,
   'review-ban': reviewBan,
+  'reset-intro': resetIntro,
   access,
   starosta,
   export: exportCsv,

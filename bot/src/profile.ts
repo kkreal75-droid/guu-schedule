@@ -39,3 +39,20 @@ export async function handleProfile(env: Env, request: Request): Promise<Respons
     .run()
   return json({ ok: true, me: meOf(await getUser(env.DB, req.profile.id)) })
 }
+
+// Знакомство (истории автора, подтверждение группы, тур) просмотрено: POST /intro {version}.
+// Версия только растёт — со старого устройства её не откатить (сбросить может владелец себе, в админке).
+export async function handleIntro(env: Env, request: Request): Promise<Response> {
+  const req = await readApi<{ version?: unknown }>(env, request)
+  if (req instanceof Response) return req
+  const version = typeof req.body.version === 'number' && Number.isSafeInteger(req.body.version) ? req.body.version : null
+  if (version === null || version < 1 || version > 100) return json({ ok: false, error: 'version' }, 400)
+  const now = Date.now()
+  await env.DB.prepare(
+    `INSERT INTO users (id, username, name, first_seen, last_seen, intro_version) VALUES (?1, ?2, ?3, ?4, ?4, ?5)
+     ON CONFLICT (id) DO UPDATE SET intro_version = MAX(users.intro_version, ?5)`,
+  )
+    .bind(req.profile.id, req.profile.username, req.profile.name, now, version)
+    .run()
+  return json({ ok: true, intro: version })
+}

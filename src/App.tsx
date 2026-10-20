@@ -26,9 +26,10 @@ type Props = {
   startTab?: Tab
   onReload: (tab: Tab) => Promise<void>
   onChangeProfile: () => void
+  onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
-export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile }: Props) {
+export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile, onShowIntro }: Props) {
   const [prefs, updatePrefs] = usePrefs()
   // правки и подгруппы; староста меняет их — обновляем сразу, без перезапуска
   const [extras, setExtras] = useState(initialExtras)
@@ -113,6 +114,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
             if (patch.favorites) setFavoritesChanged(true)
           }}
           onChangeProfile={onChangeProfile}
+          onShowIntro={onShowIntro}
         />
       )}
 
