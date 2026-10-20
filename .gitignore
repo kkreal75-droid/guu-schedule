@@ -10,3 +10,6 @@ __pycache__/
 .wrangler/
 bot/worker-configuration.d.ts
 data/raw/
+
+# референс-скрины конкурента, не публикуем
+docs/reference/

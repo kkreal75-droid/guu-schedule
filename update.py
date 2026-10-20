@@ -31,7 +31,9 @@ MIN_LESSONS пар — файл не публикуем (остаются про
 Ручные правки сюда не попадают: overrides.json и замены дней (overrides/thursday*.json) накладываются
 поверх при показе (shared/schedule-core.ts), автообновление их не стирает.
 
-Код выхода: 0 — всё в порядке (обновилось или нет), 1 — сайт ГУУ недоступен или ссылок нет вовсе.
+Код выхода: 0 — всё в порядке (обновилось или нет; guu.ru не ответил даже после повторов — тоже 0,
+с предупреждением: ничего не публикуем, следующий запуск через час попробует снова), 1 — ссылок нет вовсе,
+ответ не тот (HTTP 4xx, не файл) или ошибка разбора.
 В GitHub Actions пишет changed=true|false, message=..., need_soffice=true|false в $GITHUB_OUTPUT.
 """
 
@@ -88,6 +90,10 @@ class UpdateError(Exception):
     pass
 
 
+class SiteUnavailable(UpdateError):
+    """guu.ru не ответил (таймаут, обрыв, HTTP 5xx) даже после повторов — временно, не ошибка данных."""
+
+
 def annotate(level: str, message: str) -> None:
     """В GitHub Actions — ещё и аннотация: видна в сводке запуска, а не только в логе."""
     if os.environ.get("GITHUB_ACTIONS"):
@@ -139,11 +145,13 @@ def fetch(url: str, method: str = "GET", attempts: int = 3) -> tuple[dict[str, s
                     return headers, b""
                 return headers, decompress(resp.read(), headers.get("content-encoding"))
         except HTTPError as e:
-            if e.code < 500 or attempt == attempts:
+            if e.code < 500:
                 raise UpdateError(f"{method} {unquote(url)}: HTTP {e.code}") from e
+            if attempt == attempts:
+                raise SiteUnavailable(f"{method} {unquote(url)}: HTTP {e.code}") from e
         except (URLError, TimeoutError, ConnectionError) as e:
             if attempt == attempts:
-                raise UpdateError(f"{method} {unquote(url)}: {e}") from e
+                raise SiteUnavailable(f"{method} {unquote(url)}: {e}") from e
         time.sleep(5 * attempt)
     raise AssertionError("unreachable")
 
@@ -898,6 +906,12 @@ def main() -> int:
     args = ap.parse_args()
     try:
         changed, message, need_soffice = update(args.force, args.local)
+    except SiteUnavailable as e:
+        # сайт ГУУ временами не отвечает раннерам GitHub — ничего не меняем, через час попробуем снова
+        print(f"⚠ guu.ru недоступен, пропускаю: {e}", file=sys.stderr)
+        annotate("warning", f"guu.ru недоступен, обновление пропущено: {e}")
+        github_output(changed="false", need_soffice="false")
+        return 0
     except UpdateError as e:
         print(f"✖ {e}", file=sys.stderr)
         annotate("error", str(e))
