@@ -2,9 +2,16 @@
 // владелец (author, grp, reports приходят только ему).
 import { ApiError, callBot } from '../api'
 
+export type Criteria = { clarity: number; competence: number; communication: number }
+export type Helpful = { up: number; down: number; mine: number } // mine: 1 / -1 / 0
+
 export type Review = {
   id: number
   rating: number
+  score: number // среднее критериев (у старых отзывов — rating)
+  criteria: Criteria | null // null — старый отзыв с одной оценкой
+  recommend: boolean | null
+  helpful: Helpful
   text: string
   discipline: string | null
   at: number
@@ -20,6 +27,8 @@ export type TeacherCard = {
   teacher: string
   count: number
   average: number | null // только от 3 отзывов
+  criteria: (Record<keyof Criteria, number | null> & { count: number }) | null // средние по критериям, от 3
+  recommend: number | null // % «рекомендуют»
   distribution: number[] // сколько оценок 1, 2, 3, 4, 5
   reviews: Review[]
   mine: Review | null
@@ -31,9 +40,9 @@ export type TeacherCard = {
 }
 
 // t — id преподавателя, n — отзывов, avg — средняя (null, если отзывов меньше 3)
-export type Rated = { t: string; n: number; avg: number | null }
+export type Rated = { t: string; n: number; avg: number | null; rec: number | null }
 
-export type ReviewDraft = { rating: number; text: string; discipline: string | null; confirm: boolean }
+export type ReviewDraft = Criteria & { recommend: boolean | null; text: string; discipline: string | null; confirm: boolean }
 
 export const reviewsApi = {
   top: () => callBot<{ teachers: Rated[] }>('/reviews/top'),
@@ -41,6 +50,7 @@ export const reviewsApi = {
   save: (teacher: string, draft: ReviewDraft) => callBot<TeacherCard>('/reviews/save', { teacher, ...draft }),
   remove: (teacher: string) => callBot<TeacherCard>('/reviews/delete', { teacher }),
   report: (id: number) => callBot('/reviews/report', { id }),
+  vote: (id: number, value: number) => callBot<{ id: number; helpful: Helpful }>('/reviews/vote', { id, value }),
 }
 
 // Текст ошибки для человека: бот присылает готовую фразу (или код)

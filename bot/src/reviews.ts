@@ -2,7 +2,10 @@
 //
 //   top — число отзывов и средняя оценка у всех, о ком писали (список и сортировка);
 //   teacher — карточка: отзывы, распределение 1–5, свой отзыв, можно ли оставить и почему нет;
-//   save / delete — свой отзыв (один на преподавателя: изменить, удалить); report — жалоба.
+//   save / delete — свой отзыв (один на преподавателя: изменить, удалить); report — жалоба;
+//   vote — «полезно / не полезно» (одна отметка от человека).
+// Отзыв (этап 7.6): три критерия 1–5 (понятность, компетентность, коммуникация) + «рекомендую / нет»;
+// общая оценка — среднее критериев (score; rating — округлённое). Старые отзывы — одна оценка rating.
 //
 // Оставить отзыв можно, только если преподаватель ведёт пары у группы автора или вёл их в прошлом
 // семестре — по data/teachers/<id>.json (lessons[].groups и past_groups, их пишет update.py). Группа —
@@ -33,6 +36,11 @@ const DAY_MS = 86_400_000
 type Body = {
   teacher?: unknown
   rating?: unknown
+  clarity?: unknown
+  competence?: unknown
+  communication?: unknown
+  recommend?: unknown
+  value?: unknown
   text?: unknown
   discipline?: unknown
   confirm?: unknown
@@ -70,6 +78,14 @@ type ReviewRow = {
   user_id: number
   grp: string | null
   rating: number
+  clarity: number | null
+  competence: number | null
+  communication: number | null
+  recommend: number | null
+  score: number | null
+  up?: number
+  down?: number
+  myvote?: number | null
   text: string
   discipline: string | null
   created_at: number
@@ -84,6 +100,10 @@ function reviewOut(row: ReviewRow, viewerId: number, admin: boolean) {
   return {
     id: row.id,
     rating: row.rating,
+    score: row.score ?? row.rating,
+    criteria: row.clarity ? { clarity: row.clarity, competence: row.competence, communication: row.communication } : null,
+    recommend: row.recommend === null || row.recommend === undefined ? null : Boolean(row.recommend),
+    helpful: { up: row.up ?? 0, down: row.down ?? 0, mine: row.myvote ?? 0 },
     text: row.text,
     discipline: row.discipline,
     at: row.created_at,
@@ -99,12 +119,19 @@ function reviewOut(row: ReviewRow, viewerId: number, admin: boolean) {
 // Число отзывов и средняя у всех преподавателей, о ком писали; средняя — только от 3 отзывов
 async function top(env: Env): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT teacher_id AS t, COUNT(*) AS n, AVG(rating) AS avg FROM teacher_reviews
-     WHERE deleted = 0 AND hidden = 0 GROUP BY teacher_id`,
-  ).all<{ t: string; n: number; avg: number }>()
+    `SELECT teacher_id AS t, COUNT(*) AS n, AVG(COALESCE(score, rating)) AS avg, AVG(recommend) AS rec, COUNT(recommend) AS nrec
+     FROM teacher_reviews WHERE deleted = 0 AND hidden = 0 GROUP BY teacher_id`,
+  ).all<{ t: string; n: number; avg: number; rec: number | null; nrec: number }>()
+  const enough = (n: number) => n >= REVIEW_LIMITS.minForAverage
   return json({
     ok: true,
-    teachers: results.map((r) => ({ t: r.t, n: r.n, avg: r.n >= REVIEW_LIMITS.minForAverage ? Math.round(r.avg * 10) / 10 : null })),
+    teachers: results.map((r) => ({
+      t: r.t,
+      n: r.n,
+      avg: enough(r.n) ? Math.round(r.avg * 10) / 10 : null,
+      // доля «рекомендую» — от тех, кто отвечал (старые отзывы без ответа не считаются)
+      rec: enough(r.n) && r.nrec ? Math.round((r.rec ?? 0) * 100) : null,
+    })),
   })
 }
 
@@ -120,12 +147,21 @@ async function teacherCard(env: Env, req: ApiRequest<Body>): Promise<Response> {
   if (!teacher) return fail(400, 'bad request')
   const me = req.profile.id
   const admin = req.admin
-  const [stats, rows] = await env.DB.batch([
+  const [stats, agg, rows] = await env.DB.batch([
     env.DB.prepare(
       'SELECT rating, COUNT(*) AS n FROM teacher_reviews WHERE teacher_id = ? AND deleted = 0 AND hidden = 0 GROUP BY rating',
     ).bind(teacher),
     env.DB.prepare(
-      `SELECT r.id, r.teacher_id, r.user_id, r.grp, r.rating, r.text, r.discipline, r.created_at, r.updated_at, r.hidden
+      `SELECT AVG(COALESCE(score, rating)) AS avg, AVG(clarity) AS clarity, AVG(competence) AS competence,
+              AVG(communication) AS communication, COUNT(clarity) AS ncrit, AVG(recommend) AS rec, COUNT(recommend) AS nrec
+       FROM teacher_reviews WHERE teacher_id = ? AND deleted = 0 AND hidden = 0`,
+    ).bind(teacher),
+    env.DB.prepare(
+      `SELECT r.id, r.teacher_id, r.user_id, r.grp, r.rating, r.clarity, r.competence, r.communication, r.recommend, r.score,
+              r.text, r.discipline, r.created_at, r.updated_at, r.hidden,
+              (SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.value = 1) AS up,
+              (SELECT COUNT(*) FROM review_votes v WHERE v.review_id = r.id AND v.value = -1) AS down,
+              (SELECT value FROM review_votes v WHERE v.review_id = r.id AND v.user_id = ?3) AS myvote
               ${admin ? `, u.name, u.username, (SELECT COUNT(*) FROM review_reports p WHERE p.review_id = r.id AND p.status = 'open') AS reports` : ''}
        FROM teacher_reviews r ${admin ? 'LEFT JOIN users u ON u.id = r.user_id' : ''}
        WHERE r.teacher_id = ?1 AND r.deleted = 0 AND (r.hidden = 0 OR ?2 = 1 OR r.user_id = ?3)
@@ -135,14 +171,22 @@ async function teacherCard(env: Env, req: ApiRequest<Body>): Promise<Response> {
   const distribution = [0, 0, 0, 0, 0]
   for (const r of stats.results as { rating: number; n: number }[]) distribution[r.rating - 1] = r.n
   const count = distribution.reduce((a, b) => a + b, 0)
-  const sum = distribution.reduce((a, n, i) => a + n * (i + 1), 0)
+  const a = (agg.results as { avg: number | null; clarity: number | null; competence: number | null; communication: number | null; ncrit: number; rec: number | null; nrec: number }[])[0]
+  const enough = count >= REVIEW_LIMITS.minForAverage
+  const round1 = (v: number | null) => (v === null ? null : Math.round(v * 10) / 10)
   const reviews = (rows.results as ReviewRow[]).map((r) => reviewOut(r, me, admin))
   const [problem, contact] = await Promise.all([reviewProblem(env, req.user, teacher), ownerContact(env)])
   return json({
     ok: true,
     teacher,
     count,
-    average: count >= REVIEW_LIMITS.minForAverage ? Math.round((sum / count) * 10) / 10 : null,
+    average: enough ? round1(a.avg) : null,
+    // критерии — только по новым отзывам, тоже от 3
+    criteria:
+      a.ncrit >= REVIEW_LIMITS.minForAverage
+        ? { clarity: round1(a.clarity), competence: round1(a.competence), communication: round1(a.communication), count: a.ncrit }
+        : null,
+    recommend: enough && a.nrec ? Math.round((a.rec ?? 0) * 100) : null,
     distribution,
     reviews,
     mine: reviews.find((r) => r.mine) ?? null,
@@ -158,8 +202,16 @@ async function teacherCard(env: Env, req: ApiRequest<Body>): Promise<Response> {
 
 async function save(env: Env, req: ApiRequest<Body>): Promise<Response> {
   const teacher = validTeacherId(req.body.teacher)
-  const rating = asInt(req.body.rating)
-  if (!teacher || rating === null || rating < 1 || rating > 5) return fail(400, 'Поставь оценку от 1 до 5')
+  if (!teacher) return fail(400, 'bad request')
+  // новый отзыв — три критерия и «рекомендую»; старые версии приложения присылают одну оценку rating
+  const crit = [req.body.clarity, req.body.competence, req.body.communication].map(asInt)
+  const hasCriteria = crit.some((c) => c !== null)
+  if (hasCriteria && crit.some((c) => c === null || c < 1 || c > 5)) return fail(400, 'Оцени все три критерия от 1 до 5')
+  if (hasCriteria && typeof req.body.recommend !== 'boolean') return fail(400, 'Выбери: рекомендуешь или нет')
+  const score = hasCriteria ? (crit[0]! + crit[1]! + crit[2]!) / 3 : null
+  const rating = score !== null ? Math.round(score) : asInt(req.body.rating)
+  if (rating === null || rating < 1 || rating > 5) return fail(400, 'Поставь оценку от 1 до 5')
+  const recommend = hasCriteria ? (req.body.recommend ? 1 : 0) : null
   if (req.body.confirm !== true) return fail(400, 'Отметь, что отзыв основан на твоём опыте')
   const text = cleanText(req.body.text)
   const length = [...text].length
@@ -180,16 +232,19 @@ async function save(env: Env, req: ApiRequest<Body>): Promise<Response> {
   // один отзыв на преподавателя: повторная отправка меняет его. Скрытый после жалоб остаётся скрытым
   // (правкой жалобы не обойти); удалённый раньше — пишется заново
   await env.DB.prepare(
-    `INSERT INTO teacher_reviews (teacher_id, user_id, grp, rating, text, discipline, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+    `INSERT INTO teacher_reviews (teacher_id, user_id, grp, rating, text, discipline, created_at, updated_at,
+                                  clarity, competence, communication, recommend, score)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9, ?10, ?11, ?12)
      ON CONFLICT (teacher_id, user_id) DO UPDATE SET
        grp = excluded.grp, rating = excluded.rating, text = excluded.text, discipline = excluded.discipline,
+       clarity = excluded.clarity, competence = excluded.competence, communication = excluded.communication,
+       recommend = excluded.recommend, score = excluded.score,
        created_at = CASE WHEN teacher_reviews.deleted != 0 THEN excluded.created_at ELSE teacher_reviews.created_at END,
        hidden = CASE WHEN teacher_reviews.deleted != 0 THEN 0 ELSE teacher_reviews.hidden END,
        updated_at = excluded.updated_at,
        deleted = 0`,
   )
-    .bind(teacher, req.profile.id, normalizeGroup(req.user?.grp), rating, text, discipline, now)
+    .bind(teacher, req.profile.id, normalizeGroup(req.user?.grp), rating, text, discipline, now, crit[0], crit[1], crit[2], recommend, score)
     .run()
   return teacherCard(env, req)
 }
@@ -229,11 +284,34 @@ async function report(env: Env, req: ApiRequest<Body>): Promise<Response> {
   return json({ ok: true })
 }
 
+// «Полезно» (1) / «Не полезно» (-1) / снять (0): одна отметка от человека, свой отзыв — нельзя
+async function vote(env: Env, req: ApiRequest<Body>): Promise<Response> {
+  const id = asInt(req.body.id)
+  const value = asInt(req.body.value)
+  if (id === null || value === null || ![-1, 0, 1].includes(value)) return fail(400, 'bad request')
+  const review = await env.DB.prepare('SELECT user_id, hidden FROM teacher_reviews WHERE id = ? AND deleted = 0').bind(id).first<{ user_id: number; hidden: number }>()
+  if (!review || (review.hidden && !req.admin)) return fail(404, 'Отзыв уже удалён')
+  if (review.user_id === req.profile.id) return fail(400, 'Свой отзыв оценивать нельзя')
+  const [, counts] = await env.DB.batch([
+    value === 0
+      ? env.DB.prepare('DELETE FROM review_votes WHERE review_id = ? AND user_id = ?').bind(id, req.profile.id)
+      : env.DB.prepare(
+          `INSERT INTO review_votes (review_id, user_id, value, created_at) VALUES (?1, ?2, ?3, ?4)
+           ON CONFLICT (review_id, user_id) DO UPDATE SET value = ?3`,
+        ).bind(id, req.profile.id, value, Date.now()),
+    env.DB.prepare(
+      'SELECT COALESCE(SUM(value = 1), 0) AS up, COALESCE(SUM(value = -1), 0) AS down FROM review_votes WHERE review_id = ?',
+    ).bind(id),
+  ])
+  const c = (counts.results as { up: number; down: number }[])[0]
+  return json({ ok: true, id, helpful: { up: c.up, down: c.down, mine: value } })
+}
+
 // ---------- маршрутизация ----------
 
-const ACTIONS = ['top', 'teacher', 'save', 'delete', 'report'] as const
+const ACTIONS = ['top', 'teacher', 'save', 'delete', 'report', 'vote'] as const
 type Action = (typeof ACTIONS)[number]
-const WRITES: Action[] = ['save', 'delete', 'report']
+const WRITES: Action[] = ['save', 'delete', 'report', 'vote']
 
 export const isReviewAction = (action: string): action is Action => (ACTIONS as readonly string[]).includes(action)
 
@@ -254,6 +332,8 @@ export async function handleReviewsApi(env: Env, request: Request, action: Actio
       return remove(env, req)
     case 'report':
       return report(env, req)
+    case 'vote':
+      return vote(env, req)
   }
 }
 

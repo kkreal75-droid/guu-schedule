@@ -3689,3 +3689,434 @@ select.input {
   line-height: 1.45;
   color: var(--hint);
 }
+
+/* ---------- рейтинг преподавателей (этап 7.6) ---------- */
+
+.rating-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rating-search {
+  display: flex;
+  gap: 10px;
+}
+
+.search-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--hint);
+}
+
+.search-field svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.rating-filter-btn {
+  width: 46px;
+  height: 46px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--hint);
+}
+
+.rating-filter-btn[data-on] {
+  color: var(--accent-ink);
+}
+
+.rating-filters {
+  justify-content: flex-start;
+}
+
+.rating-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.rating-sort {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rating-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rating-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.rating-card:active {
+  transform: scale(0.99);
+}
+
+.rating-rank {
+  flex: none;
+  width: 22px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.letter-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5ab0ff, var(--accent));
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.letter-avatar-l {
+  width: 60px;
+  height: 60px;
+  font-size: 26px;
+}
+
+.rating-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rating-card-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.rating-card-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.rating-card-sub {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hint);
+}
+
+.rating-card-right {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.rating-card-count {
+  font-size: 13px;
+  color: var(--hint);
+  white-space: nowrap;
+}
+
+.rec-pct {
+  font-weight: 600;
+  color: rgb(var(--k-practice));
+}
+
+.stars {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+}
+
+.stars-s {
+  font-size: 13px;
+}
+
+.stars-m {
+  font-size: 18px;
+}
+
+.star {
+  color: var(--fill);
+  filter: grayscale(1);
+}
+
+.star[data-on] {
+  color: rgb(var(--note));
+  filter: none;
+}
+
+.teacher-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.teacher-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.teacher-hero-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.teacher-hero-name {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.teacher-hero-avg {
+  font-size: 18px;
+}
+
+.teacher-hero-rec {
+  margin: -4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(var(--k-practice));
+}
+
+.criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--separator);
+}
+
+.criteria-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.criteria-label {
+  width: 120px;
+  flex: none;
+  color: var(--hint);
+}
+
+.criteria-row .rating-bar-track {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.criteria-value {
+  width: 28px;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.reviews-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 18px 4px 8px;
+}
+
+.reviews-head .section-title {
+  margin: 0;
+}
+
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reviews .review {
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.reviews .review + .review {
+  border-top: 0;
+}
+
+.review-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-anon {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rec-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(var(--k-practice) / 0.14);
+  color: rgb(var(--k-practice));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rec-badge.is-no {
+  background: color-mix(in srgb, var(--destructive) 13%, transparent);
+  color: var(--destructive);
+}
+
+.review-criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-criterion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.review-criterion > span:first-child {
+  width: 118px;
+}
+
+.reviews .review-text {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+
+.review-text.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+.review-more {
+  align-self: flex-start;
+  margin-top: -2px;
+}
+
+.review-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--separator);
+}
+
+.vote-btn {
+  min-width: 46px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 14px;
+}
+
+.vote-btn[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.review-foot .review-report {
+  margin-left: auto;
+}
+
+.reviews-more {
+  margin: 4px auto 0;
+  display: block;
+}
+
+.empty-s {
+  padding: 18px;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.star-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.star-row-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.star-row .star-btn {
+  font-size: 28px;
+}
+
+.rec-choice {
+  justify-content: flex-start;
+}
+
+.teacher-hero .viewer-sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}

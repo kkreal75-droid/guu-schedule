@@ -3,38 +3,67 @@ import { teacherKey } from '../../shared/schedule-core'
 import { botAvailable } from '../api'
 import { useNotice } from '../board/common'
 import { Section } from '../components/Section'
-import { Segmented } from '../components/Segmented'
 import { loadTeachers, searchTeachers, type TeacherInfo } from '../data'
-import { ChevronLeft, ChevronRight } from '../icons'
+import { ChevronLeft, ChevronRight, SearchIcon } from '../icons'
 import {
-  formatAverage, reviewError, reviewsApi, reviewsWord, type Rated, type Review, type ReviewDraft, type TeacherCard,
+  formatAverage, reviewError, reviewsApi, reviewsWord, type Criteria, type Rated, type Review, type ReviewDraft, type TeacherCard,
 } from '../reviews/api'
 import { confirmAction, haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { ScheduleViewer } from './ScheduleViewer'
 
-// «Ещё → Преподаватели»: поиск по фамилии, оценки студентов (★ — от 3 отзывов), карточка с отзывами.
-// Отзыв оставляют только студенты, у чьей группы преподаватель ведёт (или вёл в прошлом семестре)
-// пары — это проверяет бот. Авторы анонимны.
+// «Другое → Рейтинг преподавателей» (этапы 6 и 7.6): общий рейтинг (поиск, фильтр, сортировка), карточка
+// (средняя, три критерия полосками, % «рекомендуют», распределение 1–5, отзывы «Полезные / Новые», «Ещё N»),
+// новый отзыв — три критерия + «Рекомендую / Не рекомендую». Авторы анонимны. Отзыв оставляют только
+// студенты, у чьей группы преподаватель ведёт (или вёл в прошлом семестре) пары — это проверяет бот.
 
 type Sort = 'rating' | 'count' | 'name'
-const SORTS: { value: Sort; label: string }[] = [
-  { value: 'rating', label: 'По оценке' },
-  { value: 'count', label: 'По отзывам' },
-  { value: 'name', label: 'А–Я' },
+const SORT_LABEL: Record<Sort, string> = { rating: 'По оценке ↓', count: 'По отзывам ↓', name: 'По алфавиту' }
+const NEXT_SORT: Record<Sort, Sort> = { rating: 'count', count: 'name', name: 'rating' }
+type Filter = 'all' | 'rated' | 'mine'
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'rated', label: 'С оценкой' },
+  { value: 'mine', label: 'Мои' },
+]
+
+const CRITERIA: { key: keyof Criteria; label: string }[] = [
+  { key: 'clarity', label: 'Понятность' },
+  { key: 'competence', label: 'Компетентность' },
+  { key: 'communication', label: 'Коммуникация' },
 ]
 
 const RULES = 'Оценивай преподавание, а не личность. Без оскорблений, мата, слухов и личных данных. Отзывы с нарушениями удаляются, за повтор — бан.'
+const PAGE = 50
+const REVIEWS_PAGE = 5
 
-const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n)
+const letter = (name: string) => name.trim().slice(0, 1).toUpperCase()
 
-// initial — сразу открыть карточку (нажали преподавателя в паре); onClose — «Назад» из неё (на расписание)
-export function TeachersPage({ initial, onClose }: { initial?: TeacherInfo; onClose?: () => void } = {}) {
-  const [list, setList] = useState<TeacherInfo[] | null>(null)
+export function Stars({ value, size = 'm' }: { value: number; size?: 's' | 'm' }) {
+  return (
+    <span className={`stars stars-${size}`} aria-label={`${formatAverage(value)} из 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span key={n} className="star" data-on={value >= n - 0.25 || undefined}>
+          ★
+        </span>
+      ))}
+    </span>
+  )
+}
+
+type TeacherWithPast = TeacherInfo & { past_groups?: string[] }
+
+// initial — сразу открыть карточку (нажали преподавателя в паре); onClose — «Назад» из неё (на расписание);
+// group — своя группа (фильтр «Мои»)
+export function TeachersPage({ initial, onClose, group }: { initial?: TeacherInfo; onClose?: () => void; group?: string } = {}) {
+  const [list, setList] = useState<TeacherWithPast[] | null>(null)
   const [rated, setRated] = useState<Map<string, Rated>>(new Map())
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('rating')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [limit, setLimit] = useState(PAGE)
   const [open, setOpen] = useState<TeacherInfo | null>(initial ?? null)
 
   const loadRated = useCallback(() => {
@@ -58,19 +87,23 @@ export function TeachersPage({ initial, onClose }: { initial?: TeacherInfo; onCl
 
   const shown = useMemo(() => {
     if (!list) return []
-    const found = query.trim().length >= 2 ? searchTeachers(list, query, 50) : list.filter((t) => rated.has(t.id))
     const avg = (t: TeacherInfo) => rated.get(t.id)?.avg ?? -1
     const count = (t: TeacherInfo) => rated.get(t.id)?.n ?? 0
     const byName = (a: TeacherInfo, b: TeacherInfo) => a.name.localeCompare(b.name, 'ru')
+    let found: TeacherWithPast[] = query.trim().length >= 2 ? searchTeachers(list, query, 200) : list
+    if (filter === 'rated') found = found.filter((t) => rated.get(t.id)?.avg != null)
+    if (filter === 'mine' && group) found = found.filter((t) => t.groups.includes(group) || t.past_groups?.includes(group))
     return [...found].sort((a, b) =>
       sort === 'name' ? byName(a, b)
       : sort === 'count' ? count(b) - count(a) || avg(b) - avg(a) || byName(a, b)
       : avg(b) - avg(a) || count(b) - count(a) || byName(a, b),
     )
-  }, [list, query, rated, sort])
+  }, [list, query, rated, sort, filter, group])
 
-  // открыли из расписания — «Назад» в шапке страницы и так ведёт туда
-  if (open) return <TeacherView teacher={open} onBack={close} backLabel={initial && onClose ? null : 'Все преподаватели'} />
+  if (open) {
+    // открыли из расписания — «Назад» в шапке страницы и так ведёт туда
+    return <TeacherView teacher={open} onBack={close} backLabel={initial && onClose ? null : 'Все преподаватели'} />
+  }
   if (error) {
     return (
       <div className="ob-hero">
@@ -83,53 +116,94 @@ export function TeachersPage({ initial, onClose }: { initial?: TeacherInfo; onCl
   }
 
   return (
-    <div className="gsearch">
-      <input
-        className="input gsearch-input"
-        type="search"
-        placeholder="Фамилия преподавателя"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        aria-label="Фамилия преподавателя"
-      />
-      <Segmented label="Сортировка" value={sort} options={SORTS} onChange={setSort} />
-      {!list && <p className="gsearch-empty">Загружаю…</p>}
-      {list && query.trim().length >= 2 && !shown.length && <p className="gsearch-empty">Не нашёл такую фамилию в расписании ГУУ.</p>}
-      {list && query.trim().length < 2 && !shown.length && (
-        <p className="gsearch-empty">Отзывов пока нет. Найди своего преподавателя по фамилии — и оставь первый.</p>
+    <div className="rating-page">
+      <div className="rating-search">
+        <label className="search-field">
+          <SearchIcon />
+          <input
+            type="search"
+            placeholder="Поиск по фамилии…"
+            value={query}
+            onChange={(e) => (setQuery(e.target.value), setLimit(PAGE))}
+            aria-label="Фамилия преподавателя"
+          />
+        </label>
+        <button
+          type="button"
+          className="round-btn rating-filter-btn"
+          aria-label="Фильтр"
+          aria-expanded={filtersOpen}
+          data-on={filter !== 'all' || undefined}
+          onClick={() => (haptic(), setFiltersOpen((v) => !v))}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M7 12h10M10 17h4" />
+          </svg>
+        </button>
+      </div>
+      {filtersOpen && (
+        <div className="row-chips rating-filters" role="radiogroup" aria-label="Фильтр">
+          {FILTERS.filter((f) => f.value !== 'mine' || group).map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className="chip"
+              role="radio"
+              aria-pressed={filter === f.value}
+              onClick={() => (haptic(), setFilter(f.value), setLimit(PAGE))}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       )}
-      {shown.length > 0 && (
-        <div className="section-body gsearch-list">
-          {shown.map((t) => {
-            const r = rated.get(t.id)
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className="row row-btn gsearch-row"
-                onClick={() => {
-                  haptic()
-                  setOpen(t)
-                  window.scrollTo(0, 0)
-                }}
-              >
-                <span className="gsearch-text">
-                  <span className="gsearch-name">{t.name}</span>
-                  <span className="gsearch-sub">
-                    {t.subjects.slice(0, 2).join(', ')}
-                    {t.subjects.length > 2 ? ` и ещё ${t.subjects.length - 2}` : ''}
+      <div className="rating-meta">
+        <span>
+          {filter === 'mine' ? 'Преподаватели твоей группы' : 'Общий рейтинг'} · {list ? shown.length : '…'}
+        </span>
+        <button type="button" className="rating-sort" onClick={() => (haptic(), setSort(NEXT_SORT[sort]))}>
+          {SORT_LABEL[sort]}
+        </button>
+      </div>
+
+      {!list && <p className="gsearch-empty">Загружаю…</p>}
+      {list && !shown.length && (
+        <p className="gsearch-empty">{query.trim().length >= 2 ? 'Не нашёл такую фамилию в расписании ГУУ.' : 'Никого нет.'}</p>
+      )}
+      <div className="rating-list">
+        {shown.slice(0, limit).map((t, i) => {
+          const r = rated.get(t.id)
+          return (
+            <button key={t.id} type="button" className="rating-card" onClick={() => (haptic(), setOpen(t), window.scrollTo(0, 0))}>
+              {sort !== 'name' && r?.avg != null && <span className="rating-rank">{i + 1}</span>}
+              <span className="letter-avatar">{letter(t.name)}</span>
+              <span className="rating-card-text">
+                <span className="rating-card-name">{t.name}</span>
+                {r?.avg != null ? (
+                  <span className="rating-card-score">
+                    <Stars value={r.avg} size="s" /> <b>{formatAverage(r.avg)}</b>
                   </span>
-                </span>
+                ) : (
+                  <span className="rating-card-sub">{r ? 'мало отзывов' : t.subjects[0]}</span>
+                )}
+              </span>
+              <span className="rating-card-right">
                 {r && (
-                  <span className="teacher-score">
-                    {r.avg !== null ? `${formatAverage(r.avg)} ★ · ${r.n}` : `${r.n} ${reviewsWord(r.n)}`}
+                  <span className="rating-card-count">
+                    {r.n} {reviewsWord(r.n)}
+                    {r.rec != null && <span className="rec-pct"> · {r.rec}%</span>}
                   </span>
                 )}
                 <ChevronRight className="row-chevron" />
-              </button>
-            )
-          })}
-        </div>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {shown.length > limit && (
+        <button type="button" className="button-secondary" onClick={() => setLimit((l) => l + PAGE)}>
+          Показать ещё
+        </button>
       )}
     </div>
   )
@@ -141,6 +215,8 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
   const [card, setCard] = useState<TeacherCard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'card' | 'form' | 'schedule'>('card')
+  const [order, setOrder] = useState<'useful' | 'new'>('useful')
+  const [limit, setLimit] = useState(REVIEWS_PAGE)
   const [notice, flash] = useNotice()
 
   useEffect(() => {
@@ -218,17 +294,64 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
     }
   }
 
+  // «Полезно» / «Не полезно»: повторное нажатие снимает отметку
+  const vote = async (review: Review, value: number) => {
+    haptic()
+    const next = review.helpful.mine === value ? 0 : value
+    try {
+      const res = await reviewsApi.vote(review.id, next)
+      setCard((c) => (c ? { ...c, reviews: c.reviews.map((r) => (r.id === review.id ? { ...r, helpful: res.helpful } : r)) } : c))
+    } catch (err) {
+      flash(reviewError(err))
+    }
+  }
+
   const banned = Boolean(card?.banned_until && card.banned_until > Date.now())
-  const others = card?.reviews.filter((r) => !r.mine) ?? []
+  const useful = (r: Review) => r.helpful.up - r.helpful.down
+  const others = (card?.reviews.filter((r) => !r.mine) ?? []).sort((a, b) =>
+    order === 'new' ? b.at - a.at : useful(b) - useful(a) || b.at - a.at,
+  )
+  const goForm = () => (haptic(), setMode('form'), window.scrollTo(0, 0))
 
   return (
     <>
       {back}
-      <div className="viewer-head">
-        <div className="viewer-title">
-          <span className="viewer-name">{teacher.name}</span>
-          {teacher.subjects.length > 0 && <span className="viewer-sub">{teacher.subjects.join(' · ')}</span>}
+      <div className="teacher-hero">
+        <div className="teacher-hero-top">
+          <span className="letter-avatar letter-avatar-l">{letter(teacher.name)}</span>
+          <div className="teacher-hero-text">
+            <h2 className="teacher-hero-name">{teacher.name}</h2>
+            {card?.average != null ? (
+              <span className="rating-card-score">
+                <Stars value={card.average} /> <b className="teacher-hero-avg">{formatAverage(card.average)}</b>
+              </span>
+            ) : (
+              <span className="rating-card-sub">{card ? 'Мало отзывов' : ' '}</span>
+            )}
+          </div>
+          {card && card.count > 0 && (
+            <span className="rating-card-count">
+              {card.count} {reviewsWord(card.count)}
+              {card.recommend != null && <span className="rec-pct"> · {card.recommend}%</span>}
+            </span>
+          )}
         </div>
+        {card?.criteria && (
+          <div className="criteria">
+            {CRITERIA.map((c) => (
+              <div key={c.key} className="criteria-row">
+                <span className="criteria-label">{c.label}</span>
+                <span className="rating-bar-track">
+                  <span className="rating-bar-fill" style={{ width: `${((card.criteria![c.key] ?? 0) / 5) * 100}%` }} />
+                </span>
+                <span className="criteria-value">{formatAverage(card.criteria![c.key] ?? 0)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {card && card.recommend != null && <p className="teacher-hero-rec">{card.recommend}% рекомендуют</p>}
+        {card && card.count > 0 && <Distribution card={card} />}
+        {teacher.subjects.length > 0 && <p className="viewer-sub">{teacher.subjects.join(' · ')}</p>}
         <div className="viewer-actions">
           <button type="button" className="chip chip-accent" onClick={() => (haptic(), setMode('schedule'), window.scrollTo(0, 0))}>
             Расписание преподавателя
@@ -243,14 +366,12 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
 
       {card && (
         <>
-          <RatingSummary card={card} />
-
           {card.mine ? (
             <Section title="Мой отзыв" footer={card.mine.hidden ? 'Скрыт после жалоб — ждёт проверки.' : 'Видят все, но без имени и группы.'}>
               <ReviewItem review={card.mine} />
               <div className="row row-chips review-own-actions">
                 {!banned && (
-                  <button type="button" className="chip chip-accent" onClick={() => (haptic(), setMode('form'), window.scrollTo(0, 0))}>
+                  <button type="button" className="chip chip-accent" onClick={goForm}>
                     Изменить
                   </button>
                 )}
@@ -262,19 +383,39 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
           ) : banned ? (
             <p className="lead">Тебе запрещено писать отзывы.</p>
           ) : card.can_review ? (
-            <button type="button" className="button-primary" onClick={() => (haptic(), setMode('form'), window.scrollTo(0, 0))}>
+            <button type="button" className="button-primary" onClick={goForm}>
               Оставить отзыв
             </button>
           ) : (
             card.reason && <p className="section-footer review-reason">{card.reason}</p>
           )}
 
-          <Section title={others.length ? `Отзывы · ${others.length}` : 'Отзывы'}>
-            {others.length === 0 && <div className="row row-text">Пока никто не написал</div>}
-            {others.map((r) => (
-              <ReviewItem key={r.id} review={r} onReport={banned ? undefined : () => report(r)} />
+          <div className="reviews-head">
+            <h3 className="section-title">
+              Отзывы{others.length ? ` · ${others.length} ${reviewsWord(others.length)}` : ''}
+            </h3>
+            {others.length > 1 && (
+              <button type="button" className="rating-sort" onClick={() => (haptic(), setOrder(order === 'useful' ? 'new' : 'useful'))}>
+                {order === 'useful' ? 'Полезные' : 'Новые'} ↓
+              </button>
+            )}
+          </div>
+          {others.length === 0 && <div className="empty empty-s">Пока никто не написал</div>}
+          <div className="reviews">
+            {others.slice(0, limit).map((r) => (
+              <ReviewItem
+                key={r.id}
+                review={r}
+                onReport={banned ? undefined : () => report(r)}
+                onVote={banned ? undefined : (v) => vote(r, v)}
+              />
             ))}
-          </Section>
+          </div>
+          {others.length > limit && (
+            <button type="button" className="sport-more reviews-more" onClick={() => setLimit((l) => l + 10)}>
+              Ещё {others.length - limit}
+            </button>
+          )}
 
           {card.contact && (
             <p className="section-footer review-contact">
@@ -290,55 +431,61 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
   )
 }
 
-function RatingSummary({ card }: { card: TeacherCard }) {
+function Distribution({ card }: { card: TeacherCard }) {
   const max = Math.max(1, ...card.distribution)
   return (
-    <div className="rating">
-      <div className="rating-main">
-        {card.average !== null ? (
-          <span className="rating-value">
-            {formatAverage(card.average)} <span className="rating-star">★</span>
+    <div className="rating-bars">
+      {[5, 4, 3, 2, 1].map((n) => (
+        <div key={n} className="rating-bar">
+          <span className="rating-bar-label">{n} ★</span>
+          <span className="rating-bar-track">
+            <span className="rating-bar-fill" style={{ width: `${(card.distribution[n - 1] / max) * 100}%` }} />
           </span>
-        ) : (
-          <span className="rating-few">Мало отзывов</span>
-        )}
-        <span className="rating-count">
-          {card.count} {reviewsWord(card.count)}
-        </span>
-      </div>
-      {card.count > 0 && (
-        <div className="rating-bars">
-          {[5, 4, 3, 2, 1].map((n) => (
-            <div key={n} className="rating-bar">
-              <span className="rating-bar-label">{n} ★</span>
-              <span className="rating-bar-track">
-                <span className="rating-bar-fill" style={{ width: `${(card.distribution[n - 1] / max) * 100}%` }} />
-              </span>
-              <span className="rating-bar-count">{card.distribution[n - 1]}</span>
-            </div>
-          ))}
+          <span className="rating-bar-count">{card.distribution[n - 1]}</span>
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
 const dateLabel = (at: number) => new Date(at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
 
-function ReviewItem({ review, onReport }: { review: Review; onReport?: () => void }) {
+function ReviewItem({ review, onReport, onVote }: { review: Review; onReport?: () => void; onVote?: (value: number) => void }) {
+  const [full, setFull] = useState(false)
+  const long = review.text.length > 260
   return (
     <div className={`review${review.hidden ? ' is-hidden' : ''}`}>
       <div className="review-head">
-        <span className="review-stars" aria-label={`Оценка ${review.rating} из 5`}>
-          {stars(review.rating)}
+        <span className="review-who">
+          <span className="review-anon">{review.mine ? 'Ты' : 'Студент'}</span>
+          {review.recommend !== null && (
+            <span className={`rec-badge${review.recommend ? '' : ' is-no'}`}>{review.recommend ? 'Рекомендует' : 'Не рекомендует'}</span>
+          )}
         </span>
         <span className="review-date">
           {dateLabel(review.at)}
           {review.edited ? ' · изменён' : ''}
         </span>
       </div>
+      {review.criteria ? (
+        <div className="review-criteria">
+          {CRITERIA.map((c) => (
+            <span key={c.key} className="review-criterion">
+              <span>{c.label}</span>
+              <Stars value={review.criteria![c.key]} size="s" />
+            </span>
+          ))}
+        </div>
+      ) : (
+        <Stars value={review.rating} size="s" />
+      )}
       {review.discipline && <div className="review-discipline">{review.discipline}</div>}
-      <p className="review-text">{review.text}</p>
+      <p className={`review-text${long && !full ? ' is-clamped' : ''}`}>{review.text}</p>
+      {long && !full && (
+        <button type="button" className="link-btn review-more" onClick={() => setFull(true)}>
+          ещё
+        </button>
+      )}
       {review.author && (
         <div className="review-admin">
           {review.author.username ? `@${review.author.username}` : (review.author.name ?? `id ${review.author.id}`)} · id {review.author.id}
@@ -347,10 +494,24 @@ function ReviewItem({ review, onReport }: { review: Review; onReport?: () => voi
           {review.hidden ? ' · скрыт' : ''}
         </div>
       )}
-      {onReport && (
-        <button type="button" className="link-btn review-report" onClick={onReport}>
-          Пожаловаться
-        </button>
+      {(onVote || onReport) && (
+        <div className="review-foot">
+          {onVote && (
+            <>
+              <button type="button" className="vote-btn" aria-pressed={review.helpful.mine === 1} aria-label="Полезно" onClick={() => onVote(1)}>
+                👍 {review.helpful.up || ''}
+              </button>
+              <button type="button" className="vote-btn" aria-pressed={review.helpful.mine === -1} aria-label="Не полезно" onClick={() => onVote(-1)}>
+                👎 {review.helpful.down || ''}
+              </button>
+            </>
+          )}
+          {onReport && (
+            <button type="button" className="link-btn review-report" onClick={onReport}>
+              Пожаловаться
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -358,18 +519,47 @@ function ReviewItem({ review, onReport }: { review: Review; onReport?: () => voi
 
 // ---------- форма отзыва ----------
 
+function StarPicker({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="star-row">
+      <span className="star-row-label">{label}</span>
+      <div className="star-picker" role="radiogroup" aria-label={label}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={value === n}
+            aria-label={`${label}: ${n} из 5`}
+            className={`star-btn${n <= value ? ' is-on' : ''}`}
+            onClick={() => (haptic(), onChange(n))}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: TeacherCard; onSaved: (card: TeacherCard) => void }) {
+  const old = card.mine
   const [draft, setDraft] = useState<ReviewDraft>({
-    rating: card.mine?.rating ?? 0,
-    text: card.mine?.text ?? '',
-    discipline: card.mine?.discipline ?? null,
+    clarity: old?.criteria?.clarity ?? 0,
+    competence: old?.criteria?.competence ?? 0,
+    communication: old?.criteria?.communication ?? 0,
+    recommend: old?.recommend ?? null,
+    text: old?.text ?? '',
+    discipline: old?.discipline ?? null,
     confirm: false,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { text_min: min, text_max: max } = card.limits
   const length = [...draft.text.trim()].length
-  const ready = draft.rating > 0 && length >= min && length <= max && draft.confirm
+  const allRated = draft.clarity > 0 && draft.competence > 0 && draft.communication > 0
+  const overall = allRated ? (draft.clarity + draft.competence + draft.communication) / 3 : null
+  const ready = allRated && draft.recommend !== null && length >= min && length <= max && draft.confirm
   const set = (patch: Partial<ReviewDraft>) => setDraft((d) => ({ ...d, ...patch }))
 
   const submit = async () => {
@@ -388,25 +578,22 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
   return (
     <>
       <p className="review-rules">{RULES}</p>
-      <Section title={card.mine ? 'Изменить отзыв' : 'Новый отзыв'}>
+      <Section title={old ? 'Изменить отзыв' : 'Оставить отзыв'}>
         <div className="form">
-          <div className="field">
-            <span>Оценка</span>
-            <div className="star-picker" role="radiogroup" aria-label="Оценка">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.rating === n}
-                  aria-label={`${n} из 5`}
-                  className={`star-btn${n <= draft.rating ? ' is-on' : ''}`}
-                  onClick={() => (haptic(), set({ rating: n }))}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
+          {CRITERIA.map((c) => (
+            <StarPicker key={c.key} label={c.label} value={draft[c.key]} onChange={(v) => set({ [c.key]: v } as Partial<ReviewDraft>)} />
+          ))}
+          <p className="form-hint">
+            {overall !== null ? `Общая оценка — ${formatAverage(overall)} ★ (среднее трёх)` : 'Общая оценка — среднее трёх критериев'}
+          </p>
+
+          <div className="row-chips rec-choice" role="radiogroup" aria-label="Рекомендуешь?">
+            <button type="button" className="chip" role="radio" aria-pressed={draft.recommend === true} onClick={() => (haptic(), set({ recommend: true }))}>
+              👍 Рекомендую
+            </button>
+            <button type="button" className="chip" role="radio" aria-pressed={draft.recommend === false} onClick={() => (haptic(), set({ recommend: false }))}>
+              👎 Не рекомендую
+            </button>
           </div>
 
           {teacher.subjects.length > 0 && (
@@ -439,9 +626,7 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
               onChange={(e) => set({ text: e.target.value })}
             />
           </label>
-          <p className="form-hint">
-            {length < min ? `Ещё хотя бы ${min - length} симв.` : `${length} / ${max}`}
-          </p>
+          <p className="form-hint">{length < min ? `Ещё хотя бы ${min - length} симв.` : `${length} / ${max}`}</p>
 
           <label className="check-row">
             <input type="checkbox" checked={draft.confirm} onChange={(e) => set({ confirm: e.target.checked })} />
@@ -450,7 +635,7 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
 
           {error && <p className="form-error">{error}</p>}
           <button type="button" className="button-primary" disabled={!ready || busy} onClick={submit}>
-            {busy ? 'Отправляю…' : card.mine ? 'Сохранить' : 'Отправить'}
+            {busy ? 'Отправляю…' : old ? 'Сохранить' : 'Отправить'}
           </button>
         </div>
       </Section>

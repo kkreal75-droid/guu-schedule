@@ -79,7 +79,7 @@ LibreOffice ставится, только если изменился .doc (н�
   `POST /my-subgroups` — свои подгруппы; `POST /extras {groups}` — правки и подгруппы групп (просмотр чужой);
 - `POST /cal/status|connect|disconnect`, `GET /cal/<токен>.ics`, `GET /cal/<токен>/apple` (страница webcal для iPhone);
 - `POST /board/<enter|accept|poll|send|react|report|delete|origin>` — анонимный чат (`origin` — подпись «курс, институт»);
-- `POST /reviews/<top|teacher|save|delete|report>` — рейтинг преподавателей (`reviews.ts`);
+- `POST /reviews/<top|teacher|save|delete|report|vote>` — рейтинг преподавателей (`reviews.ts`);
 - `GET /sport` — секции и занятия «Спорта» (`sport.ts`, публично, кэш 60 с); правка — `/admin/sport-*`;
 - `POST /support {text}` — «Написать в поддержку»: владельцу в бот с кнопкой «Ответить» (`sp:reply:N`), ответ
   владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки);
@@ -89,7 +89,7 @@ LibreOffice ставится, только если изменился .doc (н�
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
   в :35 — чистка чата, остаток лимита — досылка рассылок (≤30 сообщений за запуск, пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0013`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`, 0013 — `support_messages`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0014`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок, рисовалка удалена, 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions`, 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_aliases`, `board_members`, `board_messages`, `board_reactions`, `board_reports`,
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`. Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
@@ -168,6 +168,8 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   семестре (`teachers/<id>.json` → `lessons[].groups`, `past_groups`; группа — из D1). Анонимно, владелец видит
   автора. Жалоба → владельцу с кнопками «Удалить» / «Удалить и забанить в отзывах» / «Оставить», 3 жалобы — скрыт.
   Бан в отзывах — `users.review_banned_until`. Внизу карточки — «Напишите @ник владельца» (ник из D1).
+  С 7.6: три критерия (понятность, компетентность, коммуникация) + «Рекомендую / Не рекомендую», общая — среднее
+  (`score`, `rating` — округлённое); старые отзывы с одной оценкой остаются; «Полезно / не полезно» — `review_votes`.
 - Беседы-форумы: ответ в ту же тему (`message_thread_id`, если `is_topic_message`; General — без темы);
   тема рассылки — из `/setup` или `/here`; тема удалена/закрыта — в General не писать, владельцу ошибку.
 - Telegram открывает из приложения только http(s): `webcal://` — через `/cal/<токен>/apple`.

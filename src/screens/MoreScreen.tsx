@@ -108,7 +108,7 @@ export function MoreScreen({
           sub: 'Отзывы и оценки',
           icon: StarIcon,
           color: 'yellow',
-          render: () => <TeachersPage initial={request?.teacher} onClose={request ? onRequestBack : undefined} />,
+          render: () => <TeachersPage initial={request?.teacher} onClose={request ? onRequestBack : undefined} group={teacherMode ? undefined : group} />,
         },
         { id: 'board', title: 'Подслушано', sub: 'Анонимный чат ГУУ', icon: ChatIcon, color: 'pink', render: () => <BoardPage />, dot: boardNew },
         { id: 'groupbot', title: 'Бот в беседе группы', sub: 'Расписание в чат каждое утро', icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
