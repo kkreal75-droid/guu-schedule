@@ -1,5 +1,5 @@
 // Логика расписания, общая для мини-приложения (src/) и бота (bot/):
-// формат schedule.json, ручные правки overrides.json, учебные недели, пары на день.
+// формат schedule.json, ручные правки overrides.json и overrides/*.json, учебные недели, пары на день.
 
 // Формат schedule.json — см. parser.py и update.py
 export type Lesson = {
@@ -76,6 +76,54 @@ export function applyOverrides(lessons: Lesson[], overrides: Overrides): Lesson[
   return [...out, ...added]
 }
 
+// ---------- замена дня целиком (overrides/thursday.json и т. п.) ----------
+// Все пары группы в этот день недели (данные ГУУ и overrides.json) убираются и заменяются
+// своим расписанием: even — на чётные недели, odd — на нечётные (неделя % 2, как в isEvenWeek).
+
+type ReplacementLesson = Omit<Lesson, 'group' | 'weekday' | 'weeks' | 'kind' | 'teacher' | 'room'> & {
+  kind?: string | null
+  teacher?: string | null
+  room?: string | null
+}
+
+export type DayReplacement = {
+  group: string
+  weekday: number
+  kind?: string | null // тип пар по умолчанию
+  weeks?: Weeks // на какие недели действует; нет — весь семестр
+  even: ReplacementLesson[]
+  odd: ReplacementLesson[]
+}
+
+export function applyReplacements(lessons: Lesson[], replacements: DayReplacement[]): Lesson[] {
+  const semesterWeeks = [...new Set(lessons.flatMap((l) => l.weeks))].sort((a, b) => a - b)
+  const lastWeek = semesterWeeks.at(-1) ?? 0
+  let out = lessons
+  for (const r of replacements) {
+    const weeks = r.weeks ? parseWeeks(r.weeks) : Array.from({ length: lastWeek }, (_, i) => i + 1)
+    const covered = new Set(weeks)
+    out = out.flatMap((l) => {
+      if (l.group !== r.group || l.weekday !== r.weekday) return [l]
+      const rest = l.weeks.filter((w) => !covered.has(w))
+      return rest.length ? [{ ...l, weeks: rest }] : []
+    })
+    const make = (list: ReplacementLesson[], parity: 0 | 1): Lesson[] =>
+      list.map((l) => ({
+        group: r.group,
+        weekday: r.weekday,
+        start: l.start,
+        end: l.end,
+        subject: l.subject,
+        kind: l.kind ?? r.kind ?? null,
+        teacher: l.teacher ?? null,
+        room: l.room ?? null,
+        weeks: weeks.filter((w) => w % 2 === parity),
+      }))
+    out = [...out, ...make(r.even, 0), ...make(r.odd, 1)]
+  }
+  return out
+}
+
 // ---------- даты ----------
 // Даты храним как номер дня от 1970-01-01 (UTC) — без часовых поясов и DST.
 
@@ -117,7 +165,7 @@ export function moscowNow(at: Date = new Date()): { day: number; minutes: number
 // ---------- учебные недели ----------
 
 export type Timetable = {
-  schedule: Schedule // с наложенными overrides.json
+  schedule: Schedule // с наложенными overrides.json и заменами дней
   startDay: number // понедельник 1-й недели
   maxWeek: number
   weekOf(day: number): number
@@ -128,8 +176,8 @@ export type Timetable = {
   lessonsOn(group: string, week: number, weekday: number): Lesson[]
 }
 
-export function makeTimetable(data: Schedule, overrides: Overrides): Timetable {
-  const schedule = { ...data, lessons: applyOverrides(data.lessons, overrides) }
+export function makeTimetable(data: Schedule, overrides: Overrides, replacements: DayReplacement[] = []): Timetable {
+  const schedule = { ...data, lessons: applyReplacements(applyOverrides(data.lessons, overrides), replacements) }
   const startDay = dayFromIso(schedule.semester_start)
   const maxWeek = Math.max(...schedule.lessons.flatMap((l) => l.weeks))
   const slotStarts = [...new Set(schedule.lessons.map((l) => l.start))].sort()

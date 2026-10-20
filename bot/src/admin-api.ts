@@ -329,6 +329,8 @@ async function schedule({ env }: Call): Promise<Response> {
     source_sha256: s.source_sha256 ?? null,
     lessons: s.lessons.length,
     edits,
+    // замены дней целиком из файлов репозитория — в панели с пометкой «из файла», удалить нельзя
+    file_edits: tt.replacements.map(({ file, group, weekday, even, odd }) => ({ file, group, weekday, even, odd })),
     github: { token: Boolean(env.GITHUB_TOKEN), runs: gh.runs, error: gh.error },
   })
 }

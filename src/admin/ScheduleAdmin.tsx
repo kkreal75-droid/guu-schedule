@@ -4,11 +4,39 @@ import { Section } from '../components/Section'
 import { WEEKDAYS_FULL, formatDate, formatStamp } from '../format'
 import { dayFromIso, inSemester, isoFromDay, lessonsOn, moscowNow, weekOf, weekdayOf } from '../schedule'
 import { confirmAction, haptic, openLink } from '../telegram'
-import { adminApi, adminError, shortGroup, type Run } from './api'
+import { adminApi, adminError, shortGroup, type FileEdit, type Run } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
 const GROUPS = ['МБ(МП) 1-1', 'МБ(МП) 1-2']
 type GroupChoice = 'МБ(МП) 1-1' | 'МБ(МП) 1-2' | 'both'
+
+// замена дня из файла репозитория: «чётные» и «нечётные» недели, пара за парой
+function FileEditRow({ edit }: { edit: FileEdit }) {
+  const lines = (list: FileEdit['even']) =>
+    list.map((l) => (
+      <div key={l.start}>
+        {l.start}–{l.end} · {l.subject}
+        {[l.teacher, l.room].filter(Boolean).length ? ` — ${[l.teacher, l.room].filter(Boolean).join(', ')}` : ''}
+      </div>
+    ))
+  return (
+    <div className="row admin-msg">
+      <div className="admin-msg-body">
+        <div className="admin-msg-meta">
+          <span className="badge-file">из файла</span> {WEEKDAYS_FULL[edit.weekday]}, все недели · {shortGroup(edit.group)} · пары ГУУ
+          заменены
+        </div>
+        <div className="admin-msg-text file-edit">
+          <b>Чётные недели</b>
+          {lines(edit.even)}
+          <b>Нечётные недели</b>
+          {lines(edit.odd)}
+        </div>
+        <div className="admin-msg-meta">Меняется только в репозитории: {edit.file}</div>
+      </div>
+    </div>
+  )
+}
 
 const EVENTS: Record<string, string> = { schedule: 'по часам', workflow_dispatch: 'вручную', push: 'обновление кода' }
 
@@ -192,8 +220,11 @@ export function ScheduleAdmin() {
         </div>
       </Section>
 
-      <Section title={`Правки (${data.edits.length})`}>
-        {data.edits.length === 0 && <div className="row row-text">Правок нет</div>}
+      <Section title={`Ручные правки (${data.edits.length + (data.file_edits?.length ?? 0)})`}>
+        {data.file_edits?.map((f) => (
+          <FileEditRow key={f.file} edit={f} />
+        ))}
+        {data.edits.length === 0 && !data.file_edits?.length && <div className="row row-text">Правок нет</div>}
         {data.edits.map((e) => (
           <div key={e.id} className="row admin-msg">
             <div className="admin-msg-body">

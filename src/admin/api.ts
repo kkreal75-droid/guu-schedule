@@ -72,8 +72,13 @@ export type ScheduleStatus = {
   source_sha256: string | null
   lessons: number
   edits: (ScheduleEdit & { created_at: number })[]
+  // замены дней целиком из файлов репозитория (overrides/thursday.json) — только просмотр
+  file_edits: FileEdit[]
   github: { token: boolean; runs: Run[] | null; error: string | null }
 }
+
+type FileLesson = { start: string; end: string; subject: string; teacher?: string | null; room?: string | null }
+export type FileEdit = { file: string; group: string; weekday: number; even: FileLesson[]; odd: FileLesson[] }
 
 export type Settings = {
   greetings: string[]

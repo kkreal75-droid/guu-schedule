@@ -1,15 +1,30 @@
-// Расписание в боте: те же schedule.json и overrides.json, что у мини-приложения (берём с сайта),
-// и та же логика недель — shared/schedule-core.ts. Плюс ручные правки из админ-панели (edits.ts).
+// Расписание в боте: те же schedule.json, overrides.json и overrides/*.json, что у мини-приложения
+// (берём с сайта), и та же логика недель — shared/schedule-core.ts. Плюс ручные правки из админ-панели
+// (edits.ts).
 import { WEEKDAYS_FULL, formatDate, weekTitle } from '../../shared/format-core'
-import { isoFromDay, makeTimetable, moscowNow, type Lesson, type Overrides, type Schedule, type Timetable } from '../../shared/schedule-core'
+import {
+  isoFromDay,
+  makeTimetable,
+  moscowNow,
+  type DayReplacement,
+  type Lesson,
+  type Overrides,
+  type Schedule,
+  type Timetable,
+} from '../../shared/schedule-core'
 import { loadEdits, type ScheduleEdit } from './edits'
 import { escapeHtml } from './util'
 
-export type BotTimetable = Timetable & { edits: ScheduleEdit[] }
+// replacements — замены дней целиком из файлов репозитория (их показывает админ-панель)
+export type BotTimetable = Timetable & { edits: ScheduleEdit[]; replacements: FileReplacement[] }
+export type FileReplacement = DayReplacement & { file: string }
+
+// Замены дней целиком: файлы лежат на сайте рядом с schedule.json (см. vite.config.ts)
+const REPLACEMENT_FILES = ['overrides/thursday.json']
 
 // Сайт отдаёт файлы с кэшем CDN; храним разобранное и в памяти воркера на минуту
 const MEMORY_TTL_MS = 60_000
-let cached: { at: number; timetable: Timetable } | null = null
+let cached: { at: number; timetable: Timetable; replacements: FileReplacement[] } | null = null
 
 async function fetchJson<T>(env: Env, name: string): Promise<T> {
   const url = new URL(name, env.WEBAPP_URL)
@@ -18,23 +33,30 @@ async function fetchJson<T>(env: Env, name: string): Promise<T> {
   return (await res.json()) as T
 }
 
-async function loadBase(env: Env): Promise<Timetable> {
-  if (cached && Date.now() - cached.at < MEMORY_TTL_MS) return cached.timetable
-  const [schedule, overrides] = await Promise.all([
+async function loadBase(env: Env): Promise<NonNullable<typeof cached>> {
+  if (cached && Date.now() - cached.at < MEMORY_TTL_MS) return cached
+  const [schedule, overrides, ...files] = await Promise.all([
     fetchJson<Schedule>(env, 'schedule.json'),
     fetchJson<Overrides>(env, 'overrides.json').catch(() => ({}) as Overrides),
+    ...REPLACEMENT_FILES.map((file) =>
+      fetchJson<DayReplacement>(env, file).then(
+        (r) => ({ ...r, file }),
+        (err) => (console.error(`Замена дня ${file}:`, err), null),
+      ),
+    ),
   ])
-  cached = { at: Date.now(), timetable: makeTimetable(schedule, overrides) }
-  return cached.timetable
+  const replacements = files.filter((r): r is FileReplacement => r !== null)
+  cached = { at: Date.now(), timetable: makeTimetable(schedule, overrides, replacements), replacements }
+  return cached
 }
 
 // Расписание вместе с ручными правками; правки недоступны — показываем без них
 export async function loadTimetable(env: Env): Promise<BotTimetable> {
-  const [timetable, edits] = await Promise.all([
+  const [base, edits] = await Promise.all([
     loadBase(env),
     loadEdits(env).catch((err) => (console.error('Правки расписания:', err), [] as ScheduleEdit[])),
   ])
-  return { ...timetable, edits }
+  return { ...base.timetable, edits, replacements: base.replacements }
 }
 
 // Пары дня с правками: отменённая — зачёркнута, пометки — 📌. Пометки ко всему дню — сверху.

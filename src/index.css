@@ -2132,3 +2132,31 @@ select.input {
 .button-inline {
   min-height: 42px;
 }
+
+/* правка из файла репозитория (overrides/*.json) в админке */
+.badge-file {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(var(--note) / 0.22);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.file-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.file-edit b {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.file-edit b:first-child {
+  margin-top: 0;
+}
