@@ -1,12 +1,13 @@
-// Запросы доски к боту (bot/src/board.ts). Обычный пользователь получает только псевдонимы.
+// Запросы «Подслушано» к боту (bot/src/board.ts). Обычный пользователь получает только псевдонимы.
 import { ApiError, callBot } from '../api'
 
-export type BoardId = 'g11' | 'g12' | 'all'
-export type BoardInfo = { id: BoardId; title: string; alias: string }
+// одна доска на весь ГУУ; в базе её id — «all» (бывшая «Общая»)
+export type BoardId = 'all'
 export type Reaction = { emoji: string; count: number; me: boolean }
 export type Message = {
   id: number
   alias: string
+  origin: string | null // «1 курс, ИУПСиБК» — если автор включил в профиле
   text: string
   at: number
   reply_to: number | null
@@ -18,35 +19,30 @@ export type Message = {
   hidden?: boolean
   reports?: number
 }
-export type Stroke = { id: number; c: string; w: number; p: number[]; mine: boolean; by?: number }
 type Removed = { id: number; removed: true }
 
 export type BoardConfig = {
-  colors: string[]
-  widths: number[]
   reactions: string[]
   message_length: number
-  points_per_stroke: number
   keep_days: number
 }
 export type Entered = {
   rules: true
   admin: boolean
-  group: string
-  boards: BoardInfo[]
+  board: BoardId
+  alias: string
   banned_until: number | null
   config: BoardConfig
 }
-export type EnterResult = Entered | { rules: false; group: string }
+export type EnterResult = Entered | { rules: false }
 
 export const isRemoved = <T extends { id: number }>(item: T | Removed): item is Removed => 'removed' in item
 
 type ChatPage = { cursor: number; messages: (Message | Removed)[]; has_more: boolean; banned_until: number | null }
-type DrawPage = { cursor: number; strokes: (Stroke | Removed)[]; banned_until: number | null }
 
 export const boardApi = {
-  enter: (group: string) => callBot<EnterResult>('/board/enter', { group }),
-  accept: (group: string) => callBot<Entered>('/board/accept', { group }),
+  enter: () => callBot<EnterResult>('/board/enter'),
+  accept: () => callBot<Entered>('/board/accept'),
   chat: (board: BoardId, since: number, before?: number) =>
     callBot<ChatPage>('/board/poll', { board, mode: 'chat', since, before }),
   send: (board: BoardId, text: string, replyTo: number | null) =>
@@ -55,32 +51,30 @@ export const boardApi = {
     callBot<{ id: number; reactions: Reaction[] }>('/board/react', { id, emoji, on }),
   report: (id: number) => callBot('/board/report', { id }),
   remove: (id: number) => callBot('/board/delete', { id }),
-  draw: (board: BoardId, since: number) => callBot<DrawPage>('/board/poll', { board, mode: 'draw', since }),
-  stroke: (board: BoardId, color: string, width: number, points: number[]) =>
-    callBot<{ stroke: Stroke }>('/board/stroke', { board, color, width, points }),
-  undo: (board: BoardId) => callBot<{ id: number | null }>('/board/undo', { board }),
-  erase: (board: BoardId, ids: number[]) => callBot<{ ids: number[] }>('/board/erase', { board, ids }),
-  clear: (board: BoardId, png: string) => callBot<{ snapshot: number; strokes: number }>('/board/clear', { board, png }),
+  // подпись «курс, институт» у псевдонима (переключатель в профиле)
+  origin: (on: boolean) => callBot<{ on: boolean; label: string | null }>('/board/origin', { on }),
 }
 
-// Текст ошибки для человека; draw — ошибки рисовалки (лимиты там свои)
-export function errorText(err: unknown, draw = false): string {
+// Текст ошибки для человека
+export function errorText(err: unknown): string {
   if (!(err instanceof ApiError) || err.status === 0) return 'Нет связи. Попробуй ещё раз.'
   switch (err.code) {
     case 'filter':
       return 'Сообщение не прошло фильтр'
     case 'slow':
-      return draw ? 'Слишком много штрихов — подожди минуту' : 'Не так быстро — одно сообщение в 5 секунд'
+      return 'Не так быстро — одно сообщение в 5 секунд'
     case 'day-limit':
-      return draw ? 'На сегодня штрихов хватит — продолжим завтра' : 'На сегодня лимит сообщений — продолжим завтра'
+      return 'На сегодня лимит сообщений — продолжим завтра'
     case 'too-long':
       return 'Слишком длинное сообщение'
     case 'board-banned':
-      return 'Тебе запрещено писать на доске'
+      return 'Тебе запрещено писать в «Подслушано»'
+    case 'no-group':
+      return 'Сначала выбери группу в профиле'
     case 'gone':
       return 'Сообщение уже удалено'
     case 'not-configured':
-      return 'Доска скоро заработает'
+      return '«Подслушано» скоро заработает'
     default:
       return 'Что-то сломалось 🛠'
   }

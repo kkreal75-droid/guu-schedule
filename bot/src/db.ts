@@ -25,6 +25,7 @@ export type UserRow = {
   onboarded_at: number | null
   starosta_of: string | null // староста этой группы (назначает владелец)
   subgroups: string | null // JSON: выбранные подгруппы
+  board_origin: number // «Подслушано»: показывать у псевдонима курс и институт
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -37,9 +38,12 @@ export type Me = {
   access: Access
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
+  origin: boolean // «Подслушано»: курс и институт у псевдонима (переключатель в профиле)
 }
 
-export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of'> | null): Me {
+type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'board_origin'
+
+export function meOf(row: Pick<UserRow, MeFields> | null): Me {
   const group = normalizeGroup(row?.grp)
   return {
     role: row?.role ?? null,
@@ -48,6 +52,7 @@ export function meOf(row: Pick<UserRow, 'role' | 'grp' | 'teacher_id' | 'access'
     access: row?.access ?? 'standard',
     onboarding: !row?.legacy && !group && !row?.role,
     starosta: normalizeGroup(row?.starosta_of),
+    origin: Boolean(row?.board_origin),
   }
 }
 
@@ -88,7 +93,7 @@ export async function touchUser(
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
            access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
-         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of`,
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, board_origin`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1]),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
@@ -99,7 +104,7 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
   ])
-  const row = (upsert.results as (Pick<UserRow, 'banned' | 'grp' | 'role' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of'>)[])[0]
+  const row = (upsert.results as Pick<UserRow, 'banned' | MeFields>[])[0]
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }
 }
 

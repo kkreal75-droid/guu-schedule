@@ -4,8 +4,8 @@ import { AdminPage } from '../admin/AdminPage'
 import { BoardPage } from '../board/BoardPage'
 import type { Extras } from '../edits'
 import {
-  BoardIcon, ChevronLeft, ChevronRight, DoorIcon, EditIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon,
-  ShieldIcon, TeacherIcon,
+  ChevronLeft, ChevronRight, DoorIcon, EditIcon, ExamIcon, GroupChatIcon, PhoneCalendarIcon, SearchIcon,
+  ShieldIcon, TeacherIcon, WhisperIcon,
 } from '../icons'
 import { CalendarPage } from '../more/CalendarPage'
 import { FreeRoomsPage } from '../more/FreeRoomsPage'
@@ -29,7 +29,7 @@ type Item = {
 }
 
 // group — группа на экране расписания; teacherMode — роль «Преподаватель» (сессия и календарь — для групп);
-// boardNew — точка «есть новое» на доске; onBoardOpen — человек зашёл на доску, точку убрать;
+// boardNew — точка «есть новое» в «Подслушано»; onBoardOpen — человек зашёл туда, точку убрать;
 // prefs / onPrefsChange — избранные группы
 type Props = {
   admin: boolean
@@ -57,7 +57,7 @@ export function MoreScreen({ admin, group, teacherMode, boardNew, onBoardOpen, p
     },
     { id: 'teacher-schedule', title: 'Расписание преподавателя', icon: TeacherIcon, render: () => <TeacherSchedulePage /> },
     { id: 'rooms', title: 'Свободные аудитории', icon: DoorIcon, render: () => <FreeRoomsPage /> },
-    { id: 'board', title: 'Доска', icon: BoardIcon, render: () => <BoardPage group={group} />, dot: boardNew },
+    { id: 'board', title: 'Подслушано', icon: WhisperIcon, render: () => <BoardPage />, dot: boardNew },
     ...(teacherMode
       ? []
       : [

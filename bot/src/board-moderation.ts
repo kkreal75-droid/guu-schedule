@@ -1,28 +1,25 @@
-// Модерация доски: жалобы приходят владельцу с кнопками, /boardban, снимки холста, чистка старого.
+// Модерация «Подслушано»: жалобы приходят владельцу с кнопками, /boardban, чистка старого.
 import { resolveTarget, targetLabel } from './admin'
 import { isOwner } from './auth'
-import { BOARD_IDS, BOARD_TITLES, LEGACY_BOARDS, LIMITS } from './board-config'
+import { BOARD_IDS, LIMITS } from './board-config'
 import { getUser, userLabel } from './db'
-import { answerCallback, sendMessage, tg, tgForm, type TgCallbackQuery } from './telegram'
+import { answerCallback, sendMessage, tg, type TgCallbackQuery } from './telegram'
 import { escapeHtml, formatMsk } from './util'
 
 const DAY_MS = 86_400_000
-export const FOREVER = 253_402_300_799_000 // 31.12.9999 — «навсегда» для бана на доске
-
-const boardTitle = (board: string) => BOARD_TITLES[board] ?? board
+export const FOREVER = 253_402_300_799_000 // 31.12.9999 — «навсегда» для бана в «Подслушано»
 
 type ReportedMessage = { id: number; board: string; user_id: number; alias: string; text: string }
 
-// Владельцу: текст, доска, настоящий автор и кнопки. Первая жалоба — и когда сообщение скрыто
+// Владельцу: текст, настоящий автор и кнопки. Первая жалоба — и когда сообщение скрыто
 export async function notifyReport(env: Env, message: ReportedMessage, count: number, hidden: boolean): Promise<void> {
   if (!env.OWNER_ID) return
   const author = await getUser(env.DB, message.user_id)
   const who = author ? `${userLabel(author, escapeHtml)} (id ${author.id})` : `id ${message.user_id}`
   const title = hidden
     ? `🙈 <b>Скрыто после ${count} жалоб</b> — ждёт решения`
-    : '🚩 <b>Жалоба на сообщение</b>'
+    : '🚩 <b>Жалоба на сообщение в «Подслушано»</b>'
   const text = `${title}
-Доска: «${escapeHtml(boardTitle(message.board))}»
 Автор: ${who} · ${escapeHtml(message.alias)}
 Жалоб: ${count}
 
@@ -31,7 +28,7 @@ export async function notifyReport(env: Env, message: ReportedMessage, count: nu
     reply_markup: {
       inline_keyboard: [
         [{ text: '🗑 Удалить', callback_data: `bd:del:${message.id}` }],
-        [{ text: '🔇 Удалить и забанить на доске', callback_data: `bd:ban:${message.id}` }],
+        [{ text: '🔇 Удалить и забанить в «Подслушано»', callback_data: `bd:ban:${message.id}` }],
         [{ text: 'Игнорировать', callback_data: `bd:ign:${message.id}` }],
       ],
     },
@@ -70,7 +67,7 @@ export async function moderate(env: Env, id: number, action: ModerationAction): 
   if (action === 'ban') {
     await deleteMessage(env, id, now)
     if (!isOwner(env, message.user_id)) await setBoardBan(env, message.user_id, FOREVER)
-    return '✅ Удалено, автор забанен на доске'
+    return '✅ Удалено, автор забанен в «Подслушано»'
   }
   await env.DB.batch([
     env.DB.prepare("UPDATE board_reports SET status = 'ignored' WHERE message_id = ? AND status = 'open'").bind(id),
@@ -112,50 +109,26 @@ export async function boardBanCommand(env: Env, chatId: number, args: string): P
 
   if (days === '0') {
     await setBoardBan(env, user.id, null)
-    await sendMessage(env, chatId, `✅ Бан на доске снят: ${targetLabel(user)}`)
+    await sendMessage(env, chatId, `✅ Бан в «Подслушано» снят: ${targetLabel(user)}`)
     return
   }
   const until = days ? Date.now() + Number(days) * DAY_MS : FOREVER
   await setBoardBan(env, user.id, until)
   const term = days ? `до ${formatMsk(until)} МСК` : 'навсегда'
-  await sendMessage(env, chatId, `🔇 Бан на доске ${term}: ${targetLabel(user)}\nЧитать доску может, писать и рисовать — нет.`)
+  await sendMessage(env, chatId, `🔇 Бан в «Подслушано» ${term}: ${targetLabel(user)}\nЧитать может, писать — нет.`)
 }
 
 export const boardBanTerm = (until: number) => (until >= FOREVER ? 'навсегда' : `до ${formatMsk(until)}`)
 
-// Снимок холста перед очисткой — ещё и владельцу в личку, чтобы архив был под рукой
-export async function sendSnapshot(env: Env, board: string, id: number, strokes: number, png: Uint8Array): Promise<void> {
-  try {
-    const form = new FormData()
-    form.append('chat_id', env.OWNER_ID)
-    form.append('document', new Blob([png], { type: 'image/png' }), `board-${board}-${id}.png`)
-    form.append('caption', `🧹 Холст «${boardTitle(board)}» очищен · штрихов: ${strokes} · снимок №${id}`)
-    await tgForm(env, 'sendDocument', form)
-  } catch (err) {
-    console.error('Не удалось отправить снимок холста:', err)
-  }
-}
-
-// Раз в час: сообщения старше 30 дней удаляются; стёртые штрихи — через 2 дня;
-// на холсте не больше LIMITS.canvasStrokes штрихов (лишние, самые старые, стираются)
+// Раз в час: сообщения старше 30 дней удаляются вместе с реакциями и жалобами
 export async function cleanupBoard(env: Env, now: number): Promise<number> {
-  // и старые доски групп — их записи дочищаем по сроку
-  const boards = [...BOARD_IDS, ...LEGACY_BOARDS].map((b) => `'${b}'`).join(', ')
+  const boards = BOARD_IDS.map((b) => `'${b}'`).join(', ')
   const old = `SELECT id FROM board_messages WHERE board IN (${boards}) AND created_at < ?1`
   const cutoff = now - LIMITS.keepMessagesDays * DAY_MS
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM board_reactions WHERE message_id IN (${old})`).bind(cutoff),
     env.DB.prepare(`DELETE FROM board_reports WHERE message_id IN (${old})`).bind(cutoff),
     env.DB.prepare(`DELETE FROM board_messages WHERE board IN (${boards}) AND created_at < ?1`).bind(cutoff),
-    env.DB.prepare(`DELETE FROM board_strokes WHERE board IN (${boards}) AND updated_at < ?1 AND deleted = 1`).bind(
-      now - 2 * DAY_MS,
-    ),
-    ...BOARD_IDS.map((board) =>
-      env.DB.prepare(
-        `UPDATE board_strokes SET deleted = 1, updated_at = ?1 WHERE id IN (
-           SELECT id FROM board_strokes WHERE board = ?2 AND deleted = 0 ORDER BY id DESC LIMIT -1 OFFSET ?3)`,
-      ).bind(now, board, LIMITS.canvasStrokes),
-    ),
   ])
   return 1
 }

@@ -1,9 +1,7 @@
 // Админ-панель в мини-приложении: POST /admin/<действие>, тело — {initData, ...}.
 // Каждый запрос проверяет подпись Telegram и OWNER_ID (readApi adminOnly) — остальным 403.
 import { exportUsers } from './admin'
-import { CORS, json, readApi, type ApiRequest } from './api'
-import { clearCanvas } from './board'
-import { BOARD_IDS, type BoardId } from './board-config'
+import { json, readApi, type ApiRequest } from './api'
 import { FOREVER, moderate, setBoardBan, type ModerationAction } from './board-moderation'
 import { audienceCount, audienceCounts, audienceTitle, broadcastHistory, panelBroadcast, type Audience } from './broadcast'
 import { loadChats } from './chats'
@@ -57,8 +55,6 @@ async function dashboard({ env }: Call): Promise<Response> {
       `SELECT (SELECT COUNT(*) FROM board_members WHERE rules_accepted_at IS NOT NULL) AS members,
               (SELECT COUNT(*) FROM board_messages WHERE created_at >= ?1) AS messages_day,
               (SELECT COUNT(*) FROM board_messages WHERE created_at >= ?2) AS messages_week,
-              (SELECT COUNT(*) FROM board_strokes WHERE created_at >= ?1) AS strokes_day,
-              (SELECT COUNT(*) FROM board_strokes WHERE created_at >= ?2) AS strokes_week,
               (SELECT COUNT(DISTINCT message_id) FROM board_reports WHERE status = 'open') AS reports`,
     ).bind(now - DAY_MS, now - 7 * DAY_MS),
   ])
@@ -101,9 +97,9 @@ async function userCard(env: Env, id: number): Promise<Response> {
   const [visits, total, member, messages, calendar] = await env.DB.batch([
     env.DB.prepare('SELECT ts, kind FROM visits WHERE user_id = ? ORDER BY ts DESC LIMIT 30').bind(id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM visits WHERE user_id = ?').bind(id),
-    env.DB.prepare('SELECT rules_accepted_at, board_grp FROM board_members WHERE user_id = ?').bind(id),
+    env.DB.prepare('SELECT rules_accepted_at FROM board_members WHERE user_id = ?').bind(id),
     env.DB.prepare(
-      'SELECT id, board, alias, text, created_at, deleted, hidden FROM board_messages WHERE user_id = ? ORDER BY id DESC LIMIT 50',
+      'SELECT id, board, alias, origin, text, created_at, deleted, hidden FROM board_messages WHERE user_id = ? ORDER BY id DESC LIMIT 50',
     ).bind(id),
     env.DB.prepare('SELECT grp, created_at, last_fetch_at, fetch_count FROM calendar_tokens WHERE user_id = ?').bind(id),
   ])
@@ -252,11 +248,11 @@ async function broadcast({ env, ctx, req }: Call): Promise<Response> {
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
 
-// ---------- модерация доски ----------
+// ---------- модерация «Подслушано» ----------
 
 async function reports({ env }: Call): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT m.id, m.board, m.alias, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username,
+    `SELECT m.id, m.board, m.alias, m.origin, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username,
             COUNT(r.id) AS reports, MAX(r.created_at) AS last_report
      FROM board_reports r
      JOIN board_messages m ON m.id = r.message_id
@@ -274,53 +270,18 @@ async function moderation({ env, req }: Call): Promise<Response> {
   return json({ ok: true, result: await moderate(env, id, action as ModerationAction) })
 }
 
-// лента всех досок с настоящими авторами
+// лента с настоящими авторами
 async function feed({ env, req }: Call): Promise<Response> {
-  const board = BOARD_IDS.includes(req.body.board as BoardId) ? (req.body.board as string) : null
   const before = asInt(req.body.before) ?? Number.MAX_SAFE_INTEGER
   const { results } = await env.DB.prepare(
-    `SELECT m.id, m.board, m.alias, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username
+    `SELECT m.id, m.board, m.alias, m.origin, m.text, m.created_at, m.hidden, m.user_id, u.name, u.username
      FROM board_messages m LEFT JOIN users u ON u.id = m.user_id
-     WHERE m.deleted = 0 AND (?1 IS NULL OR m.board = ?1) AND m.id < ?2
+     WHERE m.deleted = 0 AND m.id < ?1
      ORDER BY m.id DESC LIMIT 50`,
   )
-    .bind(board, before)
+    .bind(before)
     .all()
   return json({ ok: true, messages: results, has_more: results.length === 50 })
-}
-
-// штрихи холста — чтобы приложение нарисовало снимок перед очисткой
-async function strokes({ env, req }: Call): Promise<Response> {
-  const board = req.body.board as BoardId
-  if (!BOARD_IDS.includes(board)) return fail(400, 'bad request')
-  const { results } = await env.DB.prepare(
-    'SELECT id, color, width, points FROM board_strokes WHERE board = ? AND deleted = 0 ORDER BY id',
-  )
-    .bind(board)
-    .all<{ id: number; color: string; width: number; points: string }>()
-  const items = results.map((s) => `{"id":${s.id},"c":${JSON.stringify(s.color)},"w":${s.width},"p":${s.points},"mine":false}`)
-  return new Response(`{"ok":true,"strokes":[${items.join(',')}]}`, {
-    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' },
-  })
-}
-
-async function clear({ env, ctx, req }: Call): Promise<Response> {
-  const board = req.body.board as BoardId
-  if (!BOARD_IDS.includes(board)) return fail(400, 'bad request')
-  return clearCanvas(env, ctx, board, req.body.png)
-}
-
-async function snapshots({ env }: Call): Promise<Response> {
-  const { results } = await env.DB.prepare('SELECT * FROM board_snapshots ORDER BY id DESC LIMIT 100').all()
-  return json({ ok: true, snapshots: results })
-}
-
-// сама картинка — байтами (в <img> её не вставить: нужен initData в теле запроса)
-async function snapshot({ env, req }: Call): Promise<Response> {
-  const id = asInt(req.body.id)
-  const png = id === null ? null : await env.KV.get(`board-snapshot:${id}`, 'arrayBuffer')
-  if (!png) return fail(404, 'not found')
-  return new Response(png, { headers: { ...CORS, 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=86400' } })
 }
 
 // ---------- расписание ----------
@@ -501,10 +462,6 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   reports,
   moderate: moderation,
   feed,
-  strokes,
-  clear,
-  snapshots,
-  snapshot,
   schedule,
   'update-now': updateNow,
   'edit-add': editAdd,

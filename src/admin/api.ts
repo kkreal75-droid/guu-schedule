@@ -1,7 +1,6 @@
 // Запросы админ-панели к боту (bot/src/admin-api.ts). Каждый проверяется в боте: подпись + OWNER_ID.
 import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/groups'
-import { callBot, callBotBlob } from '../api'
-import type { BoardId, Stroke } from '../board/api'
+import { callBot } from '../api'
 import type { ScheduleEdit } from '../../shared/edits-core'
 
 export type Dashboard = {
@@ -22,7 +21,7 @@ export type Dashboard = {
   opens_by_hour: number[]
   chats: { total: number; g11: number; g12: number; digests: number }
   calendar: { total: number; active: number }
-  board: { members: number; messages_day: number; messages_week: number; strokes_day: number; strokes_week: number; reports: number }
+  board: { members: number; messages_day: number; messages_week: number; reports: number }
 }
 
 export type AdminUser = {
@@ -49,6 +48,7 @@ export type BoardMessageRow = {
   id: number
   board: string
   alias: string
+  origin?: string | null
   text: string
   created_at: number
   deleted?: number
@@ -63,7 +63,7 @@ export type UserCard = {
   user: AdminUser & { owner: boolean }
   visits: { ts: number; kind: string }[]
   visit_log_total: number
-  board: { rules_accepted_at: number | null; board_grp: string | null } | null
+  board: { rules_accepted_at: number | null } | null
   messages: BoardMessageRow[]
   calendar: { grp: string; created_at: number; last_fetch_at: number | null; fetch_count: number } | null
 }
@@ -104,8 +104,6 @@ export type Settings = {
   notice: { on: boolean; id: number; text: string }
 }
 
-export type Snapshot = { id: number; board: string; created_at: number; strokes: number; bytes: number }
-
 export const adminApi = {
   dashboard: () => callBot<Dashboard>('/admin/dashboard'),
   users: () => callBot<{ users: AdminUser[] }>('/admin/users'),
@@ -122,12 +120,7 @@ export const adminApi = {
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
   reports: () => callBot<{ reports: BoardMessageRow[] }>('/admin/reports'),
   moderate: (id: number, action: 'del' | 'ban' | 'ign') => callBot<{ result: string }>('/admin/moderate', { id, action }),
-  feed: (board: BoardId | null, before?: number) =>
-    callBot<{ messages: BoardMessageRow[]; has_more: boolean }>('/admin/feed', { board, before }),
-  strokes: (board: BoardId) => callBot<{ strokes: Stroke[] }>('/admin/strokes', { board }),
-  clear: (board: BoardId, png: string) => callBot<{ snapshot: number; strokes: number }>('/admin/clear', { board, png }),
-  snapshots: () => callBot<{ snapshots: Snapshot[] }>('/admin/snapshots'),
-  snapshot: (id: number) => callBotBlob('/admin/snapshot', { id }),
+  feed: (before?: number) => callBot<{ messages: BoardMessageRow[]; has_more: boolean }>('/admin/feed', { before }),
   schedule: () => callBot<ScheduleStatus>('/admin/schedule'),
   updateNow: (force: boolean) => callBot('/admin/update-now', { force }),
   editAdd: (edit: { groups: string[]; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }) =>
@@ -160,4 +153,3 @@ export const shortGroup = (group: string | null | undefined) => (group ? shortNa
 export const userName = (u: { name?: string | null; username?: string | null; id?: number; user_id?: number }) =>
   u.username ? `@${u.username}` : u.name || `id ${u.id ?? u.user_id}`
 
-export const BOARD_TITLES: Record<string, string> = { g11: '1-1', g12: '1-2', all: 'Общая' }

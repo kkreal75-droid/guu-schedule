@@ -51,11 +51,10 @@ export function Dashboard() {
         </div>
       </Section>
 
-      <Section title="Доска">
+      <Section title="Подслушано">
         <div className="stats">
           <Stat label="участников" value={board.members} />
           <Stat label="сообщений" value={board.messages_day} hint={`за 7 дней: ${board.messages_week}`} />
-          <Stat label="штрихов" value={board.strokes_day} hint={`за 7 дней: ${board.strokes_week}`} />
           <Stat label="жалоб ждут" value={board.reports} />
         </div>
       </Section>

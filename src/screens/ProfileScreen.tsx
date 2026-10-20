@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { boardApi, errorText } from '../board/api'
 import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { formatFullDate, weekTitle } from '../format'
@@ -54,9 +56,46 @@ type Props = {
   onChangeProfile: () => void // «Сменить группу / роль» — снова онбординг
   noteCount: number
   extras: Extras
+  boardOrigin: boolean | null // «Подслушано»: курс и институт у псевдонима; null — вне Telegram
+  onBoardOrigin: (on: boolean) => void
 }
 
-export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras }: Props) {
+// «Подслушано»: показывать у псевдонима курс и институт («Выдра 🦦 · 1 курс, ИУПСиБК»). Решает бот:
+// включить — у новых сообщений, выключить — пропадает и у старых.
+function OriginToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const toggle = async () => {
+    haptic()
+    setBusy(true)
+    setError(null)
+    try {
+      onChange((await boardApi.origin(!on)).on)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section
+      title="Подслушано"
+      footer={
+        error ??
+        (on
+          ? 'Видно у новых сообщений, например: «Выдра 🦦 · 1 курс, ИУПСиБК». Выключишь — пропадёт и у старых.'
+          : 'По умолчанию — только псевдоним. Группа и имя не показываются никогда.')
+      }
+    >
+      <button type="button" className="row row-btn" role="switch" aria-checked={on} disabled={busy} onClick={toggle}>
+        <span>Курс и институт у псевдонима</span>
+        {on && <CheckIcon className="row-check" />}
+      </button>
+    </Section>
+  )
+}
+
+export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, extras, boardOrigin, onBoardOrigin }: Props) {
   // подгруппы своей группы (их заводит староста): выбранные — только свои пары
   const ownSubgroups = prefs.role === 'student' ? extras.subgroups.filter((s) => s.group === prefs.group) : []
   const toggleSubgroup = (id: number) => {
@@ -145,6 +184,8 @@ export function ProfileScreen({ prefs, onChange, onChangeProfile, noteCount, ext
           ))}
         </Section>
       )}
+
+      {boardOrigin !== null && !teacher && <OriginToggle on={boardOrigin} onChange={onBoardOrigin} />}
 
       <Section
         title="Тема"

@@ -6,7 +6,7 @@ import { useBackButton } from '../useBackButton'
 import { loadGroups, useGroupNames } from '../data'
 import type { GroupInfo } from '../../shared/groups'
 import { GroupSearch } from '../onboarding/GroupSearch'
-import { BOARD_TITLES, adminApi, adminError, stamp, userName, type AdminUser, type UserCard } from './api'
+import { adminApi, adminError, stamp, userName, type AdminUser, type UserCard } from './api'
 import { Loading, useFlash, useLoad } from './common'
 
 // бан «навсегда» бот хранит как 9999 год
@@ -80,7 +80,7 @@ export function Users() {
         ))}
       </div>
       <p className="section-footer">
-        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан на доске · ⛔ заблокировал бота
+        Показано {list.length} из {data.users.length}. 🚫 бан · 🔇 бан в «Подслушано» · ⛔ заблокировал бота
       </p>
     </div>
   )
@@ -122,7 +122,7 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
   const boardBanned = u.board_banned_until && u.board_banned_until > now ? u.board_banned_until : null
 
   const deleteMessage = async (messageId: number) => {
-    if (!(await confirmAction('Удалить сообщение с доски?'))) return
+    if (!(await confirmAction('Удалить сообщение из «Подслушано»?'))) return
     try {
       await adminApi.moderate(messageId, 'del')
       setCard(await adminApi.user(id))
@@ -246,9 +246,9 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
       )}
 
       {!u.owner && (
-        <Section title="Доска" footer="Забаненный на доске может читать, но не писать и не рисовать.">
+        <Section title="Подслушано" footer="Забаненный может читать, но не писать.">
           <div className="row">
-            <span>Бан на доске</span>
+            <span>Бан в «Подслушано»</span>
             <span className="row-value">{boardBanned ? (isForever(boardBanned) ? 'навсегда' : `до ${stamp(boardBanned)}`) : 'нет'}</span>
           </div>
           <div className="row row-chips">
@@ -262,13 +262,13 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
                 type="button"
                 className="chip"
                 disabled={busy}
-                onClick={() => run(() => adminApi.boardBan(id, o.days), 'Бан на доске выдан')}
+                onClick={() => run(() => adminApi.boardBan(id, o.days), 'Бан в «Подслушано» выдан')}
               >
                 {o.label}
               </button>
             ))}
             {boardBanned && (
-              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.boardBan(id, 0), 'Бан на доске снят')}>
+              <button type="button" className="chip chip-accent" disabled={busy} onClick={() => run(() => adminApi.boardBan(id, 0), 'Бан в «Подслушано» снят')}>
                 Снять
               </button>
             )}
@@ -278,13 +278,13 @@ function UserCardView({ id, onClose }: { id: number; onClose: () => void }) {
 
       {notice}
 
-      <Section title={`Сообщения на доске (${card.messages.length})`}>
+      <Section title={`Сообщения в «Подслушано» (${card.messages.length})`}>
         {card.messages.length === 0 && <div className="row row-text">Не писал</div>}
         {card.messages.map((m) => (
           <div key={m.id} className="row admin-msg">
             <div className="admin-msg-body">
               <div className="admin-msg-meta">
-                «{BOARD_TITLES[m.board] ?? m.board}» · {m.alias} · {stamp(m.created_at)}
+                {m.alias}{m.origin ? ` · ${m.origin}` : ''} · {stamp(m.created_at)}
                 {m.deleted ? ' · удалено' : m.hidden ? ' · скрыто' : ''}
               </div>
               <div className={`admin-msg-text${m.deleted ? ' is-deleted' : ''}`}>{m.text}</div>

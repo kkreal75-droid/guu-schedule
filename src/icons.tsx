@@ -102,11 +102,11 @@ export const PhoneCalendarIcon = (p: P) => (
   </svg>
 )
 
-export const BoardIcon = (p: P) => (
+// «Подслушано»: облачко с многоточием — анонимный чат
+export const WhisperIcon = (p: P) => (
   <svg {...base} {...p}>
-    <rect x="3.5" y="4.5" width="17" height="12" rx="2" />
-    <path d="M8 20.5h8M12 16.5v4" />
-    <path d="M7.5 12.5l3-3 2 2 4-4" />
+    <path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 20l1-3.6C4.5 15 3.5 13.1 3.5 11c0-3.9 3.8-7 8.5-7Z" />
+    <path d="M8.5 11h.01M12 11h.01M15.5 11h.01" strokeWidth="2.6" />
   </svg>
 )
 
@@ -133,27 +133,6 @@ export const ReplyIcon = (p: P) => (
   <svg {...base} {...p}>
     <path d="M9.5 7 4.5 12l5 5" />
     <path d="M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5V19" />
-  </svg>
-)
-
-export const UndoIcon = (p: P) => (
-  <svg {...base} {...p}>
-    <path d="M8.5 5 4 9.5 8.5 14" />
-    <path d="M4 9.5h10a6 6 0 0 1 0 12h-3" />
-  </svg>
-)
-
-export const BrushIcon = (p: P) => (
-  <svg {...base} {...p}>
-    <path d="M14.5 4.5 19.5 9.5 10 19a2.5 2.5 0 0 1-3.5 0l-1.5-1.5a2.5 2.5 0 0 1 0-3.5l9.5-9.5Z" />
-    <path d="M5 21h4" />
-  </svg>
-)
-
-export const EraserIcon = (p: P) => (
-  <svg {...base} {...p}>
-    <path d="m7 20-3.3-3.3a1.5 1.5 0 0 1 0-2.1L13.6 4.7a1.5 1.5 0 0 1 2.1 0l4.6 4.6a1.5 1.5 0 0 1 0 2.1L11.4 20H7Z" />
-    <path d="M9 10.5 14.5 16M11.5 20H20" />
   </svg>
 )
 

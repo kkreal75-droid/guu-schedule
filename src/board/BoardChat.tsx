@@ -244,6 +244,7 @@ export function BoardChat({ board, config, admin, bannedUntil, onBanned }: Props
                 {!m.mine && (
                   <div className="msg-alias">
                     {m.alias}
+                    {m.origin && <span className="msg-origin"> · {m.origin}</span>}
                     {m.author && <span className="msg-author"> · {authorLabel(m.author)}</span>}
                   </div>
                 )}

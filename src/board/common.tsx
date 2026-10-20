@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-// Короткое сообщение под лентой/холстом, само пропадает через 4 с
+// Короткое сообщение под лентой, само пропадает через 4 с
 export function useNotice(): [string | null, (text: string) => void] {
   const [notice, setNotice] = useState<string | null>(null)
   const timer = useRef(0)
@@ -22,8 +22,8 @@ export function BanNotice({ until }: { until: number }) {
   return (
     <p className="board-banned">
       {forever
-        ? 'Тебе запрещено писать и рисовать на доске. Читать можно.'
-        : `Писать и рисовать на доске можно будет с ${date}. Пока — только читать.`}
+        ? 'Тебе запрещено писать в «Подслушано». Читать можно.'
+        : `Писать в «Подслушано» можно будет с ${date}. Пока — только читать.`}
     </p>
   )
 }

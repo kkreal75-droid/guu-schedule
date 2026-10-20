@@ -1,6 +1,6 @@
 import { useCallback, useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Section } from '../components/Section'
-import { BoardIcon, CalendarIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, UserIcon } from '../icons'
+import { CalendarIcon, ChevronLeft, ChevronRight, MoreIcon, NoteIcon, SendIcon, UserIcon, WhisperIcon } from '../icons'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { adminApi, adminError } from './api'
@@ -19,7 +19,7 @@ const ITEMS: Item[] = [
   { id: 'dashboard', title: 'Дашборд', icon: MoreIcon, render: () => <Dashboard /> },
   { id: 'users', title: 'Пользователи', icon: UserIcon, render: () => <Users /> },
   { id: 'broadcast', title: 'Рассылка', icon: SendIcon, render: () => <BroadcastAdmin /> },
-  { id: 'moderation', title: 'Модерация доски', icon: BoardIcon, render: () => <Moderation /> },
+  { id: 'moderation', title: 'Модерация «Подслушано»', icon: WhisperIcon, render: () => <Moderation /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
   { id: 'settings', title: 'Настройки', icon: NoteIcon, render: () => <SettingsAdmin /> },
 ]

@@ -1164,15 +1164,9 @@ p {
   opacity: 0.5;
 }
 
-/* ---------- доска ---------- */
+/* ---------- «Подслушано» ---------- */
 
 .board {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.board-switches {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1241,7 +1235,7 @@ p {
   text-align: center;
 }
 
-/* ---------- доска: чат ---------- */
+/* ---------- «Подслушано»: чат ---------- */
 
 .chat {
   display: flex;
@@ -1289,6 +1283,7 @@ p {
   color: var(--accent-ink);
 }
 
+.msg-origin,
 .msg-author {
   font-weight: 400;
   color: var(--hint);
@@ -1536,128 +1531,6 @@ p {
 
 .composer-send:disabled {
   opacity: 0.4;
-}
-
-/* ---------- доска: рисовалка ---------- */
-
-.draw {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-.draw-frame {
-  position: relative;
-}
-
-/* холст всегда белый: рисунок у всех выглядит одинаково, в любой теме */
-.draw-canvas {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 0 0 0.5px var(--separator), var(--shadow);
-  touch-action: none;
-  cursor: crosshair;
-}
-
-.draw-canvas.is-eraser {
-  cursor: cell;
-}
-
-.draw-loading {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  color: #8a8f98;
-}
-
-.draw-colors {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 0 2px;
-}
-
-.swatch {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
-  transition: transform 0.12s;
-}
-
-.swatch[aria-checked='true'] {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-}
-
-.draw-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.draw-widths {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 12px;
-  background: var(--fill);
-}
-
-.width-btn {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 34px;
-  border-radius: 10px;
-}
-
-.width-btn span {
-  display: block;
-  border-radius: 50%;
-  background: var(--hint);
-}
-
-.width-btn[aria-checked='true'] {
-  background: var(--seg-thumb);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
-}
-
-.tool-btn {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: 12px;
-  background: var(--fill);
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.tool-btn svg {
-  flex: none;
-  width: 18px;
-  height: 18px;
-}
-
-.tool-btn[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-
-.tool-btn:disabled {
-  opacity: 0.5;
 }
 
 /* ---------- правки расписания, объявление, техработы ---------- */
@@ -2033,14 +1906,6 @@ select.input {
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow);
-}
-
-.snapshot-img {
-  display: block;
-  width: calc(100% - 24px);
-  margin: 0 12px 12px;
-  border-radius: 12px;
-  background: #fff;
 }
 
 /* таблица пользователей: имя, группа, визиты, последний вход */
