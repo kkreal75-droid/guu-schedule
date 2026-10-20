@@ -42,7 +42,7 @@ async function groupInfo(env: Env, group: string, me: number) {
 }
 
 export async function handleStarostaApi(env: Env, request: Request, action: string): Promise<Response> {
-  const req = await readApi<Body>(env, request)
+  const req = await readApi<Body>(env, request, { write: action !== 'info' })
   if (req instanceof Response) return req
   const group = normalizeGroup(req.user?.starosta_of)
   if (!group) return fail(403, 'not-starosta')
@@ -150,7 +150,7 @@ export async function handleStarostaApi(env: Env, request: Request, action: stri
 
 // POST /my-subgroups {group, ids} — свои подгруппы (только существующие подгруппы этой группы)
 export async function handleMySubgroups(env: Env, request: Request): Promise<Response> {
-  const req = await readApi<{ group?: unknown; ids?: unknown }>(env, request)
+  const req = await readApi<{ group?: unknown; ids?: unknown }>(env, request, { write: true })
   if (req instanceof Response) return req
   const group = normalizeGroup(req.body.group)
   if (!group || !Array.isArray(req.body.ids)) return fail(400, 'bad request')

@@ -10,6 +10,7 @@ import { academicReset, academicSave, loadCalendarEdits } from './academic'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
+import { ADMIN_LIMIT } from './guard'
 import { cleanEditData, editProblem, type EditKind, type NewEdit, type ScheduleEdit } from '../../shared/edits-core'
 import { addEdits, editFromRow, revertEdit } from './edits'
 import { isOwner } from './auth'
@@ -553,7 +554,7 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
 
 export async function handleAdminApi(env: Env, ctx: ExecutionContext, request: Request, action: string): Promise<Response> {
   // сначала подпись и OWNER_ID: чужим — 403 на любой адрес, даже несуществующий
-  const req = await readApi<Body>(env, request, { adminOnly: true })
+  const req = await readApi<Body>(env, request, { adminOnly: true, maxBody: ADMIN_LIMIT })
   if (req instanceof Response) return req
   const handler = HANDLERS[action]
   if (!handler) return fail(404, 'not found')

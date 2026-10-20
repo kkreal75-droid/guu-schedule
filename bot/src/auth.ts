@@ -1,10 +1,13 @@
 // Проверка подлинности: вебхук Telegram и initData мини-приложения.
 // https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
 
+import { safeEqual } from './guard'
 import type { TgUser } from './telegram'
 
 // initData старше суток не принимаем — меньше простора для повторной отправки чужих данных
 const INIT_DATA_MAX_AGE_S = 24 * 60 * 60
+// часы клиента и Telegram могут расходиться — «из будущего» допускаем не больше 5 минут
+const INIT_DATA_FUTURE_S = 5 * 60
 
 // кто это: ник и имя из Telegram
 export type Profile = { id: number; username: string | null; name: string | null }
@@ -46,12 +49,13 @@ export async function verifyInitData(initData: string, env: Env): Promise<Profil
   // по документации оно входит, но на случай расхождений проверяем оба варианта
   let valid = false
   for (const candidate of [dataCheck(['hash']), dataCheck(['hash', 'signature'])]) {
-    if (toHex(await hmac(secret, candidate)) === hash) valid = true
+    if (safeEqual(toHex(await hmac(secret, candidate)), hash)) valid = true
   }
   if (!valid) return null
 
   const authDate = Number(params.get('auth_date'))
-  if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_S) return null
+  const age = Date.now() / 1000 - authDate
+  if (!authDate || age > INIT_DATA_MAX_AGE_S || age < -INIT_DATA_FUTURE_S) return null
   try {
     const user = JSON.parse(params.get('user') ?? '') as Partial<TgUser>
     return typeof user.id === 'number' ? profileOf(user as TgUser) : null

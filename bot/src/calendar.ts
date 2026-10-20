@@ -143,7 +143,7 @@ function status(origin: string, row: TokenRow | null) {
 
 // POST /cal/status | /cal/connect {group} | /cal/disconnect — из мини-приложения
 export async function handleCalendarApi(env: Env, request: Request, action: string): Promise<Response> {
-  const req = await readApi<{ group?: string }>(env, request)
+  const req = await readApi<{ group?: string }>(env, request, { write: action !== 'status' })
   if (req instanceof Response) return req
   const origin = new URL(request.url).origin
   const userId = req.profile.id
@@ -151,6 +151,7 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
 
   if (action === 'status') return json(status(origin, current))
   if (action === 'disconnect') {
+    if (current) icsCache.delete(current.token)
     await env.DB.prepare('DELETE FROM calendar_tokens WHERE user_id = ?').bind(userId).run()
     return json({ ok: true, connected: false })
   }
@@ -159,6 +160,7 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
     const group = normalizeGroup(req.body.group) ?? MB_IDS[0]
     if (!(await loadGroupFile(env, group))) return json({ ok: false, error: 'group' }, 400)
     if (current) {
+      icsCache.delete(current.token)
       await env.DB.prepare('UPDATE calendar_tokens SET grp = ? WHERE user_id = ?').bind(group, userId).run()
       return json(status(origin, { ...current, grp: group }))
     }
@@ -171,18 +173,37 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
   return json({ ok: false, error: 'not found' }, 404)
 }
 
+// Готовый .ics в памяти изолята на 10 минут: Apple и Google спрашивают часто, а календарь меняется редко.
+// «Отключить» убирает ссылку из кэша этого изолята; в остальных она умрёт сама за ≤ 10 минут.
+const ICS_TTL_MS = 10 * 60_000
+const icsCache = new Map<string, { at: number; ics: string; group: string }>()
+const FETCH_MARK_MS = 60 * 60_000 // last_fetch_at обновляем не чаще раза в час — меньше записей в D1
+
 // GET /cal/<токен>.ics — забирают сами календари
 export async function handleIcs(env: Env, ctx: ExecutionContext, token: string): Promise<Response> {
-  const row = await env.DB.prepare('SELECT * FROM calendar_tokens WHERE token = ?').bind(token).first<TokenRow>()
-  if (!row) return new Response('Календарь отключён', { status: 404 })
-  ctx.waitUntil(
-    env.DB.prepare('UPDATE calendar_tokens SET last_fetch_at = ?, fetch_count = fetch_count + 1 WHERE token = ?')
-      .bind(Date.now(), token)
-      .run(),
-  )
-  const group = normalizeGroup(row.grp) ?? row.grp
-  const [tt, mine] = await Promise.all([loadTimetable(env, [group]), userSubgroups(env.DB, row.user_id)])
-  const ics = buildIcs(tt, group, mine)
+  let hit = icsCache.get(token)
+  if (!hit || Date.now() - hit.at > ICS_TTL_MS) {
+    const row = await env.DB.prepare('SELECT * FROM calendar_tokens WHERE token = ?').bind(token).first<TokenRow>()
+    if (!row) {
+      icsCache.delete(token)
+      return new Response('Календарь отключён', { status: 404 })
+    }
+    const now = Date.now()
+    ctx.waitUntil(
+      env.DB.prepare(
+        `UPDATE calendar_tokens SET last_fetch_at = ?1, fetch_count = fetch_count + 1
+         WHERE token = ?2 AND (last_fetch_at IS NULL OR last_fetch_at < ?3)`,
+      )
+        .bind(now, token, now - FETCH_MARK_MS)
+        .run(),
+    )
+    const group = normalizeGroup(row.grp) ?? row.grp
+    const [tt, mine] = await Promise.all([loadTimetable(env, [group]), userSubgroups(env.DB, row.user_id)])
+    hit = { at: now, ics: buildIcs(tt, group, mine), group }
+    icsCache.set(token, hit)
+    if (icsCache.size > 300) icsCache.delete(icsCache.keys().next().value!)
+  }
+  const { ics, group } = hit
   return new Response(ics, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',

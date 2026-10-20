@@ -12,7 +12,7 @@ const PER_DAY = 5
 const PROMPT = '✍️ Ответ на обращение №'
 
 export async function handleSupport(env: Env, request: Request): Promise<Response> {
-  const req = await readApi<{ text?: unknown }>(env, request)
+  const req = await readApi<{ text?: unknown }>(env, request, { write: true })
   if (req instanceof Response) return req
   const text = cleanText(req.body.text)
   if ([...text].length < 3) return json({ ok: false, error: 'Напиши пару слов' }, 400)

@@ -2,7 +2,8 @@
 // («Места») — D1 place_edits, приложение накладывает их на файл само.
 //   GET /places — правки всем (данные публичные), кэш 60 с;
 //   POST /admin/place-* — только OWNER_ID (проверку делает handleAdminApi).
-import { CORS, json } from './api'
+import { json } from './api'
+import { cachedJson, forgetCached } from './guard'
 
 const GROUPS = ['buildings', 'sport', 'food', 'other']
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/
@@ -23,11 +24,9 @@ export async function loadPlaceEdits(env: Env): Promise<PlaceEditRow[]> {
   return results.map((r) => ({ id: r.id, data: JSON.parse(r.data) as Record<string, unknown>, updated_at: r.updated_at }))
 }
 
-export async function handlePlacesGet(env: Env): Promise<Response> {
-  return new Response(JSON.stringify({ ok: true, edits: await loadPlaceEdits(env) }), {
-    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60' },
-  })
-}
+// публичное: из памяти изолята (D1 — раз в минуту) с ETag
+export const handlePlacesGet = (env: Env, request: Request) =>
+  cachedJson(request, 'places', 60_000, async () => ({ ok: true, edits: await loadPlaceEdits(env) }))
 
 // «Как пройти»: строка — пункт; не больше 12 пунктов по 300 символов
 const howto = (v: unknown) =>
@@ -58,6 +57,7 @@ export async function placeSave(env: Env, body: Record<string, unknown>): Promis
     `INSERT INTO place_edits (id, data, updated_at) VALUES (?1, ?2, ?3)
      ON CONFLICT (id) DO UPDATE SET data = ?2, updated_at = ?3`,
   ).bind(id, JSON.stringify(data), Date.now()).run()
+  forgetCached('places')
   return json({ ok: true, id, edits: await loadPlaceEdits(env) })
 }
 
@@ -66,5 +66,6 @@ export async function placeReset(env: Env, body: Record<string, unknown>): Promi
   const id = clip(body.id, 40)
   if (!ID.test(id)) return fail('bad request')
   await env.DB.prepare('DELETE FROM place_edits WHERE id = ?').bind(id).run()
+  forgetCached('places')
   return json({ ok: true, edits: await loadPlaceEdits(env) })
 }

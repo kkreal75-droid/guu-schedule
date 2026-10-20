@@ -14,7 +14,9 @@
 //   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
-//   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново.
+//   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново (≤ 3 раз в минуту).
+//   GET  /health  — жив ли воркер и D1 (для мониторинга, без внутренних данных).
+// Вход защищает guard.ts: лимит тела, CORS только для приложения, лимиты запросов по IP и пользователю.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
 //   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка Подслушано.
 //
@@ -22,6 +24,7 @@
 // Данные — D1 (DB), настройки — KV.
 
 import { isOwner, verifyInitData, webhookSecret } from './auth'
+import { BODY_LIMIT, WEBHOOK_LIMIT, allow, clientIp, readBody, safeEqual, tooMany, withCors } from './guard'
 import { handleAdminApi } from './admin-api'
 import { CORS, json } from './api'
 import { boardLatest, handleBoardApi, isBoardAction } from './board'
@@ -48,7 +51,21 @@ import { loadSettings } from './settings'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
 
+// Кто прислал обновление и стоит ли его считать в лимит: личка, кнопки, inline и команды в беседах.
+// Обычные сообщения в беседах бот и так пропускает, не читая базу.
+function updateSender(update: TgUpdate): number | null {
+  const message = update.message
+  if (message) {
+    const command = (message.text ?? message.caption ?? '').startsWith('/')
+    return message.chat.type === 'private' || command ? (message.from?.id ?? null) : null
+  }
+  return update.callback_query?.from.id ?? update.inline_query?.from.id ?? null
+}
+
 async function handleUpdate(env: Env, ctx: ExecutionContext, update: TgUpdate): Promise<void> {
+  // флуд одного человека — молча пропускаем, до базы и до Telegram (владельца не ограничиваем)
+  const sender = updateSender(update)
+  if (sender !== null && !isOwner(env, sender) && !(await allow(env, 'RL_BOT', sender))) return
   if (update.message) {
     const message = update.message
     if (message.chat.type === 'private') await handlePrivateMessage(env, ctx, message)
@@ -122,7 +139,8 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
 // group — id группы (старые версии присылают имя «МБ(МП) 1-1»), v — версия формата приложения.
 // В ответе ещё время последнего сообщения в Подслушано (точка «есть новое») и appExtras.
 async function handleSeen(env: Env, request: Request): Promise<Response> {
-  const body = await request.text()
+  const body = await readBody(request, BODY_LIMIT)
+  if (body instanceof Response) return body
   let initData = body
   let group: string | null = null
   let groups: string[] | null = null
@@ -142,6 +160,7 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   }
   const profile = await verifyInitData(initData, env)
   if (!profile) return json({ ok: false }, 403)
+  if (!(await allow(env, 'RL_SEEN', profile.id))) return tooMany()
   try {
     const admin = isOwner(env, profile.id)
     const [{ banned, me }, board, extras] = await Promise.all([
@@ -157,100 +176,142 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   }
 }
 
+// GET /health — для мониторинга: жив ли воркер и отвечает ли D1 (проверка — не чаще раза в 30 с)
+let health: { at: number; ok: boolean } | null = null
+async function handleHealth(env: Env): Promise<Response> {
+  if (!health || Date.now() - health.at > 30_000) {
+    let ok = true
+    try {
+      await env.DB.prepare('SELECT 1').first()
+    } catch {
+      ok = false
+    }
+    health = { at: Date.now(), ok }
+  }
+  return Response.json({ ok: health.ok }, { status: health.ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } })
+}
+
+// Обновление от Telegram: только POST, секрет в заголовке (сравнение в постоянное время), тело до 1 МБ.
+// Отвечаем сразу, обработка — в фоне, иначе Telegram повторит запрос.
+async function handleWebhook(env: Env, ctx: ExecutionContext, request: Request): Promise<Response> {
+  if (request.method !== 'POST') return new Response('not found', { status: 404 })
+  if (!safeEqual(request.headers.get('X-Telegram-Bot-Api-Secret-Token') ?? '', await webhookSecret(env))) {
+    return new Response('forbidden', { status: 403 })
+  }
+  const text = await readBody(request, WEBHOOK_LIMIT)
+  if (text instanceof Response) return text
+  let update: TgUpdate | null = null
+  try {
+    update = JSON.parse(text) as TgUpdate
+  } catch {
+    return new Response('ok')
+  }
+  if (update && typeof update === 'object') {
+    ctx.waitUntil(handleUpdate(env, ctx, update).catch((err) => reportError(env, 'Обновление Telegram', err)))
+  }
+  return new Response('ok')
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (!env.BOT_TOKEN) {
-      return new Response('BOT_TOKEN не задан: npx wrangler secret put BOT_TOKEN', { status: 500 })
-    }
+    if (!env.BOT_TOKEN) return new Response('not configured', { status: 500 })
     const url = new URL(request.url)
-    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
-
-    if (url.pathname === '/webhook' && request.method === 'POST') {
-      if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== (await webhookSecret(env))) {
-        return new Response('forbidden', { status: 403 })
-      }
-      const update = (await request.json().catch(() => null)) as TgUpdate | null
-      // Telegram отвечаем сразу, обработка — в фоне, иначе он повторит запрос
-      if (update) {
-        ctx.waitUntil(handleUpdate(env, ctx, update).catch((err) => reportError(env, 'Обновление Telegram', err)))
-      }
-      return new Response('ok')
-    }
-
-    if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
-    if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
-    if (url.pathname === '/support' && request.method === 'POST') return guarded(env, 'Поддержка', () => handleSupport(env, request))
-    if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env))
-    if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env))
-    if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
-    if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
-    if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
-    const starosta = url.pathname.match(/^\/starosta\/([a-z-]+)$/)
-    if (starosta && request.method === 'POST') {
-      const action = starosta[1]
-      return guarded(env, `Староста: ${action}`, () => handleStarostaApi(env, request, action))
-    }
-
-    // календарь: подписка из приложения и сам .ics для Apple/Google
-    const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)
-    if (cal && request.method === 'POST') return guarded(env, 'Календарь', () => handleCalendarApi(env, request, cal[1]))
-    const apple = url.pathname.match(/^\/cal\/([\w-]{20,})\/apple$/)
-    if (apple && request.method === 'GET') return guarded(env, 'Календарь Apple', () => handleAppleSubscribe(env, request, apple[1]))
-    const ics = url.pathname.match(/^\/cal\/([\w-]{20,})\.ics$/)
-    if (ics && (request.method === 'GET' || request.method === 'HEAD')) {
-      return guarded(env, 'Календарь .ics', () => handleIcs(env, ctx, ics[1]))
-    }
-
-    const admin = url.pathname.match(/^\/admin\/([a-z-]+)$/)
-    if (admin && request.method === 'POST') {
-      const action = admin[1]
-      return guarded(env, `Админ-панель: ${action}`, () => handleAdminApi(env, ctx, request, action))
-    }
-
-    const board = url.pathname.match(/^\/board\/([a-z]+)$/)
-    if (board && request.method === 'POST' && isBoardAction(board[1])) {
-      const action = board[1]
-      return guarded(env, `Подслушано: ${action}`, () => handleBoardApi(env, request, action))
-    }
-
-    const reviews = url.pathname.match(/^\/reviews\/([a-z]+)$/)
-    if (reviews && request.method === 'POST' && isReviewAction(reviews[1])) {
-      const action = reviews[1]
-      return guarded(env, `Отзывы: ${action}`, () => handleReviewsApi(env, request, action))
-    }
-
-    if (url.pathname === '/' && request.method === 'GET') {
-      try {
-        return Response.json(await setupBot(env, url.origin, url.searchParams.has('force')))
-      } catch (err) {
-        await reportError(env, 'Настройка вебхука', err)
-        return Response.json({ ok: false, error: String(err) }, { status: 502 })
-      }
-    }
-
-    return new Response('not found', { status: 404 })
+    // вебхук — с IP Telegram, свой секрет; его не ограничиваем по IP
+    if (url.pathname === '/webhook') return handleWebhook(env, ctx, request)
+    // флуд с одного адреса — 429 сразу, без D1/KV (лимит щедрый: в общежитии и Wi-Fi ГУУ адрес общий)
+    if (!(await allow(env, 'RL_IP', clientIp(request)))) return withCors(env, request, tooMany())
+    return withCors(env, request, await route(env, ctx, request, url))
   },
 
   // Раз в минуту. Лимит — 50 подзапросов на вызов: сначала то, что привязано ко времени
   // (сводки, изменения), рассылкам — что осталось; недосланное подхватит следующая минута.
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const now = controller.scheduledTime
-    const run = async () => {
-      let used = 0
-      used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
-      if (new Date(now).getUTCMinutes() % 10 === 5) {
-        used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
-        used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
-      }
-      if (new Date(now).getUTCMinutes() % 10 === 7) {
-        used += await notifySessions(env).catch((err) => (reportError(env, 'Рассылка о сессии', err), 0))
-      }
-      if (new Date(now).getUTCMinutes() === 35) {
-        used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))
-      }
-      const batch = Math.max(0, BATCH - used)
-      if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))
-    }
-    ctx.waitUntil(run())
+    await runCron(controller, env, ctx)
   },
 } satisfies ExportedHandler<Env>
+
+async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL): Promise<Response> {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+  // публичное (без initData) — свой лимит по IP: из кэша, но запрос всё равно стоит денег
+  const publicGet = request.method === 'GET' && ['/', '/health', '/places', '/academic'].includes(url.pathname)
+  if (publicGet && !(await allow(env, 'RL_PUBLIC', clientIp(request)))) return tooMany()
+  if (url.pathname === '/health' && request.method === 'GET') return handleHealth(env)
+
+  if (url.pathname === '/seen' && request.method === 'POST') return handleSeen(env, request)
+  if (url.pathname === '/profile' && request.method === 'POST') return guarded(env, 'Профиль', () => handleProfile(env, request))
+  if (url.pathname === '/support' && request.method === 'POST') return guarded(env, 'Поддержка', () => handleSupport(env, request))
+  if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env, request))
+  if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env, request))
+  if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
+  if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
+  if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
+  const starosta = url.pathname.match(/^\/starosta\/([a-z-]+)$/)
+  if (starosta && request.method === 'POST') {
+    const action = starosta[1]
+    return guarded(env, `Староста: ${action}`, () => handleStarostaApi(env, request, action))
+  }
+
+  // календарь: подписка из приложения и сам .ics для Apple/Google
+  const cal = url.pathname.match(/^\/cal\/(status|connect|disconnect)$/)
+  if (cal && request.method === 'POST') return guarded(env, 'Календарь', () => handleCalendarApi(env, request, cal[1]))
+  const apple = url.pathname.match(/^\/cal\/([\w-]{20,64})\/apple$/)
+  if (apple && request.method === 'GET') return guarded(env, 'Календарь Apple', () => handleAppleSubscribe(env, request, apple[1]))
+  const ics = url.pathname.match(/^\/cal\/([\w-]{20,64})\.ics$/)
+  if (ics && (request.method === 'GET' || request.method === 'HEAD')) {
+    // календари (Google, Apple) ходят с общих адресов — лимит по ссылке, а не по IP
+    if (!(await allow(env, 'RL_PUBLIC', `ics:${ics[1]}`))) return tooMany()
+    return guarded(env, 'Календарь .ics', () => handleIcs(env, ctx, ics[1]))
+  }
+
+  const admin = url.pathname.match(/^\/admin\/([a-z-]+)$/)
+  if (admin && request.method === 'POST') {
+    const action = admin[1]
+    return guarded(env, `Админ-панель: ${action}`, () => handleAdminApi(env, ctx, request, action))
+  }
+
+  const board = url.pathname.match(/^\/board\/([a-z]+)$/)
+  if (board && request.method === 'POST' && isBoardAction(board[1])) {
+    const action = board[1]
+    return guarded(env, `Подслушано: ${action}`, () => handleBoardApi(env, request, action))
+  }
+
+  const reviews = url.pathname.match(/^\/reviews\/([a-z]+)$/)
+  if (reviews && request.method === 'POST' && isReviewAction(reviews[1])) {
+    const action = reviews[1]
+    return guarded(env, `Отзывы: ${action}`, () => handleReviewsApi(env, request, action))
+  }
+
+  if (url.pathname === '/' && request.method === 'GET') {
+    // настройка вебхука ходит в Telegram 4–8 раз — не чаще 3 раз в минуту на всех
+    if (!(await allow(env, 'RL_SETUP', 'setup'))) return tooMany()
+    try {
+      return Response.json(await setupBot(env, url.origin, url.searchParams.has('force')))
+    } catch (err) {
+      await reportError(env, 'Настройка вебхука', err)
+      return Response.json({ ok: false, error: 'telegram' }, { status: 502 })
+    }
+  }
+
+  return new Response('not found', { status: 404 })
+}
+
+async function runCron(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  const now = controller.scheduledTime
+  const run = async () => {
+    let used = 0
+    used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
+    if (new Date(now).getUTCMinutes() % 10 === 5) {
+      used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))
+      used += await sendAlerts(env).catch((err) => (reportError(env, 'Тревоги автообновления', err), 0))
+    }
+    if (new Date(now).getUTCMinutes() % 10 === 7) {
+      used += await notifySessions(env).catch((err) => (reportError(env, 'Рассылка о сессии', err), 0))
+    }
+    if (new Date(now).getUTCMinutes() === 35) {
+      used += await cleanupBoard(env, now).catch((err) => (reportError(env, 'Чистка Подслушано', err), 0))
+    }
+    const batch = Math.max(0, BATCH - used)
+    if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))
+  }
+  ctx.waitUntil(run())
+}

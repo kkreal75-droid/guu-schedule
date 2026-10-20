@@ -8,7 +8,8 @@ import {
   type PeriodKind,
 } from '../../shared/calendar-core'
 import { isoFromDay } from '../../shared/schedule-core'
-import { CORS, json } from './api'
+import { json } from './api'
+import { cachedJson, forgetCached } from './guard'
 import { loadComputedCalendar, loadGroupsIndex } from './schedule'
 
 const KINDS: PeriodKind[] = ['study', 'session', 'practice', 'holidays']
@@ -25,11 +26,9 @@ export async function loadCalendarEdits(env: Env): Promise<CalendarEdit[]> {
   return results.map((r) => ({ scope: r.scope, periods: JSON.parse(r.periods) as PeriodDraft[], doc: r.doc === 1, updated_at: r.updated_at }))
 }
 
-export async function handleAcademicGet(env: Env): Promise<Response> {
-  return new Response(JSON.stringify({ ok: true, edits: await loadCalendarEdits(env) }), {
-    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60' },
-  })
-}
+// публичное: из памяти изолята (D1 — раз в минуту) с ETag
+export const handleAcademicGet = (env: Env, request: Request) =>
+  cachedJson(request, 'academic', 60_000, async () => ({ ok: true, edits: await loadCalendarEdits(env) }))
 
 // {scope, periods: [{kind, start, end, title}], doc}
 export async function academicSave(env: Env, body: Record<string, unknown>): Promise<Response> {
@@ -51,6 +50,7 @@ export async function academicSave(env: Env, body: Record<string, unknown>): Pro
   )
     .bind(scope, JSON.stringify(periods), body.doc === true ? 1 : 0, Date.now())
     .run()
+  forgetCached('academic')
   return json({ ok: true, edits: await loadCalendarEdits(env) })
 }
 
@@ -59,6 +59,7 @@ export async function academicReset(env: Env, body: Record<string, unknown>): Pr
   const scope = clip(body.scope, 300)
   if (!parseScope(scope)) return fail('bad request')
   await env.DB.prepare('DELETE FROM calendar_edits WHERE scope = ?').bind(scope).run()
+  forgetCached('academic')
   return json({ ok: true, edits: await loadCalendarEdits(env) })
 }
 

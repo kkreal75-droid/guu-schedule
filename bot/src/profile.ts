@@ -9,7 +9,7 @@ import { loadGroupFile, loadTeacherFile } from './schedule'
 type Body = { role?: unknown; group?: unknown; teacher?: unknown }
 
 export async function handleProfile(env: Env, request: Request): Promise<Response> {
-  const req = await readApi<Body>(env, request)
+  const req = await readApi<Body>(env, request, { write: true })
   if (req instanceof Response) return req
   const role = req.body.role === 'teacher' ? 'teacher' : req.body.role === 'student' ? 'student' : null
   if (!role) return json({ ok: false, error: 'role' }, 400)
@@ -20,7 +20,8 @@ export async function handleProfile(env: Env, request: Request): Promise<Respons
     group = normalizeGroup(req.body.group)
     if (!group || !(await loadGroupFile(env, group))) return json({ ok: false, error: 'group' }, 400)
   } else {
-    teacher = typeof req.body.teacher === 'string' ? req.body.teacher : null
+    // id преподавателя — как в teachers.json (латиница, цифры, дефисы): в путь к файлу на сайте — только он
+    teacher = typeof req.body.teacher === 'string' && /^[a-z0-9][a-z0-9-]{0,79}$/.test(req.body.teacher) ? req.body.teacher : null
     if (!teacher || !(await loadTeacherFile(env, teacher))) return json({ ok: false, error: 'teacher' }, 400)
   }
   const now = Date.now()
@@ -43,7 +44,7 @@ export async function handleProfile(env: Env, request: Request): Promise<Respons
 // Знакомство (истории автора, подтверждение группы, тур) просмотрено: POST /intro {version}.
 // Версия только растёт — со старого устройства её не откатить (сбросить может владелец себе, в админке).
 export async function handleIntro(env: Env, request: Request): Promise<Response> {
-  const req = await readApi<{ version?: unknown }>(env, request)
+  const req = await readApi<{ version?: unknown }>(env, request, { write: true })
   if (req instanceof Response) return req
   const version = typeof req.body.version === 'number' && Number.isSafeInteger(req.body.version) ? req.body.version : null
   if (version === null || version < 1 || version > 100) return json({ ok: false, error: 'version' }, 400)

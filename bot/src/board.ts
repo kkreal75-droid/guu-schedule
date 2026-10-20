@@ -470,7 +470,7 @@ const ADMIN_ONLY: Action[] = ['delete']
 export const isBoardAction = (action: string): action is Action => (ACTIONS as readonly string[]).includes(action)
 
 export async function handleBoardApi(env: Env, request: Request, action: Action): Promise<Response> {
-  const req = await readApi<Body>(env, request)
+  const req = await readApi<Body>(env, request, { write: WRITES.includes(action) || action === 'accept' || action === 'origin' })
   if (req instanceof Response) return req
   if (!env.BOARD_SALT) return fail(503, 'not-configured')
   if (ADMIN_ONLY.includes(action) && !req.admin) return fail(403, 'forbidden')

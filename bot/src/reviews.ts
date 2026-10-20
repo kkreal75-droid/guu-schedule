@@ -316,7 +316,7 @@ const WRITES: Action[] = ['save', 'delete', 'report', 'vote']
 export const isReviewAction = (action: string): action is Action => (ACTIONS as readonly string[]).includes(action)
 
 export async function handleReviewsApi(env: Env, request: Request, action: Action): Promise<Response> {
-  const req = await readApi<Body>(env, request)
+  const req = await readApi<Body>(env, request, { write: WRITES.includes(action) })
   if (req instanceof Response) return req
   const until = bannedUntil(req)
   // удалить свой отзыв можно и с баном
