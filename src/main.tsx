@@ -58,7 +58,7 @@ function applyChoice(prefs: Prefs, choice: Choice): Prefs {
     : { ...prefs, role: 'student', group: choice.group, teacher: null, teacherName: null, at: Date.now() }
 }
 
-type Tab = 'schedule' | 'more' | 'profile'
+type Tab = import('./components/TabBar').Tab
 // app — расписание; intro — знакомство (этап 7.1: всем один раз, «Показать знакомство ещё раз»);
 // onboarding — только выбор группы / роли («Сменить группу / роль», группа пропала из расписания)
 type Phase =

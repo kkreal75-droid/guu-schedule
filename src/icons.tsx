@@ -197,3 +197,10 @@ export const StarFillIcon = (p: P) => (
     <path d="m12 3.2 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.6l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8L12 3.2Z" />
   </svg>
 )
+
+// гантель: вкладка «Спорт»
+export const DumbbellIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M6.5 7.5v9M17.5 7.5v9M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />
+  </svg>
+)

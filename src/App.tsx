@@ -6,17 +6,18 @@ import { hasNew, markSeen } from './board/seen'
 import { NoticeBar } from './components/NoticeBar'
 import type { Extras } from './edits'
 import { formatStamp } from './format'
-import { CalendarIcon, MoreIcon, UserIcon } from './icons'
 import { useNotes } from './notes'
 import { MAX_FAVORITES, usePrefs } from './prefs'
+import { TabBar, type Tab } from './components/TabBar'
 import { MoreScreen, type MoreRequest } from './screens/MoreScreen'
+import { SportScreen } from './screens/SportScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleScreen'
 import { fromCache, schedule } from './schedule'
 import { haptic, showAlert, type CheckIn } from './telegram'
 import { useTheme } from './theme'
 
-export type Tab = 'schedule' | 'more' | 'profile'
+export type { Tab }
 
 // status — ответ бота при открытии (админ ли); null — вне Telegram или бот недоступен.
 // edits — ручные правки расписания из админ-панели.
@@ -119,6 +120,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           notes={notes}
           onSaveNote={setNote}
         />
+      ) : tab === 'sport' ? (
+        <SportScreen />
       ) : tab === 'more' ? (
         <MoreScreen
           admin={Boolean(status?.admin)}
@@ -169,21 +172,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
         </p>
       )}
 
-      <nav className="tabbar">
-        <button type="button" className="tab" aria-current={tab === 'schedule'} onClick={() => switchTab('schedule')}>
-          <CalendarIcon />
-          <span>Расписание</span>
-        </button>
-        <button type="button" className="tab" aria-current={tab === 'more'} onClick={() => switchTab('more')}>
-          <MoreIcon />
-          <span>Ещё</span>
-          {boardNew && <span className="new-dot" aria-label="есть новое" />}
-        </button>
-        <button type="button" className="tab" aria-current={tab === 'profile'} onClick={() => switchTab('profile')}>
-          <UserIcon />
-          <span>Профиль</span>
-        </button>
-      </nav>
+      <TabBar tab={tab} onTab={switchTab} dot={boardNew} />
     </div>
   )
 }
