@@ -238,6 +238,14 @@ export const BuildingIcon = (p: P) => (
   </svg>
 )
 
+// глобус: «For international students»
+export const GlobeIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5Z" />
+  </svg>
+)
+
 // вопрос: «Частые вопросы»
 export const QuestionIcon = (p: P) => (
   <svg {...base} {...p}>

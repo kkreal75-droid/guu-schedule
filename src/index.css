@@ -4588,3 +4588,34 @@ select.account-select:disabled {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- «For international students» (этап 11.4) ---------- */
+
+.intl-code {
+  justify-content: flex-start;
+}
+
+.intl-code-key {
+  flex: none;
+  min-width: 36px;
+  font-weight: 600;
+}
+
+.intl-code-name {
+  color: var(--text);
+}
+
+.intl-link {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.intl-link-title {
+  color: var(--accent-ink);
+}
+
+.intl-link-sub {
+  font-size: 13px;
+  color: var(--hint);
+}

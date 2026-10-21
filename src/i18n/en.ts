@@ -266,6 +266,7 @@ export const EN: Record<string, string> = {
   "Как настроить": "How to set it up",
   "1. Нажмите «Добавить в беседу» и выберите беседу группы.": "1. Tap «Add to a group chat» and choose your group's chat.",
   "2. Админ беседы отправляет /setup и выбирает группу и время: 7:00, 7:30 или 8:00.": "2. A chat admin sends /setup and picks the group and time: 7:00, 7:30 or 8:00.",
+  "3. Язык сообщений — кнопками «Русский / English» в конце настройки.": "3. Message language — the 🇷🇺 / 🇬🇧 buttons at the end of the setup.",
   "В беседе работают /today и /tomorrow — пары на сегодня и завтра, /off выключает автосообщения.": "In the chat, /today and /tomorrow show today's and tomorrow's classes, /off turns automatic messages off.",
   "Иконка расписания рядом с остальными приложениями — открывается одним касанием, без поиска бота в чатах.": "A schedule icon next to your other apps — opens with one tap, no need to look for the bot in your chats.",
   "✅ Уже на домашнем экране": "✅ Already on your home screen",

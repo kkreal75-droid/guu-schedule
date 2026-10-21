@@ -3,7 +3,7 @@ import { AdminPage } from '../admin/AdminPage'
 import type { TeacherInfo } from '../data'
 import type { Extras } from '../edits'
 import {
-  BuildingIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GroupChatIcon,
+  BuildingIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GlobeIcon, GroupChatIcon,
   MegaphoneIcon, MessageIcon, PeopleIcon, PhoneCalendarIcon, PlanIcon, QuestionIcon, ShieldIcon, StarIcon, TableIcon,
   TeacherIcon,
 } from '../icons'
@@ -14,6 +14,7 @@ import { FreeRoomsPage } from '../more/FreeRoomsPage'
 import { GroupBotPage } from '../more/GroupBotPage'
 import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { InstallPage } from '../more/InstallPage'
+import { InternationalPage } from '../more/InternationalPage'
 import { KugPage } from '../more/KugPage'
 import { PlacesPage, type PlacesTarget } from '../more/PlacesPage'
 import { SessionPage } from '../more/SessionPage'
@@ -24,10 +25,11 @@ import { TeachersPage } from '../more/TeachersPage'
 import type { Prefs } from '../prefs'
 import { haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
-import { t } from '../i18n'
+import { t, useLang } from '../i18n'
 
 // «Другое» — всё, кроме расписания: группы-карточки (Учебное, Сообщество, Информация, Помощь), у пункта —
 // цветная иконка, название и серая подпись. У старосты — «Правки группы», у владельца — «Админ-панель».
+// В английском интерфейсе первым — «For international students» (этап 11.4).
 
 type Color = 'red' | 'orange' | 'amber' | 'yellow' | 'green' | 'teal' | 'sky' | 'blue' | 'indigo' | 'purple' | 'pink' | 'gray'
 type Item = {
@@ -73,7 +75,24 @@ export function MoreScreen({
     window.scrollTo(0, 0)
   }, [request, onRequestBack])
 
+  const lang = useLang()
   const groups: Group[] = [
+    ...(lang === 'en'
+      ? [
+          {
+            items: [
+              {
+                id: 'international',
+                title: 'For international students',
+                sub: 'Weeks, buildings, visas, contacts',
+                icon: GlobeIcon,
+                color: 'teal' as Color,
+                render: () => <InternationalPage onOpen={(item) => (setOpenId(item), window.scrollTo(0, 0))} />,
+              },
+            ],
+          },
+        ]
+      : []),
     {
       title: t('Учебное'),
       items: [

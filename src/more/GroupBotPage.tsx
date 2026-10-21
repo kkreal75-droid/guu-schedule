@@ -27,6 +27,7 @@ export function GroupBotPage() {
       <Section title={t('Как настроить')}>
         <div className="row row-text">{t('1. Нажмите «Добавить в беседу» и выберите беседу группы.')}</div>
         <div className="row row-text">{t('2. Админ беседы отправляет /setup и выбирает группу и время: 7:00, 7:30 или 8:00.')}</div>
+        <div className="row row-text">{t('3. Язык сообщений — кнопками «Русский / English» в конце настройки.')}</div>
       </Section>
 
       <p className="section-footer">
