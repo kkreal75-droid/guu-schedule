@@ -1,8 +1,11 @@
 // Учебный график группы (этап 8.3): типовой график + учёба по расписанию (data/calendar.json) + правки владельца
 // (GET /academic у бота) + опубликованная сессия группы. Логика периодов — shared/calendar-core.ts.
-import { periodsFor, type CalendarEdit, type ComputedCalendar, type Period } from '../shared/calendar-core'
+import { periodsFor, type CalendarEdit, type ComputedCalendar, type Period, type PeriodKind, type PeriodSource } from '../shared/calendar-core'
+import { dayFromIso } from '../shared/schedule-core'
 import type { GroupInfo } from '../shared/groups'
 import { cachedList, groupInfo, loadSession, loadSessionStatus } from './data'
+import { formatDate } from './format'
+import { t, tKnown } from './i18n'
 import { readLocal, writeLocal } from './storage'
 import { BOT_URL } from './telegram'
 
@@ -67,3 +70,18 @@ export async function groupCalendar(group: string): Promise<GroupCalendar> {
   ])
   return { info, periods: periodsFor(info ?? TYPICAL, computed, edits, session), typical: !info }
 }
+
+// ---------- на языке интерфейса (этап 11) ----------
+// названия периодов из типового графика и праздников — по словарю; свои названия владельца — как есть
+
+export const kindTitle = (kind: PeriodKind) =>
+  ({ study: t('Учёба'), session: t('Сессия'), practice: t('Практика#период'), holidays: t('Каникулы') })[kind]
+
+export const sourceTitle = (source: PeriodSource) =>
+  ({ doc: t('по документу ГУУ'), schedule: t('по расписанию (уточняется)'), estimate: t('по типовому графику ГУУ (уточняется)') })[source]
+
+export const periodTitle = (p: Pick<Period, 'title' | 'kind'>) => (p.title ? (tKnown(p.title) ?? p.title) : kindTitle(p.kind))
+export const holidayTitle = (title: string) => tKnown(title) ?? title
+
+// «7 февраля» / «7 February»
+export const isoLong = (iso: string) => formatDate(dayFromIso(iso))

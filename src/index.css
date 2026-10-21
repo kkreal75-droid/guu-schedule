@@ -2165,6 +2165,28 @@ select.input {
   min-height: 76px;
 }
 
+/* выбор языка: плитка 🌐 и заголовок по центру, выбранная карточка — обводка цветом темы и галочка */
+.ob-lang {
+  padding-top: 24px;
+  text-align: center;
+}
+
+.ob-lang .ob-emoji {
+  margin: 0 auto 16px;
+}
+
+.ob-lang .ob-cards {
+  text-align: left;
+}
+/* выбор языка: выбранная карточка — обводка цветом темы и галочка */
+.ob-card-lang[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+}
+
+.ob-card-check {
+  color: var(--accent);
+}
+
 .ob-card-emoji {
   flex: none;
   font-size: 30px;

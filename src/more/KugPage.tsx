@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { groupCalendar, type GroupCalendar } from '../academic'
-import { LEVEL_TITLES, type GroupInfo, type Level } from '../../shared/groups'
+import type { GroupInfo, Level } from '../../shared/groups'
 import { isEvenWeek } from '../../shared/format-core'
 import { Section } from '../components/Section'
 import { groupInfo } from '../data'
@@ -9,6 +9,8 @@ import { ChevronRight, ExternalIcon } from '../icons'
 import { dataUrl, getTimetable, moscowNow } from '../schedule'
 import { openLink } from '../telegram'
 import { AcademicCalendar } from './AcademicCalendar'
+import { t, tKnown } from '../i18n'
+import { levelTitle } from '../onboarding/Onboarding'
 
 // «Другое → Календарный учебный график»: учебный год визуально (AcademicCalendar — учёба, сессии, каникулы,
 // практика, праздники; данные — src/academic.ts), недели семестра по расписанию ГУУ и официальные графики
@@ -20,7 +22,7 @@ const words = (s: string) =>
   new Set(
     s
       .toLowerCase()
-      .replace(/ё/g, 'е')
+      .replace(/ё/g, 'е') // i18n-ignore — сравнение названий
       .replace(/[^a-zа-я0-9 ]+/g, ' ')
       .split(/\s+/)
       .filter((w) => w.length > 2),
@@ -84,56 +86,62 @@ export function KugPage({ group }: { group: string }) {
         <AcademicCalendar
           periods={calendar.periods}
           typical={calendar.typical}
-          title={calendar.info ? `${calendar.info.name} · ${calendar.info.course} курс` : 'типовой график'}
+          title={calendar.info ? `${calendar.info.name} · ${t('{n} курс', { n: calendar.info.course })}` : t('типовой график')}
         />
       ) : (
-        <p className="lead">Загружаю график…</p>
+        <p className="lead">{t('Загружаю график…')}</p>
       )}
 
       <details className="cd-details">
-        <summary>Недели семестра и официальные графики (PDF)</summary>
+        <summary>{t('Недели семестра и официальные графики (PDF)')}</summary>
         <Section
-          title="Семестр по расписанию ГУУ"
-          footer="Номера недель и чётность — как в файлах расписания. Сессия и каникулы — в графике своей программы ниже."
+          title={t('Семестр по расписанию ГУУ')}
+          footer={t('Номера недель и чётность — как в файлах расписания. Сессия и каникулы — в графике своей программы ниже.')}
         >
           <div className="row">
-            <span>Занятия</span>
+            <span>{t('Занятия')}</span>
             <span className="row-value">{formatShortRange(firstMonday, lastSunday)}</span>
           </div>
           <div className="row">
-            <span>Недель</span>
+            <span>{t('Недель')}</span>
             <span className="row-value">{T.maxWeek}</span>
           </div>
           <div className="row">
-            <span>Сейчас</span>
+            <span>{t('Сейчас')}</span>
             <span className="row-value">
-              {T.inSemester(current) ? `${current}-я неделя, ${isEvenWeek(current) ? 'чётная' : 'нечётная'}` : current < 1 ? 'семестр не начался' : 'семестр окончен'}
+              {T.inSemester(current)
+                ? isEvenWeek(current)
+                  ? t('{n}-я неделя, чётная', { n: current })
+                  : t('{n}-я неделя, нечётная', { n: current })
+                : current < 1
+                  ? t('семестр не начался')
+                  : t('семестр окончен')}
             </span>
           </div>
         </Section>
 
-        <Section title="Недели">
+        <Section title={t('Недели')}>
           {visibleWeeks.map((w) => (
             <div key={w} className="row kug-week" data-current={w === current || undefined}>
               <span className="kug-week-no">{w}</span>
               <span className="kug-week-dates">{formatShortRange(T.dayOf(w, 0), T.dayOf(w, 6))}</span>
-              <span className="row-value">{isEvenWeek(w) ? 'чётная' : 'нечётная'}</span>
+              <span className="row-value">{isEvenWeek(w) ? t('чётная') : t('нечётная')}</span>
             </div>
           ))}
           {!all && (
             <button type="button" className="row row-btn row-link" onClick={() => setAll(true)}>
-              <span>Все {T.maxWeek} недель</span>
+              <span>{t('Все {n} недель', { n: T.maxWeek })}</span>
             </button>
           )}
         </Section>
 
         {best && (
-          <Section title="Твоя программа" footer="Официальный документ с сайта ГУУ: даты сессий, практик и каникул.">
+          <Section title={t('Твоя программа')} footer={t('Официальный документ с сайта ГУУ: даты сессий, практик и каникул.')}>
             <button type="button" className="row row-btn kug-row" onClick={() => openLink(best.url)}>
               <span className="kug-row-text">
                 <span className="kug-title">{best.title}</span>
                 <span className="kug-sub">
-                  {[best.code, best.level ? LEVEL_TITLES[best.level] : null, best.form].filter(Boolean).join(' · ')}
+                  {[best.code, best.level ? levelTitle(best.level) : null, best.form && (tKnown(best.form) ?? best.form)].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <ExternalIcon className="row-check" />
@@ -141,17 +149,17 @@ export function KugPage({ group }: { group: string }) {
           </Section>
         )}
 
-        <Section title="Графики всех программ (PDF)" footer="Источник: guu.ru → Сведения об образовательной организации → Образование.">
+        <Section title={t('Графики всех программ (PDF)')} footer={t('Источник: guu.ru → Сведения об образовательной организации → Образование.')}>
           <div className="row row-form">
-            <input className="input" type="search" placeholder="Название или код программы" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="input" type="search" placeholder={t('Название или код программы')} value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          {error && <div className="row row-text">Не получилось загрузить список. Проверь интернет.</div>}
-          {!kug && !error && <div className="row row-text">Загружаю…</div>}
+          {error && <div className="row row-text">{t('Не получилось загрузить список. Проверь интернет.')}</div>}
+          {!kug && !error && <div className="row row-text">{t('Загружаю…')}</div>}
           {shown.slice(0, 80).map((k) => (
             <button key={k.url + k.title} type="button" className="row row-btn kug-row" onClick={() => openLink(k.url)}>
               <span className="kug-row-text">
                 <span className="kug-title">{k.title}</span>
-                <span className="kug-sub">{[k.code, k.level ? LEVEL_TITLES[k.level] : null, k.form].filter(Boolean).join(' · ')}</span>
+                <span className="kug-sub">{[k.code, k.level ? levelTitle(k.level) : null, k.form && (tKnown(k.form) ?? k.form)].filter(Boolean).join(' · ')}</span>
               </span>
               <ChevronRight className="row-chevron" />
             </button>

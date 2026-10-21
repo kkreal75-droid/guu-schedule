@@ -1,12 +1,13 @@
 import { CalendarIcon, MoreIcon } from '../icons'
 import { telegramUser } from '../telegram'
+import { t } from '../i18n'
 
 export type Tab = 'schedule' | 'more' | 'profile'
 
 // Аватар Telegram на вкладке «Профиль»; нет фото — буква имени
 export function Avatar({ size }: { size: number }) {
   const user = telegramUser()
-  const letter = (user?.first_name ?? 'Г').slice(0, 1).toUpperCase()
+  const letter = (user?.first_name ?? t('Г')).slice(0, 1).toUpperCase()
   return user?.photo_url ? (
     <img className="tab-avatar" src={user.photo_url} alt="" width={size} height={size} />
   ) : (
@@ -27,9 +28,9 @@ export function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) 
   return (
     <nav className="tabbar">
       <div className="tabbar-inner">
-        {item('schedule', 'Расписание', <CalendarIcon />)}
-        {item('more', 'Другое', <MoreIcon />)}
-        {item('profile', 'Профиль', <Avatar size={26} />)}
+        {item('schedule', t('Расписание'), <CalendarIcon />)}
+        {item('more', t('Другое'), <MoreIcon />)}
+        {item('profile', t('Профиль'), <Avatar size={26} />)}
       </div>
     </nav>
   )

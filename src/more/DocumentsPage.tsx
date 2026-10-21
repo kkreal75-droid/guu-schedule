@@ -4,6 +4,7 @@ import { groupInfo, loadSessionStatus } from '../data'
 import { ExternalIcon } from '../icons'
 import { dataUrl } from '../schedule'
 import { openLink } from '../telegram'
+import { t, tn } from '../i18n'
 
 // «Другое → Документы»: исходные таблицы ГУУ, из которых собрано расписание (parse_report.json, update.py)
 
@@ -21,10 +22,11 @@ type FileRow = {
 
 const shortYear = (year: string) => year.replace(/^(\d{4})\/\d{2}(\d{2})$/, '$1/$2')
 
-const SECTIONS: [string, string][] = [
-  ['бакалавриат', 'Бакалавриат'],
-  ['магистратура', 'Магистратура'],
-  ['аспирантура', 'Аспирантура'],
+// раздел страницы guu.ru (как в update.py) → заголовок
+const sections = (): [string, string][] => [
+  ['бакалавриат', t('Бакалавриат')], // i18n-ignore — ключ раздела
+  ['магистратура', t('Магистратура')], // i18n-ignore
+  ['аспирантура', t('Аспирантура')], // i18n-ignore
 ]
 
 const label = (f: FileRow) => {
@@ -46,20 +48,20 @@ export function DocumentsPage({ group }: { group: string }) {
     loadSessionStatus().then((s) => setSessionPage(s.page), () => {})
   }, [group])
 
-  if (error) return <p className="lead">Не получилось загрузить список. Проверь интернет.</p>
-  if (!files) return <p className="lead">Загружаю…</p>
+  if (error) return <p className="lead">{t('Не получилось загрузить список. Проверь интернет.')}</p>
+  if (!files) return <p className="lead">{t('Загружаю…')}</p>
 
   const row = (f: FileRow) => (
     <button key={f.url} type="button" className="row row-btn kug-row" onClick={() => openLink(f.url)}>
       <span className="kug-row-text">
         <span className="kug-title">
           {label(f)}
-          {f.name === mineFile && <span className="badge badge-mine">твоя группа</span>}
-          {f.kind === 'session' && f.archive && f.year && <span className="badge badge-archive">архив {shortYear(f.year)}</span>}
+          {f.name === mineFile && <span className="badge badge-mine">{t('твоя группа')}</span>}
+          {f.kind === 'session' && f.archive && f.year && <span className="badge badge-archive">{t('архив {year}', { year: shortYear(f.year) })}</span>}
         </span>
         <span className="kug-sub">
           {f.name}
-          {f.groups ? ` · групп: ${f.groups}` : ''}
+          {f.groups ? ` · ${tn(f.groups, '{n} группа|{n} группы|{n} групп')}` : ''}
         </span>
       </span>
       <ExternalIcon className="row-check" />
@@ -68,21 +70,21 @@ export function DocumentsPage({ group }: { group: string }) {
 
   return (
     <>
-      <p className="section-footer rooms-note">Таблицы с сайта ГУУ, из которых собрано расписание в приложении. Проверяем их каждый час.</p>
-      {SECTIONS.map(([key, title]) => {
+      <p className="section-footer rooms-note">{t('Таблицы с сайта ГУУ, из которых собрано расписание в приложении. Проверяем их каждый час.')}</p>
+      {sections().map(([key, title]) => {
         const list = files.filter((f) => f.kind === 'schedule' && f.section === key)
         return list.length ? (
-          <Section key={key} title={`Расписание · ${title}`}>
+          <Section key={key} title={t('Расписание · {section}', { section: title })}>
             {list.map(row)}
           </Section>
         ) : null
       })}
       {files.some((f) => f.kind === 'session') && (
         <Section
-          title="Сессия"
+          title={t('Сессия')}
           footer={
             files.filter((f) => f.kind === 'session').every((f) => f.archive)
-              ? 'Это сессия прошлого учебного года: её группы уже на следующем курсе, в приложении она не показывается.'
+              ? t('Это сессия прошлого учебного года: её группы уже на следующем курсе, в приложении она не показывается.')
               : undefined
           }
         >
@@ -91,13 +93,13 @@ export function DocumentsPage({ group }: { group: string }) {
       )}
       <Section>
         <button type="button" className="row row-btn row-link" onClick={() => openLink('https://guu.ru/student/schedule/')}>
-          <span>Страница расписания на guu.ru</span>
+          <span>{t('Страница расписания на guu.ru')}</span>
           <ExternalIcon className="row-check" />
         </button>
         <button type="button" className="row row-btn row-link kug-row" onClick={() => openLink('https://guu.ru/student/session/')}>
           <span className="kug-row-text">
-            <span>Страница сессии на guu.ru</span>
-            {sessionPage && <span className="kug-sub">сейчас там {sessionPage}</span>}
+            <span>{t('Страница сессии на guu.ru')}</span>
+            {sessionPage && <span className="kug-sub">{t('сейчас там {what}', { what: sessionPage })}</span>}
           </span>
           <ExternalIcon className="row-check" />
         </button>

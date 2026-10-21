@@ -1,6 +1,7 @@
 // Запросы рейтинга преподавателей к боту (bot/src/reviews.ts). Авторы отзывов анонимны — их видит только
 // владелец (author, grp, reports приходят только ему).
-import { ApiError, callBot } from '../api'
+import { botError, callBot } from '../api'
+import { tn } from '../i18n'
 
 export type Criteria = { clarity: number; competence: number; communication: number }
 export type Helpful = { up: number; down: number; mine: number } // mine: 1 / -1 / 0
@@ -53,19 +54,9 @@ export const reviewsApi = {
   vote: (id: number, value: number) => callBot<{ id: number; helpful: Helpful }>('/reviews/vote', { id, value }),
 }
 
-// Текст ошибки для человека: бот присылает готовую фразу (или код)
-export function reviewError(err: unknown): string {
-  if (!(err instanceof ApiError) || err.status === 0) return 'Нет связи. Попробуй ещё раз.'
-  if (err.code && /[а-яё]/i.test(err.code)) return err.code
-  return 'Что-то сломалось 🛠'
-}
+// Текст ошибки для человека: бот присылает готовую фразу (или код) — на языке интерфейса
+export const reviewError = (err: unknown): string => botError(err)
 
 export const formatAverage = (avg: number) => avg.toFixed(1).replace('.', ',')
 
-export function reviewsWord(n: number): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return 'отзыв'
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'отзыва'
-  return 'отзывов'
-}
+export const reviewsWord = (n: number): string => tn(n, 'отзыв|отзыва|отзывов')

@@ -4,6 +4,7 @@ import { ClockIcon, DotsIcon, NoteIcon, PersonIcon, PinIcon } from '../icons'
 import { shortWhen } from '../../shared/edits-core'
 import type { DayLesson } from '../edits'
 import { toMinutes } from '../schedule'
+import { t } from '../i18n'
 
 const KIND_CLASS: Record<string, string> = {
   Лекция: 'k-lecture',
@@ -85,13 +86,13 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
       <div className="lesson-head">
         <span className="lesson-start">{short(lesson.start)}</span>
         <span className="lesson-end">— {short(lesson.end)}</span>
-        {pair ? <span className="lesson-pair">{pair} пара</span> : null}
+        {pair ? <span className="lesson-pair">{t('{n} пара', { n: pair })}</span> : null}
         {onEditNote && (
           <button
             type="button"
             className="lesson-note-btn"
             data-has-note={note ? true : undefined}
-            aria-label={note ? 'Изменить заметку к паре' : 'Добавить заметку к паре'}
+            aria-label={note ? t('Изменить заметку к паре') : t('Добавить заметку к паре')}
             onClick={onEditNote}
           >
             <NoteIcon />
@@ -101,7 +102,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
           <button
             type="button"
             className="lesson-note-btn lesson-more-btn"
-            aria-label="Действия с парой"
+            aria-label={t('Действия с парой')}
             onClick={() => onMenu('menu')}
           >
             <DotsIcon />
@@ -112,7 +113,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
       {(lesson.kind || lesson.added || lesson.subgroup) && (
         <div className="lesson-tags">
           {lesson.kind && <span className="badge">{lesson.kind}</span>}
-          {lesson.added && <span className="badge badge-edit">добавлена</span>}
+          {lesson.added && <span className="badge badge-edit">{t('добавлена')}</span>}
           {lesson.subgroup && <span className="badge badge-sub">{lesson.subgroup.name}</span>}
         </div>
       )}
@@ -147,10 +148,10 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
       {lesson.stream &&
         (onMenu ? (
           <button type="button" className="lesson-hint" onClick={() => onMenu('hide')}>
-            Языковая пара потока — у тебя может быть другое время
+            {t('Языковая пара потока — у тебя может быть другое время')}
           </button>
         ) : (
-          <div className="lesson-hint">Языковая пара потока — у тебя может быть другое время</div>
+          <div className="lesson-hint">{t('Языковая пара потока — у тебя может быть другое время')}</div>
         ))}
 
       {live && (
@@ -158,18 +159,21 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
           <div className="progress" aria-hidden="true">
             <div style={{ width: `${((nowMinutes! - start) / (end - start)) * 100}%` }} />
           </div>
-          <span className="lesson-timer" aria-label={`До конца пары ${formatDuration(end - nowMinutes!)}`}>
+          <span className="lesson-timer" aria-label={t('До конца пары {d}', { d: formatDuration(end - nowMinutes!) })}>
             <ClockIcon /> {formatDuration(end - nowMinutes!)}
           </span>
         </div>
       )}
-      {isNext && !live && <div className="lesson-soon">через {formatDuration(start - nowMinutes!)}</div>}
+      {isNext && !live && <div className="lesson-soon">{t('через {d}', { d: formatDuration(start - nowMinutes!) })}</div>}
       {lesson.cancel && (
-        <div className="lesson-cancel">Пара отменена{lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}</div>
+        <div className="lesson-cancel">
+          {t('Пара отменена')}
+          {lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}
+        </div>
       )}
-      {lesson.movedTo && <div className="lesson-cancel">Перенесена на {shortWhen(lesson.movedTo.date, lesson.movedTo.start)}</div>}
+      {lesson.movedTo && <div className="lesson-cancel">{t('Перенесена на {when}', { when: shortWhen(lesson.movedTo.date, lesson.movedTo.start) })}</div>}
       {lesson.movedFrom && (
-        <div className="edit-note edit-note-lesson">↩️ Перенос с {shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}</div>
+        <div className="edit-note edit-note-lesson">{t('↩️ Перенос с {when}', { when: shortWhen(lesson.movedFrom.date, lesson.movedFrom.start) })}</div>
       )}
       {lesson.notes.map((text, i) => (
         <div key={i} className="edit-note edit-note-lesson">

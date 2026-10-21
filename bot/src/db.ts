@@ -1,6 +1,7 @@
 // Пользователи в D1 (схема — migrations/0001_init.sql).
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import type { HiddenLesson, HideScope } from '../../shared/edits-core'
+import { isLang, type Lang } from '../../shared/i18n-core'
 import type { Profile } from './auth'
 
 export type UserRow = {
@@ -28,6 +29,8 @@ export type UserRow = {
   subgroups: string | null // JSON: выбранные подгруппы
   review_banned_until: number | null // бан в отзывах о преподавателях
   intro_version: number // какую версию знакомства (истории, тур) уже видел
+  lang: string | null // выбранный язык (ru / en); NULL — не выбирал
+  lang_code: string | null // language_code из Telegram
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -41,9 +44,10 @@ export type Me = {
   onboarding: boolean // показать онбординг: новый пользователь, ни группы, ни роли
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
   intro: number // какую версию знакомства уже видел (приложение покажет новую один раз)
+  lang: Lang | null // выбранный язык; null — не выбирал (приложение берёт язык Telegram)
 }
 
-type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'intro_version'
+type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'intro_version' | 'lang'
 
 export function meOf(row: Pick<UserRow, MeFields> | null): Me {
   const group = normalizeGroup(row?.grp)
@@ -55,6 +59,7 @@ export function meOf(row: Pick<UserRow, MeFields> | null): Me {
     onboarding: !row?.legacy && !group && !row?.role,
     starosta: normalizeGroup(row?.starosta_of),
     intro: row?.intro_version ?? 0,
+    lang: isLang(row?.lang) ? row.lang : null,
   }
 }
 
@@ -85,9 +90,9 @@ export async function touchUser(
   const [upsert, , current] = await db.batch([
     db
       .prepare(
-        `INSERT INTO users (id, username, name, grp, first_seen, last_seen, visits, last_open, starts, can_message, access)
+        `INSERT INTO users (id, username, name, grp, first_seen, last_seen, visits, last_open, starts, can_message, access, lang_code)
          VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, CASE WHEN ?6 = 1 THEN ?5 END, ?7, ?8,
-                 CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE 'standard' END)
+                 CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE 'standard' END, ?13)
          ON CONFLICT (id) DO UPDATE SET
            username = excluded.username,
            name = excluded.name,
@@ -98,7 +103,8 @@ export async function touchUser(
            starts = users.starts + ?7,
            can_message = MAX(users.can_message, ?8),
            blocked_bot = CASE WHEN ?8 = 1 THEN 0 ELSE users.blocked_bot END,
-           access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END
+           access = CASE WHEN ?4 IN (?10, ?11) THEN 'free_forever' ELSE users.access END,
+           lang_code = COALESCE(?13, users.lang_code)
          WHERE ?12 = 0
             OR users.last_seen < ?5 - ?9
             OR (?6 = 1 AND (users.last_open IS NULL OR ?5 - users.last_open >= ?9))
@@ -106,9 +112,10 @@ export async function touchUser(
             OR users.name IS NOT excluded.name
             OR (excluded.grp IS NOT NULL AND users.grp IS NOT excluded.grp)
             OR (?4 IN (?10, ?11) AND users.access IS NOT 'free_forever')
-         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version`,
+            OR (?13 IS NOT NULL AND users.lang_code IS NOT ?13)
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang`,
       )
-      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1], throttle),
+      .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1], throttle, profile.lang ?? null),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
     db
       .prepare(
@@ -117,7 +124,7 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
     // строку не переписали (частое открытие) — берём как есть
-    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version FROM users WHERE id = ?').bind(profile.id),
+    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang FROM users WHERE id = ?').bind(profile.id),
   ])
   const row = ((upsert.results[0] ?? current.results[0]) as Pick<UserRow, 'banned' | MeFields> | undefined)
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }

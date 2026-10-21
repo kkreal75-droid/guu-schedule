@@ -4,6 +4,7 @@ import type { DayLesson } from '../edits'
 import type { HideScope } from '../hidden'
 import { ChevronLeft, ChevronRight, EyeOffIcon, NoteIcon } from '../icons'
 import { haptic, supports, tg } from '../telegram'
+import { t } from '../i18n'
 
 // Действия с парой: «⋯» на карточке или долгое нажатие. «Это не моя пара» → скрыть в этот день, по чётным,
 // по нечётным или всегда (только у себя: приложение, календарь, inline). У пары языкового блока потока
@@ -52,14 +53,14 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
   const both = lesson.weeks.some((w) => w % 2 === 0) && lesson.weeks.some((w) => w % 2 === 1)
   const here = week % 2 === 0 ? 'even' : 'odd'
   const options: { scope: HideScope; title: string; sub?: string }[] = [
-    { scope: 'day', title: 'Скрыть только в этот день' },
+    { scope: 'day', title: t('Скрыть только в этот день') },
     ...(both
       ? [
-          { scope: 'even' as const, title: 'Скрыть по чётным', sub: here === 'even' ? 'эта неделя' : undefined },
-          { scope: 'odd' as const, title: 'Скрыть по нечётным', sub: here === 'odd' ? 'эта неделя' : undefined },
+          { scope: 'even' as const, title: t('Скрыть по чётным'), sub: here === 'even' ? t('эта неделя') : undefined },
+          { scope: 'odd' as const, title: t('Скрыть по нечётным'), sub: here === 'odd' ? t('эта неделя') : undefined },
         ]
       : []),
-    { scope: 'always', title: 'Скрыть всегда' },
+    { scope: 'always', title: t('Скрыть всегда') },
   ]
 
   return createPortal(
@@ -71,14 +72,13 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
             <div className="sheet-sub">{subtitle}</div>
           </div>
           <button type="button" className="sheet-done" onClick={onClose}>
-            Закрыть
+            {t('Закрыть')}
           </button>
         </div>
 
         {lesson.stream && (
           <p className="lesson-menu-text">
-            Языковая пара потока: в расписании ГУУ она стоит у всего потока сразу в нескольких окнах, а ты ходишь
-            в одно — по своей подгруппе. Лишние окна скрой — они пропадут и из календаря на телефоне.
+            {t('Языковая пара потока: в расписании ГУУ она стоит у всего потока сразу в нескольких окнах, а ты ходишь в одно — по своей подгруппе. Лишние окна скрой — они пропадут и из календаря на телефоне.')}
           </p>
         )}
 
@@ -87,13 +87,13 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
             {onNote && (
               <button type="button" className="row row-btn" onClick={() => (haptic(), onNote())}>
                 <span className="lesson-menu-label">
-                  <NoteIcon /> Заметка к паре
+                  <NoteIcon /> {t('Заметка к паре')}
                 </span>
               </button>
             )}
             <button type="button" className="row row-btn" onClick={() => (haptic(), setStep('hide'))}>
               <span className="lesson-menu-label">
-                <EyeOffIcon /> Это не моя пара
+                <EyeOffIcon /> {t('Это не моя пара')}
               </span>
               <ChevronRight className="row-chevron" />
             </button>
@@ -102,7 +102,7 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
           <>
             {start === 'menu' && (
               <button type="button" className="lesson-menu-back" onClick={() => (haptic(), setStep('menu'))}>
-                <ChevronLeft /> Это не моя пара
+                <ChevronLeft /> {t('Это не моя пара')}
               </button>
             )}
             {onHide ? (
@@ -115,10 +115,10 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
                 ))}
               </div>
             ) : (
-              <p className="lesson-menu-text">Скрывать пары можно в приложении внутри Telegram.</p>
+              <p className="lesson-menu-text">{t('Скрывать пары можно в приложении внутри Telegram.')}</p>
             )}
             <p className="sheet-hint lesson-menu-hint">
-              Скрытое видишь только ты. Вернуть — «Профиль → Скрытые пары».
+              {t('Скрытое видишь только ты. Вернуть — «Профиль → Скрытые пары».')}
             </p>
           </>
         )}

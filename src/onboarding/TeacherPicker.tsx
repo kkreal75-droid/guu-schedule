@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { loadTeachers, searchTeachers, type TeacherInfo } from '../data'
 import { ChevronRight } from '../icons'
 import { haptic } from '../telegram'
+import { t, tn } from '../i18n'
 
 // Поиск преподавателя по фамилии (teachers.json): онбординг и «Ещё → Расписание преподавателя»
 export function TeacherPicker({ onPick }: { onPick: (t: TeacherInfo) => void }) {
@@ -18,9 +19,9 @@ export function TeacherPicker({ onPick }: { onPick: (t: TeacherInfo) => void }) 
   if (error) {
     return (
       <div className="ob-hero">
-        <p className="ob-text">Не получилось загрузить список преподавателей.</p>
+        <p className="ob-text">{t('Не получилось загрузить список преподавателей.')}</p>
         <button type="button" className="button-secondary" onClick={load}>
-          Повторить
+          {t('Повторить')}
         </button>
       </div>
     )
@@ -31,32 +32,32 @@ export function TeacherPicker({ onPick }: { onPick: (t: TeacherInfo) => void }) 
         className="input gsearch-input"
         type="search"
         autoFocus
-        placeholder="Например, Денисова"
+        placeholder={t('Например, Денисова')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Фамилия преподавателя"
+        aria-label={t('Фамилия преподавателя')}
       />
-      {!list && <p className="gsearch-empty">Загружаю…</p>}
+      {!list && <p className="gsearch-empty">{t('Загружаю…')}</p>}
       {list && query.trim().length >= 2 && !found.length && (
-        <p className="gsearch-empty">Не нашёл такую фамилию в расписании ГУУ.</p>
+        <p className="gsearch-empty">{t('Не нашёл такую фамилию в расписании ГУУ.')}</p>
       )}
       {found.length > 0 && (
         <div className="section-body gsearch-list">
-          {found.map((t) => (
+          {found.map((teacher) => (
             <button
-              key={t.id}
+              key={teacher.id}
               type="button"
               className="row row-btn gsearch-row"
               onClick={() => {
                 haptic()
-                onPick(t)
+                onPick(teacher)
               }}
             >
               <span className="gsearch-text">
-                <span className="gsearch-name">{t.name}</span>
+                <span className="gsearch-name">{teacher.name}</span>
                 <span className="gsearch-sub">
-                  {t.subjects.slice(0, 2).join(', ')}
-                  {t.subjects.length > 2 ? ` и ещё ${t.subjects.length - 2}` : ''}
+                  {teacher.subjects.slice(0, 2).join(', ')}
+                  {teacher.subjects.length > 2 ? ` ${tn(teacher.subjects.length - 2, 'и ещё {n}|и ещё {n}|и ещё {n}')}` : ''}
                 </span>
               </span>
               <ChevronRight className="row-chevron" />

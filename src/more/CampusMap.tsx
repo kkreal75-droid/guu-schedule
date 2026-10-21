@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { toMap, type CampusMap as MapData, type Place } from '../places'
 import { haptic, openLink } from '../telegram'
+import { t } from '../i18n'
 
 // Схема кампуса ГУУ в цветах темы (данные — data/campus.json из OpenStreetMap, scripts/campus_map.py).
 // Без focus — весь кампус, корпуса нажимаются; с focus — превью вокруг места с меткой у входа.
@@ -90,7 +91,7 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
         viewBox={`${vx} ${vy} ${vw} ${vh}`}
         preserveAspectRatio="xMidYMid slice"
         role="img"
-        aria-label={focus ? `Схема: ${focus.name}` : 'Схема кампуса ГУУ'}
+        aria-label={focus ? t('Схема: {name}', { name: focus.name }) : t('Схема кампуса ГУУ')}
       >
         <rect x={map.bounds[0] - 400} y={map.bounds[1] - 400} width={map.bounds[2] - map.bounds[0] + 800} height={map.bounds[3] - map.bounds[1] + 800} className="cm-bg" />
         {map.campus.map((d, i) => <path key={i} d={d} className="cm-campus" />)}
@@ -119,7 +120,7 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
         })}
         {labels.map(({ place, at }) => {
           const kpp = place.id === 'kpp'
-          const text = kpp ? 'КПП' : (place.short ?? place.icon)
+          const text = kpp ? t('КПП') : (place.short ?? place.icon)
           const emoji = !kpp && !place.short
           return (
             <text

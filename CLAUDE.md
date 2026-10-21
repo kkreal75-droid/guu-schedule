@@ -85,7 +85,7 @@ LibreOffice ставится, только если изменился .doc (н�
   владельцем для всей группы, `my_hidden` — свои скрытые пары);
 - `POST /hidden/add {group, date, start, subject, kind, scope}` | `/hidden/delete {id}` — «Это не моя пара» (`hidden.ts`);
 - `POST /profile` — выбор из онбординга `{role, group | teacher}` (группа/преподаватель должны быть на сайте);
-  `POST /intro {version}` — знакомство просмотрено;
+  `POST /intro {version}` — знакомство просмотрено; `POST /lang {lang}` — язык интерфейса (ru / en, этап 11);
 - `POST /starosta/<info|edit-add|edit-delete|subgroup-add|subgroup-delete|tag-add|tag-delete>` — староста своей группы;
   `POST /my-subgroups` — свои подгруппы; `POST /extras {groups}` — правки и подгруппы групп (просмотр чужой);
 - `POST /cal/status|connect|disconnect`, `GET /cal/<токен>.ics`, `GET /cal/<токен>/apple` (страница webcal для iPhone);
@@ -110,7 +110,7 @@ LibreOffice ставится, только если изменился .doc (н�
   30 дней, каждую минуту — ответы поддержки из очереди, остаток лимита — досылка рассылок (≤30 сообщений за запуск,
   пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0021`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0022`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_*` (бывший чат: не используются, сообщения стираются через 30 дней),
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`, `tg_updates` (повторы обновлений Telegram), `admin_log` (действия владельца,
 в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии), `hidden_lessons` (скрытые пары: свои и `user_id = 0` — для всей группы). Группа (`users.grp` и т. п.) — id.
@@ -138,6 +138,7 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 `123456:LOCAL-TEST-TOKEN`, `TELEGRAM_API`/`GITHUB_API` на поддельные сервера, `WEBAPP_URL=http://localhost:5173/`
 — данные с локального Vite) и `.env.development.local` (`VITE_BOT_URL=http://127.0.0.1:8787`) — оба в
 .gitignore, в git не класть. Локальный cron: `/cdn-cgi/handler/scheduled?cron=*+*+*+*+*&time=<мс>`.
+Перевод приложения: `npm run i18n` (нет русского текста мимо t(), у всех строк есть английский; в CI).
 Автотесты воркера: `cd bot && npm test` (vitest в рантайме Workers, `bot/test/`; в CI — `.github/workflows/tests.yml`).
 Бэкапы D1 и восстановление — `docs/backup.md`.
 
@@ -218,6 +219,11 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 - Беседы-форумы: ответ в ту же тему (`message_thread_id`, если `is_topic_message`; General — без темы);
   тема рассылки — из `/setup` или `/here`; тема удалена/закрыта — в General не писать, владельцу ошибку.
 - Telegram открывает из приложения только http(s): `webcal://` — через `/cal/<токен>/apple`.
+- Английская версия (этап 11, `docs/roadmap.md`): русский — основной. Приложение: `src/i18n.ts` — t('русская
+  строка') / tn(n, 'пара|пары|пар'), перевод — `src/i18n/en.ts` (контекст после «#»), даты — Intl через
+  `shared/i18n-core.ts` и `src/format.ts`; новый текст интерфейса — только через t() и сразу с английским
+  (иначе падает `npm run i18n`); данные ГУУ, нарочно русское — комментарий `i18n-ignore`. Язык: выбранный (ключ
+  `lang` на устройстве/в облаке, D1 `users.lang`) → язык Telegram (ru/uk/be/kk → русский). Админ-панель — по-русски.
 - Коммиты — по-русски, по смыслу этапа.
 
 ## Состояние (21.10.2026)

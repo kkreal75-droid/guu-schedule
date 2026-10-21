@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
+import { t } from '../i18n'
 
 export type Story = {
   visual: ReactNode // эмодзи в плитке или живой пример экрана
@@ -26,7 +27,7 @@ export const EmojiTile = ({ emoji }: { emoji: string }) => (
   </div>
 )
 
-export function Stories({ stories, onDone, onBack, onSkip, doneLabel = 'Далее' }: Props) {
+export function Stories({ stories, onDone, onBack, onSkip, doneLabel = t('Далее') }: Props) {
   const [index, setIndex] = useState(0)
   const [direction, setDirection] = useState<'fwd' | 'back'>('fwd')
   const touch = useRef<{ x: number; y: number } | null>(null)
@@ -66,14 +67,14 @@ export function Stories({ stories, onDone, onBack, onSkip, doneLabel = 'Дале
     <div className="ob ob-stories" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="ob-top">
         <div className="ob-bar">
-          <div className="ob-progress" aria-label={`${index + 1} из ${stories.length}`}>
+          <div className="ob-progress" aria-label={t('{n} из {total}', { n: index + 1, total: stories.length })}>
             {stories.map((_, i) => (
               <span key={i} className="ob-seg" data-on={i <= index || undefined} />
             ))}
           </div>
           {onSkip && (
             <button type="button" className="ob-skip" onClick={() => (haptic(), onSkip())}>
-              Пропустить
+              {t('Пропустить')}
             </button>
           )}
         </div>
@@ -89,11 +90,11 @@ export function Stories({ stories, onDone, onBack, onSkip, doneLabel = 'Дале
       <div className="ob-foot">
         {story.note && <p className="ob-note">{story.note}</p>}
         <button type="button" className="button-primary" onClick={next}>
-          {last ? doneLabel : 'Далее'}
+          {last ? doneLabel : t('Далее')}
         </button>
         {(index > 0 || onBack) && (
           <button type="button" className="button-secondary" onClick={prev}>
-            Назад
+            {t('Назад')}
           </button>
         )}
       </div>

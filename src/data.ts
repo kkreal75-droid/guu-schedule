@@ -93,6 +93,7 @@ export async function loadSession(id: string): Promise<SessionFile | null> {
 
 // ---------- поиск преподавателя ----------
 
+// i18n-ignore — поиск без «ё»
 const norm = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
 
 // «денисова», «Денисова И», «ден» — по началу фамилии; потом — по вхождению

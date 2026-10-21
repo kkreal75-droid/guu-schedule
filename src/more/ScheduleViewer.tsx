@@ -4,6 +4,7 @@ import { callBot, botAvailable } from '../api'
 import { NO_EXTRAS, type Extras } from '../../shared/edits-core'
 import { ScheduleScreen, initialCursor, type Cursor } from '../screens/ScheduleScreen'
 import { buildTimetable, fetchGroup } from '../schedule'
+import { t } from '../i18n'
 
 // Чужое расписание — любая группа ГУУ или преподаватель («t-<id>»): по неделям, как главный экран,
 // только без заметок. Своё расписание (главный экран) не трогает.
@@ -41,8 +42,8 @@ export function ScheduleViewer({ id, actions }: { id: string; actions?: ReactNod
     }
   }, [id])
 
-  if (error) return <p className="lead">Не получилось загрузить расписание. Проверьте интернет.</p>
-  if (!tt || !cursor) return <p className="lead">Загружаю расписание…</p>
+  if (error) return <p className="lead">{t('Не удалось загрузить расписание. Проверьте интернет.')}</p>
+  if (!tt || !cursor) return <p className="lead">{t('Загружаю расписание…')}</p>
   return (
     <>
       {actions}

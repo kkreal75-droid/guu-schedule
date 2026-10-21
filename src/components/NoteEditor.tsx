@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NOTE_MAX } from '../notes'
 import { haptic, supports, tg } from '../telegram'
+import { t } from '../i18n'
 
 export type NoteTarget = {
   key: string
@@ -63,7 +64,7 @@ export function NoteEditor({ target, initial, onClose }: Props) {
             <div className="sheet-sub">{target.subtitle}</div>
           </div>
           <button type="button" className="sheet-done" onClick={close}>
-            Готово
+            {t('Готово')}
           </button>
         </div>
 
@@ -73,13 +74,13 @@ export function NoteEditor({ target, initial, onClose }: Props) {
           maxLength={NOTE_MAX}
           rows={6}
           autoFocus
-          placeholder="Домашка, что взять с собой, перенос пары…"
+          placeholder={t('Домашка, что взять с собой, перенос пары…')}
           onChange={(e) => setText(e.target.value)}
         />
 
         <div className="sheet-foot">
           <span className="sheet-hint">
-            {text.length > NOTE_MAX - 300 ? `${text.length} / ${NOTE_MAX}` : 'Сохранится при закрытии'}
+            {text.length > NOTE_MAX - 300 ? `${text.length} / ${NOTE_MAX}` : t('Сохранится при закрытии')}
           </span>
           {(initial || text) && (
             <button
@@ -90,7 +91,7 @@ export function NoteEditor({ target, initial, onClose }: Props) {
                 onClose('')
               }}
             >
-              Удалить
+              {t('Удалить')}
             </button>
           )}
         </div>

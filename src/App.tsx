@@ -4,7 +4,7 @@ import { loadTeachers } from './data'
 import type { Choice } from './onboarding/Onboarding'
 import { teacherKey } from '../shared/schedule-core'
 import { NoticeBar } from './components/NoticeBar'
-import { ApiError, botAvailable } from './api'
+import { botAvailable, botError } from './api'
 import type { DayLesson, Extras } from './edits'
 import { cachedHidden, hideLesson, rememberHidden, unhideLesson, type HiddenLesson, type HideScope } from './hidden'
 import { formatStamp } from './format'
@@ -17,6 +17,7 @@ import { ScheduleScreen, initialCursor, type Cursor } from './screens/ScheduleSc
 import { fromCache, schedule } from './schedule'
 import { haptic, showAlert, type CheckIn } from './telegram'
 import { useTheme } from './theme'
+import { t } from './i18n'
 
 export type { Tab }
 
@@ -70,8 +71,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     setMyHidden(list)
     rememberHidden(list)
   }
-  const hideError = (err: unknown) =>
-    showAlert(err instanceof ApiError && err.status === 400 ? err.code : err instanceof ApiError && err.status === 429 ? 'Слишком часто — подожди минуту.' : 'Что-то сломалось 🛠')
+  const hideError = (err: unknown) => showAlert(botError(err))
   // скрываем сразу, бот подтверждает; не вышло — возвращаем как было
   const onHide = useCallback(async (lesson: DayLesson, date: string, scope: HideScope): Promise<number | null> => {
     const temp: HiddenLesson = {
@@ -136,7 +136,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     haptic()
     const list = await loadTeachers().then((d) => d.teachers, () => null)
     const teacher = list?.find((t) => t.name === name)
-    if (!teacher) return showAlert(list ? `${name} нет в списке преподавателей ГУУ.` : 'Нет связи. Попробуй ещё раз.')
+    if (!teacher) return showAlert(list ? t('{name} нет в списке преподавателей ГУУ.', { name }) : t('Нет связи. Попробуй ещё раз.'))
     setMoreRequest({ item: 'teachers', teacher })
     setTab('more')
     window.scrollTo(0, 0)
@@ -230,8 +230,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
 
       {updatedAt && (
         <p className="updated">
-          Обновлено: {updatedAt}
-          {fromCache && ' · нет сети, сохранённая копия'}
+          {t('Обновлено: {at}', { at: updatedAt })}
+          {fromCache && ` · ${t('нет сети, сохранённая копия')}`}
         </p>
       )}
 

@@ -10,12 +10,13 @@ import { AccountForm } from '../onboarding/AccountForm'
 import type { Choice } from '../onboarding/Onboarding'
 import type { Prefs, ThemeMode } from '../prefs'
 import { groupName, isoFromDay, moscowNow, schedule } from '../schedule'
-import { WEEKDAYS_SHORT } from '../format'
-import { hideScopeTitle } from '../../shared/edits-core'
+import { weekdayShort } from '../format'
 import type { HiddenLesson } from '../hidden'
 import { cloudAvailable } from '../storage'
 import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
 import { useBackButton } from '../useBackButton'
+import { t, useLang, type Lang } from '../i18n'
+import { chooseLang } from '../language'
 
 // «Профиль» (этап 7.8, сверено с profile-28): крупный заголовок, карточка «аватар · имя · @ник · группа»,
 // «Параметры аккаунта» (студент / преподаватель + выпадающие списки и «Сохранить»), подгруппы, избранные
@@ -23,15 +24,28 @@ import { useBackButton } from '../useBackButton'
 
 const SOURCE_URL = 'https://guu.ru/student/schedule/'
 
-const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
-  { value: 'light', label: 'Светлая' },
-  { value: 'system', label: 'Системная' },
-  { value: 'dark', label: 'Тёмная' },
+const themeOptions = (): { value: ThemeMode; label: string }[] => [
+  { value: 'light', label: t('Светлая') },
+  { value: 'system', label: t('Системная') },
+  { value: 'dark', label: t('Тёмная') },
 ]
+
+// названия языков — каждое на своём языке, заголовок — на обоих: найти, даже если язык включился случайно
+const LANG_OPTIONS: { value: Lang; label: string }[] = [
+  { value: 'ru', label: 'Русский' }, // i18n-ignore
+  { value: 'en', label: 'English' },
+]
+const LANG_TITLE = 'Язык · Language' // i18n-ignore
+
+// «по чётным неделям», «только 21.10» — на языке интерфейса
+const scopeText = (h: HiddenLesson) =>
+  h.scope === 'day'
+    ? t('только {date}', { date: h.date ? `${h.date.slice(8, 10)}.${h.date.slice(5, 7)}` : '' })
+    : { even: t('по чётным неделям'), odd: t('по нечётным неделям'), always: t('всегда') }[h.scope]
 
 function UserCard({ who }: { who: string }) {
   const user = telegramUser()
-  const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : 'Гость'
+  const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : t('Гость')
   const initials = name
     .split(' ')
     .map((part) => part[0])
@@ -48,7 +62,7 @@ function UserCard({ who }: { who: string }) {
       <div className="user-text">
         <div className="user-name">{name}</div>
         <div className="user-sub">{sub}</div>
-        {!inTelegram && <div className="user-sub">Откройте через Telegram — настройки будут синхронизироваться</div>}
+        {!inTelegram && <div className="user-sub">{t('Откройте через Telegram — настройки будут синхронизироваться')}</div>}
       </div>
     </div>
   )
@@ -72,26 +86,26 @@ function HiddenSection({ hidden, home, nameOf, onUnhide }: { hidden: HiddenLesso
   const list = hidden.filter((h) => h.scope !== 'day' || (h.date ?? '') >= today)
   return (
     <Section
-      title="Скрытые пары"
+      title={t('Скрытые пары')}
       footer={
         list.length
-          ? 'Скрытые пары не видны ни в приложении, ни в календаре на телефоне, ни в inline. Другим ничего не меняется.'
-          : 'Пара не твоя (например, язык у потока в нескольких окнах)? Нажми «⋯» на карточке пары → «Это не моя пара».'
+          ? t('Скрытые пары не видны ни в приложении, ни в календаре на телефоне, ни в inline. Другим ничего не меняется.')
+          : t('Пара не твоя (например, язык у потока в нескольких окнах)? Нажми «⋯» на карточке пары → «Это не моя пара».')
       }
     >
-      {list.length === 0 && <div className="row row-text hidden-empty">Ничего не скрыто</div>}
+      {list.length === 0 && <div className="row row-text hidden-empty">{t('Ничего не скрыто')}</div>}
       {list.map((h) => (
         <div key={h.id} className="row">
           <span className="hidden-row">
             <span className="hidden-row-title">{h.subject}</span>
             <span className="hidden-row-sub">
-              {[h.group !== home ? nameOf(h.group) : null, `${WEEKDAYS_SHORT[h.weekday]} ${h.start}`, h.kind, hideScopeTitle(h)]
+              {[h.group !== home ? nameOf(h.group) : null, `${weekdayShort(h.weekday)} ${h.start}`, h.kind, scopeText(h)]
                 .filter(Boolean)
                 .join(' · ')}
             </span>
           </span>
           <button type="button" className="link-btn" disabled={h.id < 0} onClick={() => (haptic(), onUnhide(h.id))}>
-            Вернуть
+            {t('Вернуть#скрытая пара')}
           </button>
         </div>
       ))}
@@ -102,6 +116,7 @@ function HiddenSection({ hidden, home, nameOf, onUnhide }: { hidden: HiddenLesso
 export function ProfileScreen({
   prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, hidden, onUnhide, onShowIntro,
 }: Props) {
+  const lang = useLang()
   const [sub, setSub] = useState<'calendar' | null>(null)
   const closeSub = useCallback(() => {
     setSub(null)
@@ -129,10 +144,10 @@ export function ProfileScreen({
     return (
       <div className="screen more">
         <header className="page-head">
-          <button type="button" className="page-back" onClick={closeSub} aria-label="Назад">
-            <ChevronLeft /> Профиль
+          <button type="button" className="page-back" onClick={closeSub} aria-label={t('Назад')}>
+            <ChevronLeft /> {t('Профиль')}
           </button>
-          <h2 className="page-title">Календарь на телефоне</h2>
+          <h2 className="page-title">{t('Календарь на телефоне')}</h2>
         </header>
         <CalendarPage group={prefs.group} />
       </div>
@@ -142,7 +157,7 @@ export function ProfileScreen({
   return (
     <div className="screen profile">
       <header className="screen-head profile-head">
-        <h1 className="screen-title">Профиль</h1>
+        <h1 className="screen-title">{t('Профиль')}</h1>
       </header>
 
       <UserCard who={who} />
@@ -151,8 +166,8 @@ export function ProfileScreen({
 
       {ownSubgroups.length > 0 && (
         <Section
-          title="Подгруппы"
-          footer="Например, по языку. Пары чужих подгрупп не будут показываться. Ничего не выбрано — видно всё."
+          title={t('Подгруппы')}
+          footer={t('Например, по языку. Пары чужих подгрупп не будут показываться. Ничего не выбрано — видно всё.')}
         >
           {ownSubgroups.map((s) => (
             <button
@@ -171,14 +186,14 @@ export function ProfileScreen({
       )}
 
       {favorites.length > 0 && (
-        <Section title="Избранные группы" footer="Видны над расписанием рядом со своей. Добавить — «+» у групп на главном экране.">
+        <Section title={t('Избранные группы')} footer={t('Видны над расписанием рядом со своей. Добавить — «+» у групп на главном экране.')}>
           {favorites.map((g) => (
             <div key={g} className="row">
               <span>{nameOf(g)}</span>
               <button
                 type="button"
                 className="icon-btn"
-                aria-label={`Убрать ${nameOf(g)} из избранного`}
+                aria-label={t('Убрать {name} из избранного', { name: nameOf(g) })}
                 onClick={() => {
                   haptic()
                   onChange({ favorites: prefs.favorites.filter((f) => f !== g) })
@@ -195,21 +210,27 @@ export function ProfileScreen({
         <HiddenSection
           hidden={hidden}
           home={teacher ? `t-${prefs.teacher}` : prefs.group}
-          nameOf={(g) => (g.startsWith('t-') ? 'расписание преподавателя' : nameOf(g))}
+          nameOf={(g) => (g.startsWith('t-') ? t('расписание преподавателя') : nameOf(g))}
           onUnhide={onUnhide}
         />
       )}
 
-      <Section title="Тема" footer={inTelegram ? 'Системная — как в Telegram.' : 'Системная — как в настройках устройства.'}>
+      <Section title={t('Тема')} footer={inTelegram ? t('Системная — как в Telegram.') : t('Системная — как в настройках устройства.')}>
         <div className="row row-plain">
-          <Segmented label="Тема оформления" value={prefs.theme} options={THEME_OPTIONS} onChange={(theme) => onChange({ theme })} />
+          <Segmented label={t('Тема оформления')} value={prefs.theme} options={themeOptions()} onChange={(theme) => onChange({ theme })} />
+        </div>
+      </Section>
+
+      <Section title={LANG_TITLE}>
+        <div className="row row-plain">
+          <Segmented label={LANG_TITLE} value={lang} options={LANG_OPTIONS} onChange={(next) => (haptic(), chooseLang(next))} />
         </div>
       </Section>
 
       {!teacher && (
-        <Section title="Календарь" footer="Пары сами появятся в календаре телефона и будут обновляться.">
+        <Section title={t('Календарь')} footer={t('Пары сами появятся в календаре телефона и будут обновляться.')}>
           <button type="button" className="row row-btn row-nav" onClick={() => (haptic(), setSub('calendar'), window.scrollTo(0, 0))}>
-            <span className="row-label">Календарь на телефоне</span>
+            <span className="row-label">{t('Календарь на телефоне')}</span>
             <span className="row-value">Apple / Google</span>
             <ChevronRight className="row-chevron" />
           </button>
@@ -218,38 +239,38 @@ export function ProfileScreen({
 
       <Section>
         <button type="button" className="row row-btn row-link" onClick={() => (haptic(), onShowIntro())}>
-          <span>Показать знакомство ещё раз</span>
+          <span>{t('Показать знакомство ещё раз')}</span>
           <ChevronRight className="row-check" />
         </button>
       </Section>
 
       <Section
-        title="О приложении"
+        title={t('О приложении')}
         footer={
           cloudAvailable()
-            ? 'Заметки хранятся в облаке Telegram и видны на всех твоих устройствах. Всё бесплатно.'
-            : 'Вне Telegram заметки хранятся только в этом браузере. Всё бесплатно.'
+            ? t('Заметки хранятся в облаке Telegram и видны на всех твоих устройствах. Всё бесплатно.')
+            : t('Вне Telegram заметки хранятся только в этом браузере. Всё бесплатно.')
         }
       >
         <div className="row">
-          <span>Версия</span>
+          <span>{t('Версия')}</span>
           <span className="row-value">
             {__BUILD__.version} · {__BUILD__.date.split('-').reverse().join('.')}
             {__BUILD__.sha && ` · ${__BUILD__.sha}`}
           </span>
         </div>
         <div className="row">
-          <span>Заметок</span>
+          <span>{t('Заметок')}</span>
           <span className="row-value">{noteCount}</span>
         </div>
         {schedule.source_file && (
           <div className="row">
-            <span>Файл ГУУ</span>
+            <span>{t('Файл ГУУ')}</span>
             <span className="row-value">{sourceVersion ? `№${sourceVersion}` : schedule.source_file}</span>
           </div>
         )}
         <button type="button" className="row row-btn row-link" onClick={() => openLink(SOURCE_URL)}>
-          <span>Расписание на guu.ru</span>
+          <span>{t('Расписание на guu.ru')}</span>
           <ExternalIcon className="row-check" />
         </button>
       </Section>

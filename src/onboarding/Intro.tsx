@@ -1,5 +1,6 @@
-// Знакомство (этап 7.1), всем один раз: истории автора → регистрация (новым) или «Это твоя группа?»
-// (тем, кто уже выбирал) → тур по приложению → расписание. «Профиль → Показать знакомство ещё раз».
+// Знакомство (этап 7.1), всем один раз: выбор языка (только новым, этап 11) → истории автора → регистрация
+// (новым) или «Это твоя группа?» (тем, кто уже выбирал) → тур по приложению → расписание.
+// «Профиль → Показать знакомство ещё раз».
 import { useEffect, useState } from 'react'
 import { MB_GROUPS } from '../../shared/groups'
 import type { DayLesson } from '../edits'
@@ -8,45 +9,84 @@ import { LessonCard } from '../components/LessonCard'
 import { WeekCard } from '../components/WeekCard'
 import { BOT_USERNAME } from '../config'
 import { loadGroups } from '../data'
-import { haptic } from '../telegram'
+import { setLang, t, useLang, type Lang } from '../i18n'
+import { CheckIcon } from '../icons'
+import { haptic, telegramLang } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { GroupCard, Onboarding, Shell, type Choice } from './Onboarding'
 import { EmojiTile, Stories, type Story } from './Stories'
 
-// ---------- истории автора (тексты — от владельца, менять только опечатки) ----------
+// ---------- истории автора (тексты — от владельца, менять только опечатки; английские — тоже от него) ----------
 
-const AUTHOR: Story[] = [
+const author = (): Story[] => [
   {
     visual: <EmojiTile emoji="👋" />,
-    overline: 'пара слов перед началом',
-    title: 'Привет! Я Кирилл',
-    text: <p>Студент 1 курса ГУУ и автор этого приложения.</p>,
+    overline: t('пара слов перед началом'),
+    title: t('Привет! Я Кирилл'),
+    text: <p>{t('Студент 1 курса ГУУ и автор этого приложения.')}</p>,
   },
   {
     visual: <EmojiTile emoji="💸" />,
-    overline: 'почему это появилось',
-    title: 'Расписание не должно стоить денег',
-    text: (
-      <p>
-        Мне надоело платить за то, что университет и так публикует бесплатно. Поэтому я сделал своё — удобное и
-        бесплатное.
-      </p>
-    ),
+    overline: t('почему это появилось'),
+    title: t('Расписание не должно стоить денег'),
+    text: <p>{t('Мне надоело платить за то, что университет и так публикует бесплатно. Поэтому я сделал своё — удобное и бесплатное.')}</p>,
   },
   {
     visual: <EmojiTile emoji="🎁" />,
-    overline: 'и так будет дальше',
-    title: 'Всё бесплатно. Без подписок и замков',
-    text: <p>Все пары, преподаватели, аудитории, корпуса, календарь — для всех и сразу.</p>,
+    overline: t('и так будет дальше'),
+    title: t('Всё бесплатно. Без подписок и замков'),
+    text: <p>{t('Все пары, преподаватели, аудитории, корпуса, календарь — для всех и сразу.')}</p>,
   },
   {
     visual: <EmojiTile emoji="🤝" />,
-    overline: 'сделано студентами',
-    title: 'Нашёл ошибку или есть идея?',
-    text: <p>Пиши в поддержку прямо из приложения — я читаю всё.</p>,
-    note: 'Проект неофициальный и не связан с администрацией ГУУ.',
+    overline: t('сделано студентами'),
+    title: t('Нашёл ошибку или есть идея?'),
+    text: <p>{t('Пиши в поддержку прямо из приложения — я читаю всё.')}</p>,
+    note: t('Проект неофициальный и не связан с администрацией ГУУ.'),
   },
 ]
+
+// ---------- выбор языка (этап 11): первый экран у новых; предвыбор — по языку Telegram ----------
+
+// нажатие на карточку — сразу показывает интерфейс на этом языке, «Далее» — сохраняет выбор
+function LanguagePicker({ onDone }: { onDone: (lang: Lang) => void }) {
+  const lang = useLang()
+  const options: { lang: Lang; flag: string; label: string }[] = [
+    { lang: 'ru', flag: '🇷🇺', label: 'Русский' }, // i18n-ignore — название языка на нём самом
+    { lang: 'en', flag: '🇬🇧', label: 'English' },
+  ]
+  return (
+    <Shell
+      foot={
+        <button type="button" className="button-primary" onClick={() => (haptic('light'), onDone(lang))}>
+          {t('Далее')}
+        </button>
+      }
+    >
+      <div className="ob-step ob-lang">
+        <EmojiTile emoji="🌐" />
+        <h1 className="ob-title">Выбери язык / Choose language</h1>{/* i18n-ignore — на обоих языках */}
+        <div className="ob-cards">
+          {options.map((o) => (
+            <button
+              key={o.lang}
+              type="button"
+              className="ob-card ob-card-role ob-card-lang"
+              aria-pressed={lang === o.lang}
+              onClick={() => (haptic(), setLang(o.lang))}
+            >
+              <span className="ob-card-emoji">{o.flag}</span>
+              <span className="ob-card-text">
+                <span className="ob-card-label">{o.label}</span>
+              </span>
+              {lang === o.lang && <CheckIcon className="ob-card-chevron ob-card-check" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Shell>
+  )
+}
 
 // ---------- тур ----------
 
@@ -79,7 +119,9 @@ function TourSchedule() {
   return (
     <div className="tour-demo" aria-hidden="true" inert>
       <WeekCard week={week} day={day} monday={monday} />
+      {/* i18n-ignore — пример пар: данные как в файлах ГУУ (переводит карточка) */}
       <LessonCard lesson={demoLesson('09:00', '10:30', 'Теория управления', 'Лекция', 'Смирнова А.В.', 'ПА-119')} nowMinutes={now} isNext={false} pair={1} note={undefined} />
+      {/* i18n-ignore */}
       <LessonCard lesson={demoLesson('10:40', '12:10', 'Макроэкономика', 'Практика', 'Орлов Д.С.', 'У-432')} nowMinutes={now} isNext={false} pair={2} note={undefined} />
     </div>
   )
@@ -101,42 +143,42 @@ function FeatureList({ items }: { items: [string, string, string][] }) {
   )
 }
 
-const TOUR: Story[] = [
+const tour = (): Story[] => [
   {
     visual: <TourSchedule />,
-    overline: 'главное',
-    title: 'Расписание, которое видно с одного взгляда',
-    text: <p>Сразу понятно, какая пара идёт и сколько осталось до конца. Дни меняются свайпом.</p>,
+    overline: t('главное'),
+    title: t('Расписание, которое видно с одного взгляда'),
+    text: <p>{t('Сразу понятно, какая пара идёт и сколько осталось до конца. Дни меняются свайпом.')}</p>,
   },
   {
     visual: (
       <FeatureList
         items={[
-          ['🏛', 'Корпуса и карты', 'Как пройти и открыть в картах'],
-          ['⭐', 'Рейтинг преподавателей', 'Оценки и отзывы студентов'],
-          ['🚪', 'Свободные аудитории', 'Где посидеть между парами'],
-          ['📝', 'Заметки', 'К паре и ко всему дню'],
-          ['📚', 'Сессия и каникулы', 'Экзамены и учебный график'],
+          ['🏛', t('Корпуса и карты'), t('Как пройти и открыть в картах')],
+          ['⭐', t('Рейтинг преподавателей'), t('Оценки и отзывы студентов')],
+          ['🚪', t('Свободные аудитории'), t('Где посидеть между парами')],
+          ['📝', t('Заметки'), t('К паре и ко всему дню')],
+          ['📚', t('Сессия и каникулы'), t('Экзамены и учебный график')],
         ]}
       />
     ),
-    overline: 'ещё в приложении',
-    title: 'Не только пары',
-    text: <p>Всё, что нужно в течение учебного дня, — в одном месте.</p>,
+    overline: t('ещё в приложении'),
+    title: t('Не только пары'),
+    text: <p>{t('Всё, что нужно в течение учебного дня, — в одном месте.')}</p>,
   },
   {
     visual: (
       <FeatureList
         items={[
-          ['📅', 'Календарь на телефоне', 'Пары сами появятся в Apple или Google Календаре'],
-          ['💬', 'В любом чате', `Напиши @${BOT_USERNAME} — и выбери день`],
-          ['📲', 'На домашний экран', 'Открывается одним касанием'],
+          ['📅', t('Календарь на телефоне'), t('Пары сами появятся в Apple или Google Календаре')],
+          ['💬', t('В любом чате'), t('Напиши @{bot} — и выбери день', { bot: BOT_USERNAME })],
+          ['📲', t('На домашний экран'), t('Открывается одним касанием')],
         ]}
       />
     ),
-    overline: 'удобно',
-    title: 'Всегда под рукой',
-    text: <p>Расписание там, где тебе удобнее его смотреть.</p>,
+    overline: t('удобно'),
+    title: t('Всегда под рукой'),
+    text: <p>{t('Расписание там, где тебе удобнее его смотреть.')}</p>,
   },
 ]
 
@@ -147,13 +189,19 @@ export type Current = { role: 'student'; group: string } | { role: 'teacher'; te
 type Props = {
   current: Current // что уже выбрано (null — новый пользователь)
   onChoice: (choice: Choice) => Promise<void> // сохранить выбор (настройки, бот)
+  onLang: (lang: Lang) => void // язык выбран («Далее»): сохранить на устройстве, в облаке и в боте
   onFinish: () => Promise<void> // знакомство пройдено — открыть расписание
 }
 
-type Stage = 'author' | 'confirm' | 'register' | 'tour' | 'finish'
+type Stage = 'lang' | 'author' | 'confirm' | 'register' | 'tour' | 'finish'
 
-export function IntroFlow({ current, onChoice, onFinish }: Props) {
-  const [stage, setStage] = useState<Stage>('author')
+export function IntroFlow({ current, onChoice, onLang, onFinish }: Props) {
+  useLang()
+  // новым — сначала язык (предвыбран по Telegram), уже зарегистрированным — нет: язык из Telegram, сменить — в профиле
+  const [stage, setStage] = useState<Stage>(current ? 'author' : 'lang')
+  useEffect(() => {
+    if (!current) setLang(telegramLang())
+  }, [current]) // предвыбор — по языку Telegram
   const [chosen, setChosen] = useState(current)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -178,8 +226,19 @@ export function IntroFlow({ current, onChoice, onFinish }: Props) {
   const confirmBack = () => (haptic(), setStage('author'))
   useBackButton(stage === 'confirm' ? confirmBack : null)
 
+  if (stage === 'lang') {
+    return <LanguagePicker onDone={(lang) => (onLang(lang), setStage('author'))} />
+  }
+
   if (stage === 'author') {
-    return <Stories key="author" stories={AUTHOR} onDone={() => setStage(chosen ? 'confirm' : 'register')} />
+    return (
+      <Stories
+        key="author"
+        stories={author()}
+        onBack={current ? undefined : () => setStage('lang')}
+        onDone={() => setStage(chosen ? 'confirm' : 'register')}
+      />
+    )
   }
 
   if (stage === 'confirm' && chosen) {
@@ -189,20 +248,20 @@ export function IntroFlow({ current, onChoice, onFinish }: Props) {
         foot={
           <>
             <button type="button" className="button-primary" onClick={() => (haptic('light'), setStage('tour'))}>
-              Да, всё верно
+              {t('Да, всё верно')}
             </button>
             <button type="button" className="button-secondary" onClick={() => (haptic(), setStage('register'))}>
-              Сменить
+              {t('Сменить')}
             </button>
           </>
         }
       >
         <div className="ob-hero">
-          <p className="ob-overline">{student ? 'твоя группа' : 'ваше расписание'}</p>
+          <p className="ob-overline">{student ? t('твоя группа') : t('ваше расписание')}</p>
           <GroupCard
             emoji={student ? '🎓' : '🧑‍🏫'}
-            name={student ? (groupName ?? 'Загружаю…') : chosen.name}
-            text={student ? 'Это твоя группа? Её расписание откроется при запуске.' : 'Это вы? Ваше расписание откроется при запуске.'}
+            name={student ? (groupName ?? t('Загружаю…')) : chosen.name}
+            text={student ? t('Это твоя группа? Её расписание откроется при запуске.') : t('Это вы? Ваше расписание откроется при запуске.')}
           />
         </div>
       </Shell>
@@ -226,8 +285,8 @@ export function IntroFlow({ current, onChoice, onFinish }: Props) {
     return (
       <Stories
         key="tour"
-        stories={TOUR}
-        doneLabel="Начать"
+        stories={tour()}
+        doneLabel={t('Начать')}
         onSkip={finish}
         onDone={finish}
         onBack={() => setStage(chosen ? 'confirm' : 'register')}
@@ -241,13 +300,13 @@ export function IntroFlow({ current, onChoice, onFinish }: Props) {
         <EmojiTile emoji="🎓" />
         {error ? (
           <>
-            <p className="ob-text">Не получилось загрузить расписание. Проверь интернет.</p>
+            <p className="ob-text">{t('Не получилось загрузить расписание. Проверь интернет.')}</p>
             <button type="button" className="button-secondary" onClick={finish}>
-              Повторить
+              {t('Повторить')}
             </button>
           </>
         ) : (
-          <p className="ob-text">Открываю расписание…</p>
+          <p className="ob-text">{t('Открываю расписание…')}</p>
         )}
       </div>
     </Shell>

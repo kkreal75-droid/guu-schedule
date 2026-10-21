@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Section } from '../components/Section'
 import { dataUrl, getTimetable, moscowNow, toMinutes } from '../schedule'
-import { WEEKDAYS_SHORT, dateOf } from '../format'
+import { dateOf, weekdayShort } from '../format'
 import { haptic } from '../telegram'
+import { t, tn } from '../i18n'
 
 // rooms.json (update.py): аудитория → когда занята; weeks — битовая маска (бит N = N-я неделя)
 type RoomsFile = { rooms: Record<string, { building: string; busy: [number, string, string, number][] }> }
@@ -90,8 +91,8 @@ export function FreeRoomsPage() {
     return { total: all.size, free: [...byBuilding.entries()].sort(([a], [b]) => naturally(a, b)), inSemester: tt.inSemester(week) }
   }, [data, day, slot, tt])
 
-  if (error) return <p className="lead">Не получилось загрузить аудитории. Проверьте интернет.</p>
-  if (!data || !result) return <p className="lead">Загружаю аудитории…</p>
+  if (error) return <p className="lead">{t('Не получилось загрузить аудитории. Проверьте интернет.')}</p>
+  if (!data || !result) return <p className="lead">{t('Загружаю аудитории…')}</p>
 
   const pick = (next: Partial<{ day: number; slot: number }>) => {
     haptic()
@@ -100,15 +101,15 @@ export function FreeRoomsPage() {
 
   return (
     <>
-      <p className="section-footer rooms-note">По данным расписания ГУУ, без учёта мероприятий и замен.</p>
-      <div className="rooms-picker" role="radiogroup" aria-label="День">
+      <p className="section-footer rooms-note">{t('По данным расписания ГУУ, без учёта мероприятий и замен.')}</p>
+      <div className="rooms-picker" role="radiogroup" aria-label={t('День')}>
         {days.map((d) => (
           <button key={d} type="button" role="radio" aria-checked={d === day} className="group-chip" onClick={() => pick({ day: d })}>
-            {d === today ? 'Сегодня' : `${WEEKDAYS_SHORT[tt.weekdayOf(d)]} ${dateOf(d).date}`}
+            {d === today ? t('Сегодня') : `${weekdayShort(tt.weekdayOf(d))} ${dateOf(d).date}`}
           </button>
         ))}
       </div>
-      <div className="rooms-picker" role="radiogroup" aria-label="Пара" ref={slotsRef}>
+      <div className="rooms-picker" role="radiogroup" aria-label={t('Пара')} ref={slotsRef}>
         {SLOTS.map(([start, end], i) => (
           <button key={start} type="button" role="radio" aria-checked={i === slot} className="group-chip" onClick={() => pick({ slot: i })}>
             {start}–{end}
@@ -116,11 +117,13 @@ export function FreeRoomsPage() {
         ))}
       </div>
       {!result.inSemester ? (
-        <p className="lead">Этот день вне учебного семестра.</p>
+        <p className="lead">{t('Этот день вне учебного семестра.')}</p>
       ) : (
         <>
           <p className="lead rooms-count">
-            Свободно {result.free.reduce((n, [, rooms]) => n + rooms.length, 0)} из {result.total} аудиторий
+            {tn(result.total, 'Свободно {free} из {n} аудитории|Свободно {free} из {n} аудиторий|Свободно {free} из {n} аудиторий', {
+              free: result.free.reduce((n, [, rooms]) => n + rooms.length, 0),
+            })}
           </p>
           {result.free.map(([building, rooms]) => (
             <Section key={building} title={`${building}-… · ${rooms.length}`}>

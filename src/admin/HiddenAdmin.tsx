@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Section } from '../components/Section'
 import { useGroupNames } from '../data'
-import { WEEKDAYS_SHORT } from '../format'
+import { weekdayShort } from '../format'
 import { confirmAction, haptic } from '../telegram'
 import { hideScopeTitle } from '../../shared/edits-core'
 import { adminApi, adminError, type HiddenOverview, type HiddenWindow } from './api'
@@ -31,11 +31,11 @@ export function HiddenAdmin() {
     }
   }
   const title = (w: { group: string; weekday: number; start: string; subject: string; kind: string | null }) =>
-    `${nameOf(w.group)} · ${WEEKDAYS_SHORT[w.weekday]} ${w.start} · ${w.subject}${w.kind ? ` (${w.kind})` : ''}`
+    `${nameOf(w.group)} · ${weekdayShort(w.weekday)} ${w.start} · ${w.subject}${w.kind ? ` (${w.kind})` : ''}`
   const hide = async (w: HiddenWindow) => {
     haptic()
     const ok = await confirmAction(
-      `Скрыть для всей группы ${nameOf(w.group)}: ${WEEKDAYS_SHORT[w.weekday]} ${w.start}, ${w.subject} — ${hideScopeTitle(w)}? Пара пропадёт у всех, в календарях и в сводке в беседе.`,
+      `Скрыть для всей группы ${nameOf(w.group)}: ${weekdayShort(w.weekday)} ${w.start}, ${w.subject} — ${hideScopeTitle(w)}? Пара пропадёт у всех, в календарях и в сводке в беседе.`,
     )
     if (ok) await run(() => adminApi.hideForGroup(w), 'Скрыто для всей группы')
   }

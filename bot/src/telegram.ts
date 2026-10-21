@@ -1,6 +1,6 @@
 // Обёртка над Telegram Bot API и нужные нам типы.
 
-export type TgUser = { id: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string }
+export type TgUser = { id: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string; language_code?: string }
 export type TgChat = { id: number; type: 'private' | 'group' | 'supergroup' | 'channel'; title?: string; is_forum?: boolean }
 export type TgEntity = {
   type: string

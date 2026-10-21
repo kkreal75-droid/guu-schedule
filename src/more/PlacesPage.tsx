@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, PinIcon, SearchIcon } from '../icons'
 import {
-  PLACE_GROUPS, howtoLines, loadCampus, loadPlaces, mapApps, placeForRoom, placeTitle, searchPlaces,
+  PLACE_GROUPS, placeGroupTitle, howtoLines, loadCampus, loadPlaces, mapApps, placeForRoom, placeTitle, searchPlaces,
   type CampusMap as MapData, type Place, type PlaceGroup,
 } from '../places'
 import { haptic, openLink } from '../telegram'
 import { CampusMap, onCampusMap } from './CampusMap'
+import { t } from '../i18n'
 
 // «Другое → Корпуса ГУУ» (этап 7.7): поиск, схема кампуса (корпуса нажимаются), места по группам
 // «Корпуса / Спорт / Еда / Другое». Карточка раскрывается: схема с меткой у входа, «Как пройти», адрес,
@@ -49,8 +50,8 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
   const room = target?.room && roomPlace?.name.toLowerCase() === target.room.trim().toLowerCase() ? undefined : target?.room
   const found = useMemo(() => (places ? searchPlaces(places, query) : []), [places, query])
 
-  if (failed && !places) return <p className="gsearch-empty">Не получилось загрузить места. Проверь интернет.</p>
-  if (!places) return <p className="gsearch-empty">Загружаю…</p>
+  if (failed && !places) return <p className="gsearch-empty">{t('Не получилось загрузить места. Проверь интернет.')}</p>
+  if (!places) return <p className="gsearch-empty">{t('Загружаю…')}</p>
 
   const toggle = (id: string) => {
     haptic()
@@ -67,10 +68,10 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
         <SearchIcon />
         <input
           type="search"
-          placeholder="Корпус, аудитория, столовая…"
+          placeholder={t('Корпус, аудитория, столовая…')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Поиск места"
+          aria-label={t('Поиск места')}
         />
       </label>
 
@@ -82,7 +83,7 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
             </>
           ) : (
             <>
-              Не знаю, где аудитория <b>{room}</b>. Подскажи через «Другое → Написать в поддержку».
+              {t('Не знаю, где аудитория {room}. Подскажи через «Другое → Написать в поддержку».', { room })}
             </>
           )}
         </p>
@@ -91,18 +92,18 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
       {!query.trim() && map && (
         <section className="places-overview">
           <CampusMap map={map} places={places} onPick={pick} />
-          <p className="places-overview-hint">Рязанский проспект, 99 · метро «Выхино». Нажми на корпус — откроется карточка.</p>
+          <p className="places-overview-hint">{t('Рязанский проспект, 99 · метро «Выхино». Нажми на корпус — откроется карточка.')}</p>
         </section>
       )}
 
-      {found.length === 0 && <p className="gsearch-empty">Ничего не нашёл. Попробуй «столовая», «ЛК» или «У-432».</p>}
+      {found.length === 0 && <p className="gsearch-empty">{t('Ничего не нашёл. Попробуй «столовая», «ЛК» или «У-432».')}</p>}
 
-      {PLACE_GROUPS.map((g) => {
-        const items = found.filter((p) => p.group === g.id)
+      {PLACE_GROUPS.map((id) => {
+        const items = found.filter((p) => p.group === id)
         if (!items.length) return null
         return (
-          <section key={g.id} className="other-group places-group">
-            <h3 className="other-group-title">{g.title}</h3>
+          <section key={id} className="other-group places-group">
+            <h3 className="other-group-title">{placeGroupTitle(id)}</h3>
             {items.map((p) => (
               <PlaceCard
                 key={p.id}
@@ -120,7 +121,7 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
       })}
 
       <p className="places-footer">
-        Адреса и схема — по данным guu.ru и OpenStreetMap. Нашёл ошибку или нет нужного места — напиши в «Другое → Написать в поддержку».
+        {t('Адреса и схема — по данным guu.ru и OpenStreetMap. Нашёл ошибку или нет нужного места — напиши в «Другое → Написать в поддержку».')}
       </p>
     </div>
   )
@@ -154,10 +155,10 @@ function PlaceCard({ place: p, map, places, open, room, onToggle, cardRef }: Car
       {open && (
         <div className="place-body">
           {map && onCampusMap(map, p) && <CampusMap map={map} places={places} focus={p} />}
-          {room && <p className="place-room-line">{/\d/.test(room) ? `Аудитория ${room}` : room}</p>}
+          {room && <p className="place-room-line">{/\d/.test(room) ? t('Аудитория {room}', { room }) : room}</p>}
           {lines.length > 0 && (
             <div className="place-howto">
-              <h4>Как пройти</h4>
+              <h4>{t('Как пройти')}</h4>
               <ul>
                 {lines.map((line, i) => (
                   <li key={i}>{line}</li>
@@ -172,7 +173,7 @@ function PlaceCard({ place: p, map, places, open, room, onToggle, cardRef }: Car
           )}
           {p.note && <p className="place-note">{p.note}</p>}
           <button type="button" className="button-primary place-open" onClick={() => (haptic(), openLink(apps[0].url))}>
-            Открыть в {apps[0].title.replace(' Карты', ' Картах')}
+            {apps[0].open}
           </button>
           <div className="place-apps">
             {apps.slice(1).map((app) => (

@@ -2,6 +2,7 @@
 // Группа и преподаватель должны быть на сайте (data/schedule/<id>.json, data/teachers/<id>.json).
 // Тот же выбор приложение кладёт и в CloudStorage Telegram — здесь он для бота: /today, inline, рассылки.
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
+import { isLang } from '../../shared/i18n-core'
 import { json, readApi } from './api'
 import { getUser, meOf } from './db'
 import { loadGroupFile, loadTeacherFile } from './schedule'
@@ -56,4 +57,20 @@ export async function handleIntro(env: Env, request: Request): Promise<Response>
     .bind(req.profile.id, req.profile.username, req.profile.name, now, version)
     .run()
   return json({ ok: true, intro: version })
+}
+
+// Язык интерфейса (этап 11): POST /lang {lang: 'ru' | 'en'} — выбор в знакомстве или «Профиль → Язык».
+// По нему бот пишет человеку: /start, /today, inline, календарь, рассылки.
+export async function handleLang(env: Env, request: Request): Promise<Response> {
+  const req = await readApi<{ lang?: unknown }>(env, request, { write: true })
+  if (req instanceof Response) return req
+  if (!isLang(req.body.lang)) return json({ ok: false, error: 'lang' }, 400)
+  const now = Date.now()
+  await env.DB.prepare(
+    `INSERT INTO users (id, username, name, first_seen, last_seen, lang, lang_code) VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6)
+     ON CONFLICT (id) DO UPDATE SET lang = ?5`,
+  )
+    .bind(req.profile.id, req.profile.username, req.profile.name, now, req.body.lang, req.profile.lang ?? null)
+    .run()
+  return json({ ok: true, lang: req.body.lang })
 }

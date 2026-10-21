@@ -3,14 +3,12 @@
 import { cachedList } from './data'
 import { readLocal, writeLocal } from './storage'
 import { BOT_URL, inTelegram, tg } from './telegram'
+import { t } from './i18n'
 
 export type PlaceGroup = 'buildings' | 'sport' | 'food' | 'other'
-export const PLACE_GROUPS: { id: PlaceGroup; title: string }[] = [
-  { id: 'buildings', title: 'Корпуса' },
-  { id: 'sport', title: 'Спорт' },
-  { id: 'food', title: 'Еда' },
-  { id: 'other', title: 'Другое' },
-]
+export const PLACE_GROUPS: PlaceGroup[] = ['buildings', 'sport', 'food', 'other']
+export const placeGroupTitle = (id: PlaceGroup) =>
+  ({ buildings: t('Корпуса'), sport: t('Спорт'), food: t('Еда'), other: t('Другое#места') })[id]
 
 export type Place = {
   id: string
@@ -98,6 +96,7 @@ export function forgetPlaces() {
 
 export const loadPlacesFile = () => loadFile().then((f) => f.places)
 
+// i18n-ignore — поиск без «ё»
 const squash = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim()
 
 // ---------- аудитория → корпус ----------
@@ -142,7 +141,8 @@ export const howtoLines = (howto: string) =>
     .filter(Boolean)
 
 // ---------- «Открыть в…» ----------
-export type MapApp = { id: 'apple' | 'google' | 'yandex' | '2gis'; title: string; short: string; url: string }
+// open — подпись главной кнопки («Открыть в Яндекс Картах»)
+export type MapApp = { id: 'apple' | 'google' | 'yandex' | '2gis'; title: string; short: string; open: string; url: string }
 
 const platform = (): 'ios' | 'android' | 'other' => {
   const p = inTelegram ? tg!.platform : ''
@@ -154,10 +154,10 @@ const platform = (): 'ios' | 'android' | 'other' => {
 // На iOS первыми — Apple Карты, на Android (и на компьютере) — Google; Яндекс и 2ГИС — всегда
 export function mapApps(p: Pick<Place, 'lat' | 'lon' | 'name'>): MapApp[] {
   const { lat, lon } = p
-  const apple: MapApp = { id: 'apple', title: 'Apple Карты', short: 'Apple', url: `https://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(p.name)}` }
-  const google: MapApp = { id: 'google', title: 'Google Карты', short: 'Google', url: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}` }
-  const yandex: MapApp = { id: 'yandex', title: 'Яндекс Карты', short: 'Яндекс', url: `https://yandex.ru/maps/?pt=${lon},${lat}&z=18&l=map` }
-  const gis: MapApp = { id: '2gis', title: '2ГИС', short: '2ГИС', url: `https://2gis.ru/geo/${lon},${lat}` }
+  const apple: MapApp = { id: 'apple', title: t('Apple Карты'), short: 'Apple', open: t('Открыть в Apple Картах'), url: `https://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(p.name)}` }
+  const google: MapApp = { id: 'google', title: t('Google Карты'), short: 'Google', open: t('Открыть в Google Картах'), url: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}` }
+  const yandex: MapApp = { id: 'yandex', title: t('Яндекс Карты'), short: t('Яндекс'), open: t('Открыть в Яндекс Картах'), url: `https://yandex.ru/maps/?pt=${lon},${lat}&z=18&l=map` }
+  const gis: MapApp = { id: '2gis', title: t('2ГИС'), short: t('2ГИС'), open: t('Открыть в 2ГИС'), url: `https://2gis.ru/geo/${lon},${lat}` }
   return platform() === 'ios' ? [apple, yandex, gis, google] : [google, yandex, gis, apple]
 }
 

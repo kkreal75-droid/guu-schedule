@@ -3,7 +3,7 @@ import { Section } from '../components/Section'
 import { ChevronLeft, ChevronRight } from '../icons'
 import { CampusMap, onCampusMap } from '../more/CampusMap'
 import {
-  PLACE_GROUPS, forgetPlaces, loadCampus, loadPlacesFile, mapApps, mergePlaces, type CampusMap as MapData, type Place,
+  PLACE_GROUPS, placeGroupTitle, forgetPlaces, loadCampus, loadPlacesFile, mapApps, mergePlaces, type CampusMap as MapData, type Place,
   type PlaceEdit, type PlaceGroup,
 } from '../places'
 import { confirmAction, haptic, openLink } from '../telegram'
@@ -71,9 +71,9 @@ export function PlacesAdmin() {
         {todo.length ? todo.map((p) => row(p)) : <div className="row row-text">Всё проверено 🎉</div>}
       </Section>
       {PLACE_GROUPS.map((g) => (
-        <Section key={g.id} title={g.title}>
-          {shown.filter((p) => p.group === g.id).map((p) => row(p))}
-          {g.id === 'other' && (
+        <Section key={g} title={placeGroupTitle(g)}>
+          {shown.filter((p) => p.group === g).map((p) => row(p))}
+          {g === 'other' && (
             <button type="button" className="row row-btn row-link" onClick={() => (haptic(), setOpen('new'))}>
               <span>+ Добавить место</span>
             </button>
@@ -197,8 +197,8 @@ function PlaceEditor({ base, edit, map, onBack, onSaved, onReset }: EditorProps)
           </div>
           <div className="row-chips">
             {PLACE_GROUPS.map((g) => (
-              <button key={g.id} type="button" className="chip" aria-pressed={form.group === g.id} onClick={() => set({ group: g.id })}>
-                {g.title}
+              <button key={g} type="button" className="chip" aria-pressed={form.group === g} onClick={() => set({ group: g })}>
+                {placeGroupTitle(g)}
               </button>
             ))}
           </div>

@@ -3,7 +3,7 @@
 //
 //   http://localhost:5173/?tg              — «как в Telegram», тёмная тема
 //   http://localhost:5173/?tg=light        — светлая тема
-//   http://localhost:5173/?tg&uid=7&name=… — другой тестовый пользователь
+//   http://localhost:5173/?tg&uid=7&name=… — другой тестовый пользователь; &lang=en — язык Telegram
 //
 // Приложение получает тестового пользователя и цвета темы через те же параметры запуска,
 // что передаёт настоящий Telegram, а CloudStorage работает поверх localStorage (ключ mock_cloud).
@@ -64,6 +64,7 @@ export function installTelegramMock() {
       first_name: search.get('name') ?? 'Test',
       last_name: 'User',
       username: search.get('username') ?? `test_user_${search.get('uid') ?? 1}`,
+      language_code: search.get('lang') ?? 'ru', // ?lang=en — язык Telegram у человека (этап 11)
     }
     void signedInitData(user).then((initData) => {
       const launch = new URLSearchParams({

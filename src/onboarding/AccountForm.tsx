@@ -6,25 +6,27 @@ import { CloseIcon, SearchIcon } from '../icons'
 import type { Prefs, Role } from '../prefs'
 import { haptic } from '../telegram'
 import { STEPS, type Choice, type Option, type Selection, type Step, type StepKey, type Value } from './Onboarding'
+import { t } from '../i18n'
 
 // «Профиль → Параметры аккаунта» (этап 7.8): «Я студент / Я преподаватель», под ним выпадающие списки
 // Форма → Уровень → Курс → Институт → Направление → Программа → Группа (те же шаги, что в онбординге:
 // следующий список — из того, что осталось после предыдущих; один вариант выбирается сам) и «Сохранить».
 // У преподавателя — ФИО с поиском.
 
-const LABELS: Record<StepKey, string> = {
-  form: 'Форма',
-  level: 'Уровень',
-  course: 'Курс',
-  institute: 'Институт',
-  direction: 'Направление',
-  program: 'Программа',
-  group: 'Группа',
-}
+const label = (key: StepKey) =>
+  ({
+    form: t('Форма'),
+    level: t('Уровень'),
+    course: t('Курс'),
+    institute: t('Институт'),
+    direction: t('Направление'),
+    program: t('Программа'),
+    group: t('Группа'),
+  })[key]
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: 'student', label: 'Я студент' },
-  { value: 'teacher', label: 'Я преподаватель' },
+const roles = (): { value: Role; label: string }[] => [
+  { value: 'student', label: t('Я студент') },
+  { value: 'teacher', label: t('Я преподаватель') },
 ]
 
 type Field = { step: Step; options: Option[]; value: Value | undefined }
@@ -46,7 +48,7 @@ function fields(index: GroupsIndex, sel: Selection): { list: Field[]; group: Gro
 
 const selectionOf = (g: GroupInfo): Selection => Object.fromEntries(STEPS.map((s) => [s.key, s.value(g)])) as Selection
 
-const optionLabel = (key: StepKey, o: Option) => (key === 'course' ? `${o.label} курс` : o.label)
+const optionLabel = (key: StepKey, o: Option) => (key === 'course' ? t('{n} курс', { n: o.label }) : o.label)
 
 type Props = {
   prefs: Prefs
@@ -60,7 +62,7 @@ export function AccountForm({ prefs, onSave, onSearch }: Props) {
   const [failed, setFailed] = useState(false)
   const [sel, setSel] = useState<Selection>({})
   const [teacher, setTeacher] = useState<{ id: string; name: string } | null>(
-    prefs.teacher ? { id: prefs.teacher, name: prefs.teacherName ?? 'Преподаватель' } : null,
+    prefs.teacher ? { id: prefs.teacher, name: prefs.teacherName ?? t('Преподаватель') } : null,
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
@@ -120,19 +122,19 @@ export function AccountForm({ prefs, onSave, onSearch }: Props) {
 
   return (
     <section className="section">
-      <h3 className="section-title">Параметры аккаунта</h3>
+      <h3 className="section-title">{t('Параметры аккаунта')}</h3>
       <div className="section-body account">
-        <Segmented label="Кто я" value={role} options={ROLES} onChange={setRole} />
+        <Segmented label={t('Кто я')} value={role} options={roles()} onChange={setRole} />
 
         {role === 'student' &&
           (failed ? (
-            <p className="account-note">Не получилось загрузить список групп. Проверь интернет.</p>
+            <p className="account-note">{t('Не получилось загрузить список групп. Проверь интернет.')}</p>
           ) : !form ? (
-            <p className="account-note">Загружаю группы…</p>
+            <p className="account-note">{t('Загружаю группы…')}</p>
           ) : (
             form.list.map(({ step, options, value }) => (
               <label key={step.key} className="account-field">
-                <span>{LABELS[step.key]}</span>
+                <span>{label(step.key)}</span>
                 <select
                   className="account-select"
                   value={value === undefined ? '' : String(value)}
@@ -141,7 +143,7 @@ export function AccountForm({ prefs, onSave, onSearch }: Props) {
                 >
                   {value === undefined && (
                     <option value="" disabled>
-                      Выбери…
+                      {t('Выбери…')}
                     </option>
                   )}
                   {options.map((o) => (
@@ -156,13 +158,13 @@ export function AccountForm({ prefs, onSave, onSearch }: Props) {
 
         {role === 'teacher' && <TeacherField value={teacher} onChange={setTeacher} />}
 
-        {error && <p className="account-note form-error">Не получилось сохранить. Проверь интернет и попробуй ещё раз.</p>}
+        {error && <p className="account-note form-error">{t('Не получилось сохранить. Проверь интернет и попробуй ещё раз.')}</p>}
         <button type="button" className="button-primary account-save" disabled={!changed || saving} onClick={save}>
-          {saving ? 'Сохраняю…' : 'Сохранить'}
+          {saving ? t('Сохраняю…') : t('Сохранить')}
         </button>
         {role === 'student' && (
           <button type="button" className="account-link" onClick={() => (haptic(), onSearch())}>
-            Знаю свою группу — найти поиском
+            {t('Знаю свою группу — найти поиском')}
           </button>
         )}
       </div>
@@ -182,10 +184,10 @@ function TeacherField({ value, onChange }: { value: { id: string; name: string }
   if (value) {
     return (
       <div className="account-field">
-        <span>ФИО</span>
+        <span>{t('ФИО')}</span>
         <div className="account-select account-picked">
           <span>{value.name}</span>
-          <button type="button" className="icon-btn" aria-label="Выбрать другого" onClick={() => (haptic(), onChange(null))}>
+          <button type="button" className="icon-btn" aria-label={t('Выбрать другого')} onClick={() => (haptic(), onChange(null))}>
             <CloseIcon />
           </button>
         </div>
@@ -194,19 +196,19 @@ function TeacherField({ value, onChange }: { value: { id: string; name: string }
   }
   return (
     <div className="account-field">
-      <span>ФИО</span>
+      <span>{t('ФИО')}</span>
       <label className="account-select account-search">
         <SearchIcon />
-        <input type="search" value={query} placeholder="Фамилия, например Денисова" onChange={(e) => setQuery(e.target.value)} aria-label="Фамилия преподавателя" />
+        <input type="search" value={query} placeholder={t('Фамилия, например Денисова')} onChange={(e) => setQuery(e.target.value)} aria-label={t('Фамилия преподавателя')} />
       </label>
-      {!list && query.trim().length >= 2 && <p className="account-note">Загружаю…</p>}
-      {list && query.trim().length >= 2 && !found.length && <p className="account-note">Не нашёл такую фамилию в расписании ГУУ.</p>}
+      {!list && query.trim().length >= 2 && <p className="account-note">{t('Загружаю…')}</p>}
+      {list && query.trim().length >= 2 && !found.length && <p className="account-note">{t('Не нашёл такую фамилию в расписании ГУУ.')}</p>}
       {found.length > 0 && (
         <div className="account-results">
-          {found.map((t) => (
-            <button key={t.id} type="button" className="account-result" onClick={() => (haptic(), onChange({ id: t.id, name: t.name }))}>
-              <span className="account-result-name">{t.name}</span>
-              <span className="account-result-sub">{t.subjects.slice(0, 2).join(', ')}</span>
+          {found.map((teacher) => (
+            <button key={teacher.id} type="button" className="account-result" onClick={() => (haptic(), onChange({ id: teacher.id, name: teacher.name }))}>
+              <span className="account-result-name">{teacher.name}</span>
+              <span className="account-result-sub">{teacher.subjects.slice(0, 2).join(', ')}</span>
             </button>
           ))}
         </div>

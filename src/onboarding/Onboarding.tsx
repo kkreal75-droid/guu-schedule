@@ -4,7 +4,7 @@
 // сразу ведёт дальше; выбранное — хлебными крошками сверху, нажатие возвращает к шагу; на любом шаге —
 // «Знаю свою группу» (поиск по всем группам). Части знакомства (этап 7.1) и «Профиль → Сменить группу / роль».
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { FORM_TITLES, LEVEL_TITLES, type GroupInfo, type GroupsIndex } from '../../shared/groups'
+import type { GroupInfo, GroupsIndex } from '../../shared/groups'
 import { loadGroups } from '../data'
 import { ChevronRight, CloseIcon, SearchIcon } from '../icons'
 import { haptic } from '../telegram'
@@ -12,6 +12,7 @@ import { useBackButton } from '../useBackButton'
 import { GroupSearch } from './GroupSearch'
 import { EmojiTile } from './Stories'
 import { TeacherPicker } from './TeacherPicker'
+import { t } from '../i18n'
 
 export type Choice = { role: 'student'; group: string } | { role: 'teacher'; teacher: string; name: string }
 
@@ -31,7 +32,7 @@ export type Option = { value: Value; label: string; sub?: string }
 
 export type Step = {
   key: StepKey
-  title: string
+  title: () => string // на языке интерфейса
   tiles?: 'small' | 'wide' // плитки вместо карточек: курс — маленькие, группы — по две в ряд
   value: (g: GroupInfo) => Value
   options: (pool: GroupInfo[], index: GroupsIndex) => Option[]
@@ -40,44 +41,49 @@ export type Step = {
 
 const LEVEL_ORDER = ['bachelor', 'master', 'postgrad']
 
+// форма и уровень обучения на языке интерфейса
+export const formTitle = (form: GroupInfo['form']) => (form === 'ozfo' ? t('Очно-заочная') : t('Очная'))
+export const levelTitle = (level: GroupInfo['level']) =>
+  level === 'master' ? t('Магистратура') : level === 'postgrad' ? t('Аспирантура') : t('Бакалавриат')
+
 const uniq = <T,>(items: T[]) => [...new Set(items)]
 const byLabel = (a: Option, b: Option) => a.label.localeCompare(b.label, 'ru')
 
 export const STEPS: Step[] = [
   {
     key: 'form',
-    title: 'Форма обучения',
+    title: () => t('Форма обучения'),
     value: (g) => g.form,
     options: (pool) =>
       uniq(pool.map((g) => g.form))
         .sort()
-        .map((v) => ({ value: v, label: FORM_TITLES[v] })),
-    chip: (v) => FORM_TITLES[v as GroupInfo['form']],
+        .map((v) => ({ value: v, label: formTitle(v) })),
+    chip: (v) => formTitle(v as GroupInfo['form']),
   },
   {
     key: 'level',
-    title: 'Уровень образования',
+    title: () => t('Уровень образования'),
     value: (g) => g.level,
     options: (pool) =>
       uniq(pool.map((g) => g.level))
         .sort((a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b))
-        .map((v) => ({ value: v, label: LEVEL_TITLES[v] })),
-    chip: (v) => LEVEL_TITLES[v as GroupInfo['level']],
+        .map((v) => ({ value: v, label: levelTitle(v) })),
+    chip: (v) => levelTitle(v as GroupInfo['level']),
   },
   {
     key: 'course',
-    title: 'На каком ты курсе?',
+    title: () => t('На каком ты курсе?'),
     tiles: 'small',
     value: (g) => g.course,
     options: (pool) =>
       uniq(pool.map((g) => g.course))
         .sort((a, b) => a - b)
         .map((v) => ({ value: v, label: String(v) })),
-    chip: (v) => `${v} курс`,
+    chip: (v) => t('{n} курс', { n: v }),
   },
   {
     key: 'institute',
-    title: 'Твой институт',
+    title: () => t('Твой институт'),
     value: (g) => g.institute,
     options: (pool, index) =>
       uniq(pool.map((g) => g.institute))
@@ -87,7 +93,7 @@ export const STEPS: Step[] = [
   },
   {
     key: 'direction',
-    title: 'Направление',
+    title: () => t('Направление'),
     value: (g) => g.direction,
     options: (pool) =>
       uniq(pool.map((g) => g.direction))
@@ -97,7 +103,7 @@ export const STEPS: Step[] = [
   },
   {
     key: 'program',
-    title: 'Образовательная программа',
+    title: () => t('Образовательная программа'),
     value: (g) => g.program,
     options: (pool) =>
       uniq(pool.map((g) => g.program))
@@ -107,7 +113,7 @@ export const STEPS: Step[] = [
   },
   {
     key: 'group',
-    title: 'Твоя группа',
+    title: () => t('Твоя группа'),
     tiles: 'wide',
     value: (g) => g.id,
     options: (pool) =>
@@ -203,7 +209,7 @@ export function GroupCard({ emoji, name, text }: { emoji: string; name: string; 
 type Screen = 'role' | 'student' | 'search' | 'teacher'
 type Picked = { choice: Choice; name: string; from: Screen }
 
-export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel = 'Назад' }: Props) {
+export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel = t('Назад') }: Props) {
   const [screen, setScreen] = useState<Screen>(startSearch ? 'search' : 'role')
   const [sel, setSel] = useState<Selection>({})
   const [index, setIndex] = useState<GroupsIndex | null>(null)
@@ -284,7 +290,7 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
 
   const backButton = canBack && (
     <button type="button" className="button-secondary" onClick={back} disabled={saving}>
-      {screen === 'role' && !picked ? cancelLabel : 'Назад'}
+      {screen === 'role' && !picked ? cancelLabel : t('Назад')}
     </button>
   )
 
@@ -297,18 +303,18 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
         foot={
           <>
             <button type="button" className="button-primary" onClick={save} disabled={saving}>
-              {saving ? 'Сохраняю…' : 'Сохранить'}
+              {saving ? t('Сохраняю…') : t('Сохранить')}
             </button>
             {backButton}
           </>
         }
       >
         {student && walked && index && picked.from === 'student' && <Crumbs crumbs={walked.crumbs} index={index} onUnpick={unpick} />}
-        {error && <p className="ob-reason">Не получилось сохранить. Проверь интернет и попробуй ещё раз.</p>}
+        {error && <p className="ob-reason">{t('Не получилось сохранить. Проверь интернет и попробуй ещё раз.')}</p>}
         <GroupCard
           emoji={student ? '🎓' : '🧑‍🏫'}
           name={picked.name}
-          text={student ? 'Это твоя группа. Расписание уже готово — осталось сохранить.' : 'Ваше расписание по файлам ГУУ уже готово — осталось сохранить.'}
+          text={student ? t('Это твоя группа. Расписание уже готово — осталось сохранить.') : t('Ваше расписание по файлам ГУУ уже готово — осталось сохранить.')}
         />
       </Shell>
     )
@@ -316,26 +322,26 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
 
   if (screen === 'role') {
     return (
-      <Shell top={<Progress done={1} total={8} />} foot={<>{backButton}<p className="ob-note">Это займёт меньше минуты</p></>}>
+      <Shell top={<Progress done={1} total={8} />} foot={<>{backButton}<p className="ob-note">{t('Это займёт меньше минуты')}</p></>}>
         <div className="ob-step ob-role">
-          <p className="ob-overline">Настройка</p>
-          <h1 className="ob-title">Кто ты?</h1>
-          <p className="ob-text">Выбери — и сразу покажу нужное расписание.</p>
+          <p className="ob-overline">{t('Настройка')}</p>
+          <h1 className="ob-title">{t('Кто ты?')}</h1>
+          <p className="ob-text">{t('Выбери — и сразу покажу нужное расписание.')}</p>
           {reason && <p className="ob-reason">{reason}</p>}
           <div className="ob-cards">
             <button type="button" className="ob-card ob-card-role" onClick={() => (haptic(), setScreen('student'))}>
               <span className="ob-card-emoji">🎓</span>
               <span className="ob-card-text">
-                <span className="ob-card-label">Я студент</span>
-                <span className="ob-card-sub">Расписание своей группы</span>
+                <span className="ob-card-label">{t('Я студент')}</span>
+                <span className="ob-card-sub">{t('Расписание своей группы')}</span>
               </span>
               <ChevronRight className="ob-card-chevron" />
             </button>
             <button type="button" className="ob-card ob-card-role" onClick={() => (haptic(), setScreen('teacher'))}>
               <span className="ob-card-emoji">🧑‍🏫</span>
               <span className="ob-card-text">
-                <span className="ob-card-label">Я преподаватель</span>
-                <span className="ob-card-sub">Расписание по своему ФИО</span>
+                <span className="ob-card-label">{t('Я преподаватель')}</span>
+                <span className="ob-card-sub">{t('Расписание по своему ФИО')}</span>
               </span>
               <ChevronRight className="ob-card-chevron" />
             </button>
@@ -349,9 +355,9 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
     return (
       <Shell top={<Progress done={4} total={8} />} foot={backButton}>
         <div className="ob-step">
-          <p className="ob-overline">Преподаватель</p>
-          <h1 className="ob-title">Ваша фамилия</h1>
-          <p className="ob-text">Найдём ваше расписание по файлам ГУУ.</p>
+          <p className="ob-overline">{t('Преподаватель')}</p>
+          <h1 className="ob-title">{t('Ваша фамилия')}</h1>
+          <p className="ob-text">{t('Найдём ваше расписание по файлам ГУУ.')}</p>
           <TeacherPicker onPick={(t) => (haptic(), setPicked({ choice: { role: 'teacher', teacher: t.id, name: t.name }, name: t.name, from: 'teacher' }))} />
         </div>
       </Shell>
@@ -363,13 +369,13 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
       <Shell top={<Progress done={1} total={8} />} foot={backButton}>
         {error ? (
           <div className="ob-hero">
-            <p className="ob-text">Не получилось загрузить список групп. Проверь интернет.</p>
+            <p className="ob-text">{t('Не получилось загрузить список групп. Проверь интернет.')}</p>
             <button type="button" className="button-secondary" onClick={fetchIndex}>
-              Повторить
+              {t('Повторить')}
             </button>
           </div>
         ) : (
-          <p className="ob-text">Загружаю группы…</p>
+          <p className="ob-text">{t('Загружаю группы…')}</p>
         )}
       </Shell>
     )
@@ -379,8 +385,8 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
     return (
       <Shell top={<Progress done={4} total={8} />} foot={backButton}>
         <div className="ob-step">
-          <p className="ob-overline">Поиск</p>
-          <h1 className="ob-title">Знаю свою группу</h1>
+          <p className="ob-overline">{t('Поиск')}</p>
+          <h1 className="ob-title">{t('Знаю свою группу')}</h1>
           <GroupSearch
             groups={index.groups}
             onPick={(g) => (haptic(), setPicked({ choice: { role: 'student', group: g.id }, name: g.name, from: 'search' }))}
@@ -400,18 +406,16 @@ export function Onboarding({ reason, startSearch, onDone, onCancel, cancelLabel 
       foot={
         <>
           <button type="button" className="ob-link" onClick={() => (haptic(), setScreen('search'))}>
-            <SearchIcon /> Знаю свою группу
+            <SearchIcon /> {t('Знаю свою группу')}
           </button>
           {backButton}
         </>
       }
     >
       <Crumbs crumbs={crumbs} index={index} onUnpick={unpick} />
-      <p className="ob-overline">
-        Шаг {stepNo} из {STEPS.length}
-      </p>
+      <p className="ob-overline">{t('Шаг {n} из {total}', { n: stepNo, total: STEPS.length })}</p>
       <div key={current.key} className="ob-step">
-        <h1 className="ob-title">{current.title}</h1>
+        <h1 className="ob-title">{current.title()}</h1>
         {current.tiles ? (
           <Tiles options={options} wide={current.tiles === 'wide'} onPick={(v) => pick(current.key, v)} />
         ) : (
@@ -438,7 +442,7 @@ function Crumbs({ crumbs, index, onUnpick }: { crumbs: Crumb[]; index: GroupsInd
             type="button"
             className="ob-chip"
             onClick={() => onUnpick(step.key)}
-            aria-label={`Изменить: ${step.chip(value, index)}`}
+            aria-label={t('Изменить: {what}', { what: step.chip(value, index) })}
           >
             <span className="ob-chip-text">{step.chip(value, index)}</span>
             <CloseIcon className="ob-chip-x" />

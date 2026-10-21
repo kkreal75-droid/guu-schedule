@@ -1,10 +1,11 @@
 # Автотесты воркера (bot/test): подписи, права, ввод, лимиты — в рантайме Workers (Miniflare), без сети.
+# Проверка перевода приложения (scripts/i18n_check.mjs): нет русского текста мимо t(), у всех строк есть английский.
 name: Tests
 
 on:
   push:
     branches: [main]
-    paths: ["bot/**", "shared/**", "overrides.json", "overrides/**", ".github/workflows/tests.yml"]
+    paths: ["bot/**", "shared/**", "src/**", "scripts/i18n_check.mjs", "overrides.json", "overrides/**", ".github/workflows/tests.yml"]
   pull_request:
 
 permissions:
@@ -27,3 +28,14 @@ jobs:
       - run: npx wrangler types
       - run: npx tsc --noEmit && npx tsc -p test --noEmit
       - run: npm test
+
+  i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run i18n

@@ -5,7 +5,7 @@ import { LessonCard } from '../components/LessonCard'
 import { LessonMenu } from '../components/LessonMenu'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
 import { WeekCard } from '../components/WeekCard'
-import { WEEKDAYS_FULL, WEEKDAYS_SHORT, formatDate, formatDuration, pluralPairs } from '../format'
+import { WEEK_INDEXES, formatDate, formatDuration, pluralPairs, weekdayFull } from '../format'
 import { CalendarIcon, NoteIcon } from '../icons'
 import { dayLessons } from '../../shared/edits-core'
 import type { DayLesson, Extras } from '../edits'
@@ -14,6 +14,7 @@ import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import { dayFromIso, getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
 import type { Timetable } from '../../shared/schedule-core'
 import { haptic } from '../telegram'
+import { t } from '../i18n'
 
 export type Cursor = { week: number; weekday: number }
 
@@ -63,12 +64,13 @@ type Props = {
   onUnhide?: (id: number) => void
 }
 
-const HIDDEN_TOAST: Record<HideScope, string> = {
-  day: 'Пара скрыта в этот день',
-  even: 'Пара скрыта по чётным неделям',
-  odd: 'Пара скрыта по нечётным неделям',
-  always: 'Пара скрыта',
-}
+const hiddenToast = (scope: HideScope) =>
+  ({
+    day: t('Пара скрыта в этот день'),
+    even: t('Пара скрыта по чётным неделям'),
+    odd: t('Пара скрыта по нечётным неделям'),
+    always: t('Пара скрыта'),
+  })[scope]
 
 export function ScheduleScreen({
   extras, mine = null, group, groups, home, onGroupChange, onAddGroup, cursor, onCursorChange, notes, onSaveNote,
@@ -101,7 +103,7 @@ export function ScheduleScreen({
   const view = useMemo(() => dayLessons(T, group, day, extras, mine), [T, group, day, extras, mine])
   const lessons = view.lessons
   const busyDays = useMemo(
-    () => WEEKDAYS_SHORT.map((_, i) => dayLessons(T, group, monday + i, extras, mine).lessons.length > 0),
+    () => WEEK_INDEXES.map((_, i) => dayLessons(T, group, monday + i, extras, mine).lessons.length > 0),
     [T, group, monday, extras, mine],
   )
 
@@ -151,29 +153,29 @@ export function ScheduleScreen({
   const dayNote = notes[dayKey]
   const editDayNote = () => {
     haptic()
-    setEditing({ key: dayKey, title: 'Заметка к дню', subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}` })
+    setEditing({ key: dayKey, title: t('Заметка к дню'), subtitle: `${weekdayFull(weekday)}, ${formatDate(day)}` })
   }
 
   const summary = lessons.length ? `${pluralPairs(lessons.length)} · ${lessons[0].start}–${lessons[lessons.length - 1].end}` : null
-  const dayLabel = `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}`
+  const dayLabel = `${weekdayFull(weekday)}, ${formatDate(day)}`
 
   return (
     <div className="screen sched">
       {!readOnly && (
         <>
           <header className="screen-head">
-            <h1 className="screen-title">Расписание</h1>
+            <h1 className="screen-title">{t('Расписание')}</h1>
             <div className="screen-actions">
               <button
                 type="button"
                 className="round-btn round-btn-note"
-                aria-label={dayNote ? 'Заметка к дню' : 'Добавить заметку к дню'}
+                aria-label={dayNote ? t('Заметка к дню') : t('Добавить заметку к дню')}
                 data-has-note={dayNote ? true : undefined}
                 onClick={editDayNote}
               >
                 <NoteIcon />
               </button>
-              <button type="button" className="round-btn" aria-label="Выбрать дату" onClick={openPicker}>
+              <button type="button" className="round-btn" aria-label={t('Выбрать дату')} onClick={openPicker}>
                 <CalendarIcon />
               </button>
               <input
@@ -208,18 +210,18 @@ export function ScheduleScreen({
         weekday={weekday}
         today={now.day}
         busy={busyDays}
-        notes={readOnly ? undefined : WEEKDAYS_SHORT.map((_, i) => dayHasNotes(notes, monday + i, group))}
+        notes={readOnly ? undefined : WEEK_INDEXES.map((_, i) => dayHasNotes(notes, monday + i, group))}
         onPick={(i) => go({ week, weekday: i })}
       />
 
       <div className="day-sub">
         <span className="day-sub-text">
-          {isToday ? 'Сегодня' : dayLabel}
+          {isToday ? t('Сегодня') : dayLabel}
           {summary && ` · ${summary}`}
         </span>
         {!isToday && inSemester(todayWeek) && (
           <button type="button" className="pill pill-btn" onClick={() => goDay(now.day)}>
-            Сегодня
+            {t('Сегодня')}
           </button>
         )}
       </div>
@@ -241,8 +243,8 @@ export function ScheduleScreen({
           {lessons.length === 0 ? (
             <div className="empty">
               <div className="empty-emoji">{weekday === 6 ? '🌿' : '🎉'}</div>
-              <div className="empty-title">{weekday === 6 ? 'Выходной' : 'Пар нет'}</div>
-              <div className="empty-text">{inSemester(week) ? 'В этот день занятий нет' : 'Этот день вне семестра'}</div>
+              <div className="empty-title">{weekday === 6 ? t('Выходной') : t('Пар нет')}</div>
+              <div className="empty-text">{inSemester(week) ? t('В этот день занятий нет') : t('Этот день вне семестра')}</div>
             </div>
           ) : (
             lessons.map((lesson, i) => {
@@ -253,14 +255,14 @@ export function ScheduleScreen({
                 setEditing({
                   key: noteKey,
                   title: lesson.subject,
-                  subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
+                  subtitle: `${weekdayFull(weekday)}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
                 })
               }
               return (
                 <div key={`${lesson.start}|${lesson.subject}|${lesson.kind}`} className="day-item">
                   {gap > 0 && (
                     <div className="gap" data-window={gap >= GAP_MIN || undefined}>
-                      {gap >= GAP_MIN ? 'Окно' : 'Перерыв'} {formatDuration(gap)}
+                      {gap >= GAP_MIN ? t('Окно {d}', { d: formatDuration(gap) }) : t('Перерыв {d}', { d: formatDuration(gap) })}
                     </div>
                   )}
                   <LessonCard
@@ -284,7 +286,7 @@ export function ScheduleScreen({
       {menu && (
         <LessonMenu
           lesson={menu.lesson}
-          subtitle={`${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${menu.lesson.start}–${menu.lesson.end}`}
+          subtitle={`${weekdayFull(weekday)}, ${formatDate(day)} · ${menu.lesson.start}–${menu.lesson.end}`}
           week={week}
           start={menu.start}
           onNote={() => {
@@ -293,7 +295,7 @@ export function ScheduleScreen({
             setEditing({
               key: lessonNoteKey(day, group, lesson),
               title: lesson.subject,
-              subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
+              subtitle: `${weekdayFull(weekday)}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
             })
           }}
           onHide={
@@ -302,7 +304,7 @@ export function ScheduleScreen({
               const lesson = menu.lesson
               setMenu(null)
               const id = await onHide(lesson, isoFromDay(day), scope)
-              if (id !== null) setToast({ text: HIDDEN_TOAST[scope], id })
+              if (id !== null) setToast({ text: hiddenToast(scope), id })
             })
           }
           onClose={() => setMenu(null)}
@@ -322,7 +324,7 @@ export function ScheduleScreen({
                 setToast(null)
               }}
             >
-              Вернуть
+              {t('Вернуть')}
             </button>
           )}
         </div>

@@ -24,6 +24,7 @@ import { TeachersPage } from '../more/TeachersPage'
 import type { Prefs } from '../prefs'
 import { haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
+import { t } from '../i18n'
 
 // «Другое» — всё, кроме расписания: группы-карточки (Учебное, Сообщество, Информация, Помощь), у пункта —
 // цветная иконка, название и серая подпись. У старосты — «Правки группы», у владельца — «Админ-панель».
@@ -74,35 +75,35 @@ export function MoreScreen({
 
   const groups: Group[] = [
     {
-      title: 'Учебное',
+      title: t('Учебное'),
       items: [
         ...(teacherMode
           ? []
-          : [{ id: 'session', title: 'Расписание сессии', sub: 'Экзамены и зачёты', icon: ExamIcon, color: 'red' as Color, render: () => <SessionPage group={group} /> }]),
-        { id: 'kug', title: 'Календарный учебный график', sub: 'Сессии, каникулы, праздники', icon: PlanIcon, color: 'orange', render: () => <KugPage group={group} /> },
-        { id: 'teacher-schedule', title: 'Расписание преподавателя', sub: 'Поиск по фамилии', icon: TeacherIcon, color: 'purple', render: () => <TeacherSchedulePage /> },
+          : [{ id: 'session', title: t('Расписание сессии'), sub: t('Экзамены и зачёты'), icon: ExamIcon, color: 'red' as Color, render: () => <SessionPage group={group} /> }]),
+        { id: 'kug', title: t('Календарный учебный график'), sub: t('Сессии, каникулы, праздники'), icon: PlanIcon, color: 'orange', render: () => <KugPage group={group} /> },
+        { id: 'teacher-schedule', title: t('Расписание преподавателя'), sub: t('Поиск по фамилии'), icon: TeacherIcon, color: 'purple', render: () => <TeacherSchedulePage /> },
         {
           id: 'group-schedule',
-          title: 'Расписание группы',
-          sub: 'Любая группа ГУУ',
+          title: t('Расписание группы'),
+          sub: t('Любая группа ГУУ'),
           icon: PeopleIcon,
           color: 'blue',
           render: () => <GroupSchedulePage prefs={prefs} onPrefsChange={onPrefsChange} />,
         },
-        { id: 'rooms', title: 'Свободные аудитории', sub: 'Где посидеть между парами', icon: DoorIcon, color: 'teal', render: () => <FreeRoomsPage /> },
-        { id: 'documents', title: 'Документы', sub: 'Таблицы с расписанием', icon: TableIcon, color: 'sky', render: () => <DocumentsPage group={group} /> },
+        { id: 'rooms', title: t('Свободные аудитории'), sub: t('Где посидеть между парами'), icon: DoorIcon, color: 'teal', render: () => <FreeRoomsPage /> },
+        { id: 'documents', title: t('Документы'), sub: t('Таблицы с расписанием'), icon: TableIcon, color: 'sky', render: () => <DocumentsPage group={group} /> },
         ...(teacherMode
           ? []
-          : [{ id: 'calendar', title: 'Календарь на телефоне', sub: 'Apple / Google Calendar', icon: PhoneCalendarIcon, color: 'amber' as Color, render: () => <CalendarPage group={group} /> }]),
+          : [{ id: 'calendar', title: t('Календарь на телефоне'), sub: 'Apple / Google Calendar', icon: PhoneCalendarIcon, color: 'amber' as Color, render: () => <CalendarPage group={group} /> }]),
       ],
     },
     {
-      title: 'Сообщество',
+      title: t('Сообщество'),
       items: [
         {
           id: 'teachers',
-          title: 'Рейтинг преподавателей',
-          sub: 'Отзывы и оценки',
+          title: t('Рейтинг преподавателей'),
+          sub: t('Отзывы и оценки'),
           icon: StarIcon,
           color: 'yellow',
           render: () => (
@@ -113,30 +114,30 @@ export function MoreScreen({
             />
           ),
         },
-        { id: 'groupbot', title: 'Бот в беседе группы', sub: 'Расписание в чат каждое утро', icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
+        { id: 'groupbot', title: t('Бот в беседе группы'), sub: t('Расписание в чат каждое утро'), icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
       ],
     },
     {
-      title: 'Информация',
+      title: t('Информация'),
       items: [
         {
           id: 'places',
-          title: 'Корпуса ГУУ',
-          sub: 'Адреса и карта',
+          title: t('Корпуса ГУУ'),
+          sub: t('Адреса и карта'),
           icon: BuildingIcon,
           color: 'green',
           render: () => <PlacesPage target={request?.item === 'places' ? request : undefined} />,
         },
-        { id: 'faq', title: 'Частые вопросы', icon: QuestionIcon, color: 'blue', render: () => <FaqPage /> },
-        { id: 'install', title: 'Установить приложение', sub: 'На домашний экран', icon: DownloadIcon, color: 'sky', render: () => <InstallPage /> },
+        { id: 'faq', title: t('Частые вопросы'), icon: QuestionIcon, color: 'blue', render: () => <FaqPage /> },
+        { id: 'install', title: t('Установить приложение'), sub: t('На домашний экран'), icon: DownloadIcon, color: 'sky', render: () => <InstallPage /> },
       ],
     },
     {
-      title: 'Помощь',
+      title: t('Помощь'),
       items: [
-        { id: 'support', title: 'Написать в поддержку', sub: 'Ошибка, идея, вопрос', icon: MessageIcon, color: 'blue', render: () => <SupportPage /> },
+        { id: 'support', title: t('Написать в поддержку'), sub: t('Ошибка, идея, вопрос'), icon: MessageIcon, color: 'blue', render: () => <SupportPage /> },
         ...(channel
-          ? [{ id: 'channel', title: 'Канал новостей', sub: 'Что нового в приложении', icon: MegaphoneIcon, color: 'green' as Color, action: () => openTelegramLink(channel) }]
+          ? [{ id: 'channel', title: t('Канал новостей'), sub: t('Что нового в приложении'), icon: MegaphoneIcon, color: 'green' as Color, action: () => openTelegramLink(channel) }]
           : []),
       ],
     },
@@ -144,9 +145,9 @@ export function MoreScreen({
   // у старосты и владельца — отдельной карточкой внизу (остальным ни пункта, ни намёка; права проверяет бот)
   const special: Item[] = [
     ...(starosta
-      ? [{ id: 'starosta', title: 'Правки группы', sub: 'Отмены, переносы, подгруппы', icon: EditIcon, color: 'orange' as Color, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
+      ? [{ id: 'starosta', title: t('Правки группы'), sub: t('Отмены, переносы, подгруппы'), icon: EditIcon, color: 'orange' as Color, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
       : []),
-    ...(admin ? [{ id: 'admin', title: 'Админ-панель', sub: 'Только для владельца', icon: ShieldIcon, color: 'gray' as Color, render: () => <AdminPage onExit={close} />, bare: true }] : []),
+    ...(admin ? [{ id: 'admin', title: t('Админ-панель'), sub: t('Только для владельца'), icon: ShieldIcon, color: 'gray' as Color, render: () => <AdminPage onExit={close} />, bare: true }] : []),
   ]
   if (special.length) groups.push({ items: special })
 
@@ -159,8 +160,8 @@ export function MoreScreen({
     return (
       <div className="screen more">
         <header className="page-head">
-          <button type="button" className="page-back" onClick={close} aria-label="Назад">
-            <ChevronLeft /> {request ? 'Расписание' : 'Другое'}
+          <button type="button" className="page-back" onClick={close} aria-label={t('Назад')}>
+            <ChevronLeft /> {request ? t('Расписание') : t('Другое')}
           </button>
           <h2 className="page-title">{open.title}</h2>
         </header>
@@ -172,7 +173,7 @@ export function MoreScreen({
   return (
     <div className="screen other">
       <header className="screen-head">
-        <h1 className="screen-title">Другое</h1>
+        <h1 className="screen-title">{t('Другое')}</h1>
       </header>
       <div className="other-body">
         {groups.map((g, i) => (

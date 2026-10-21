@@ -1,5 +1,6 @@
 import type { ScheduleEdit, Subgroup } from './edits'
 import type { HiddenLesson, LessonTag } from '../shared/edits-core'
+import { langFromCode, type Lang } from '../shared/i18n-core'
 import { groupsToLoad } from './schedule'
 import { readPrefs } from './prefs'
 
@@ -68,6 +69,7 @@ export type Me = {
   onboarding: boolean
   starosta: string | null // староста этой группы — «Ещё → Правки группы»
   intro: number // какую версию знакомства уже видел (этап 7.1)
+  lang?: Lang | null // выбранный язык (этап 11); null — не выбирал
 }
 
 // edits — ручные правки расписания; hidden — пары, скрытые владельцем для всей группы; myHidden — свои
@@ -132,6 +134,9 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
     clearTimeout(timer)
   }
 }
+
+// язык интерфейса Telegram у человека: ru / uk / be / kk → русский, остальные → английский
+export const telegramLang = (): Lang => langFromCode(inTelegram ? tg!.initDataUnsafe.user?.language_code : navigator.language)
 
 export function telegramUser() {
   return inTelegram ? tg!.initDataUnsafe.user : undefined

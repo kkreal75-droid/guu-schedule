@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
-import { groupSubtitle, searchGroups, type GroupInfo } from '../../shared/groups'
+import { searchGroups, type GroupInfo } from '../../shared/groups'
+import { groupSubtitle } from '../guu'
 import { ChevronRight } from '../icons'
 import { haptic } from '../telegram'
+import { t } from '../i18n'
 
 // Поиск по всем группам ГУУ: «мб 1-1», «гму 2-3», «маркетинг 2», «международный бизнес»
 export function GroupSearch({
   groups,
   onPick,
   autoFocus = true,
-  placeholder = 'Например, МБ(МП) 1-1 или маркетинг 2',
+  placeholder = t('Например, МБ(МП) 1-1 или маркетинг 2'),
 }: {
   groups: GroupInfo[]
   onPick: (group: GroupInfo) => void
@@ -29,9 +31,9 @@ export function GroupSearch({
         placeholder={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Поиск группы"
+        aria-label={t('Поиск группы')}
       />
-      {query.trim() && !found.length && <p className="gsearch-empty">Ничего не нашёл. Попробуй по-другому: «гму 2», «бизнес-информатика».</p>}
+      {query.trim() && !found.length && <p className="gsearch-empty">{t('Ничего не нашёл. Попробуй по-другому: «гму 2», «бизнес-информатика».')}</p>}
       {found.length > 0 && (
         <div className="section-body gsearch-list">
           {found.map((g) => (

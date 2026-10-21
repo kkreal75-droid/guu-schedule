@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CloseIcon } from '../icons'
 import { readCloud, readLocal, save } from '../storage'
 import { haptic } from '../telegram'
+import { t } from '../i18n'
 
 const KEY = 'notice_closed'
 
@@ -19,7 +20,7 @@ export function NoticeBar({ notice }: { notice: { id: number; text: string } }) 
       <button
         type="button"
         className="notice-close"
-        aria-label="Закрыть объявление"
+        aria-label={t('Закрыть объявление')}
         onClick={() => {
           haptic()
           save(KEY, String(notice.id))

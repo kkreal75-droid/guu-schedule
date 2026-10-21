@@ -10,7 +10,7 @@ beforeAll(() => mockOutbound())
 
 const PRIVATE = [
   '/seen', '/profile', '/support', '/intro', '/my-subgroups', '/extras', '/starosta/info', '/cal/status',
-  '/reviews/top', '/admin/dashboard', '/hidden/add', '/hidden/delete',
+  '/reviews/top', '/admin/dashboard', '/hidden/add', '/hidden/delete', '/lang',
 ]
 const ADMIN_ACTIONS = [
   'dashboard', 'users', 'user', 'ban', 'unban', 'review-ban', 'reset-intro', 'places', 'academic',
@@ -257,5 +257,16 @@ describe('публичное и служебное', () => {
     const first = await call('/places')
     const etag = first.headers.get('ETag')!
     expect((await call('/places', { headers: { 'If-None-Match': etag } })).status).toBe(304)
+  })
+})
+
+describe('язык (этап 11)', () => {
+  it('/lang сохраняет выбор, /seen отдаёт его в me.lang; чужой язык — 400', async () => {
+    const u = newUser()
+    expect((await postAs(u, '/lang', { lang: 'de' })).status).toBe(400)
+    expect((await postAs(u, '/lang', { lang: 'en' })).status).toBe(200)
+    const seen = (await (await postAs(u, '/seen', { v: 2 })).json()) as { me: { lang: string | null } }
+    expect(seen.me.lang).toBe('en')
+    expect((await sql('SELECT lang FROM users WHERE id = ?', u).first<{ lang: string }>())!.lang).toBe('en')
   })
 })

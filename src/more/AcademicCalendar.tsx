@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import {
-  HOLIDAYS, KIND_TITLES, SOURCE_TITLES, YEAR, daysWord, formatIsoLong, summary, type Period, type PeriodKind,
-} from '../../shared/calendar-core'
+import { HOLIDAYS, YEAR, summary, type Period, type PeriodKind } from '../../shared/calendar-core'
 import { isEvenWeek } from '../../shared/format-core'
 import { dayFromIso, isoFromDay } from '../../shared/schedule-core'
+import { holidayTitle, isoLong, kindTitle, periodTitle, sourceTitle } from '../academic'
+import { t, tn } from '../i18n'
 import { ChevronRight } from '../icons'
 import { getTimetable, moscowNow } from '../schedule'
 import { haptic } from '../telegram'
@@ -14,14 +14,18 @@ import { haptic } from '../telegram'
 
 // «Зимняя сессия» → «до зимней сессии»
 function untilTitle(p: Period): string {
-  if (p.kind === 'holidays') return 'до каникул'
-  if (p.kind === 'study') return 'до начала учёбы'
-  if (p.kind === 'practice') return 'до практики'
-  const t = p.title.toLowerCase()
-  if (t.includes('гиа')) return 'до ГИА'
-  const season = ['зимн', 'летн', 'весенн'].find((s) => t.startsWith(s))
-  return season ? `до ${season}ей сессии` : 'до сессии'
+  if (p.kind === 'holidays') return t('до каникул')
+  if (p.kind === 'study') return t('до начала учёбы')
+  if (p.kind === 'practice') return t('до практики')
+  const title = p.title.toLowerCase()
+  if (title.includes('гиа')) return t('до ГИА') // i18n-ignore — название периода
+  if (title.startsWith('зимн')) return t('до зимней сессии') // i18n-ignore
+  if (title.startsWith('летн')) return t('до летней сессии') // i18n-ignore
+  if (title.startsWith('весенн')) return t('до весенней сессии') // i18n-ignore
+  return t('до сессии')
 }
+
+const daysText = (n: number) => tn(n, '{n} день|{n} дня|{n} дней')
 
 // куда считаем: идёт учёба или практика — до сессии; сессия — до каникул; каникулы — до учёбы
 function target(periods: Period[], current: Period | null, today: string): Period | null {
@@ -31,7 +35,7 @@ function target(periods: Period[], current: Period | null, today: string): Perio
   return next('session') ?? next('holidays')
 }
 
-const span = (p: Period) => `${formatIsoLong(p.start)} — ${formatIsoLong(p.end)}`
+const span = (p: Period) => `${isoLong(p.start)} — ${isoLong(p.end)}`
 
 function Row({ kind, label, value }: { kind: PeriodKind | 'holiday'; label: string; value: string }) {
   return (
@@ -59,8 +63,10 @@ export function AcademicCalendar({ periods, typical, title }: { periods: Period[
     : null
   const progressSub = current
     ? current.kind === 'study' && T.inSemester(week) && today < '2027-01-01'
-      ? `${week}-я неделя, ${isEvenWeek(week) ? 'чётная' : 'нечётная'} · учёба до ${formatIsoLong(current.end)}`
-      : `${KIND_TITLES[current.kind]} до ${formatIsoLong(current.end)}`
+      ? isEvenWeek(week)
+        ? t('{n}-я неделя, чётная · учёба до {date}', { n: week, date: isoLong(current.end) })
+        : t('{n}-я неделя, нечётная · учёба до {date}', { n: week, date: isoLong(current.end) })
+      : t('{what} до {date}', { what: kindTitle(current.kind), date: isoLong(current.end) })
     : null
 
   // «что дальше»: сессия, каникулы, ближайший праздник
@@ -74,28 +80,26 @@ export function AcademicCalendar({ periods, typical, title }: { periods: Period[
       {goal && days !== null ? (
         <div className={`cd-hero ck-${goal.kind}`}>
           <span className="cd-hero-label">{untilTitle(goal)}</span>
-          <span className="cd-hero-number">{days === 0 ? 'сегодня' : `${days} ${daysWord(days)}`}</span>
-          <span className="cd-hero-sub">с {formatIsoLong(goal.start)}</span>
+          <span className="cd-hero-number">{days === 0 ? t('сегодня') : daysText(days)}</span>
+          <span className="cd-hero-sub">{t('с {date}', { date: isoLong(goal.start) })}</span>
         </div>
       ) : current ? (
         // впереди в этом году ничего — летние каникулы: считаем до нового учебного года
         <div className={`cd-hero ck-${current.kind}`}>
-          <span className="cd-hero-label">до нового учебного года</span>
-          <span className="cd-hero-number">
-            {dayFromIso(current.end) + 1 - dayFromIso(today)} {daysWord(dayFromIso(current.end) + 1 - dayFromIso(today))}
-          </span>
-          <span className="cd-hero-sub">с {formatIsoLong(isoFromDay(dayFromIso(current.end) + 1))}</span>
+          <span className="cd-hero-label">{t('до нового учебного года')}</span>
+          <span className="cd-hero-number">{daysText(dayFromIso(current.end) + 1 - dayFromIso(today))}</span>
+          <span className="cd-hero-sub">{t('с {date}', { date: isoLong(isoFromDay(dayFromIso(current.end) + 1)) })}</span>
         </div>
       ) : (
         <div className="cd-hero ck-none">
-          <span className="cd-hero-number cd-hero-small">Учебный год {YEAR.title} окончен</span>
+          <span className="cd-hero-number cd-hero-small">{t('Учебный год {year} окончен', { year: YEAR.title })}</span>
         </div>
       )}
 
       {current && progress !== null && (
         <div className={`cd-progress ck-${current.kind}`}>
           <div className="cd-progress-head">
-            <span>{current.title || KIND_TITLES[current.kind]}</span>
+            <span>{periodTitle(current)}</span>
             <span className="cd-progress-pct">{progress}%</span>
           </div>
           <div className="cd-bar">
@@ -106,13 +110,13 @@ export function AcademicCalendar({ periods, typical, title }: { periods: Period[
       )}
 
       <div className="cd-list">
-        {session && <Row kind="session" label={session.title || 'Сессия'} value={span(session)} />}
-        {holidays && <Row kind="holidays" label={holidays.title || 'Каникулы'} value={span(holidays)} />}
-        {holiday && <Row kind="holiday" label={holiday.title} value={formatIsoLong(holiday.date)} />}
+        {session && <Row kind="session" label={periodTitle(session)} value={span(session)} />}
+        {holidays && <Row kind="holidays" label={periodTitle(holidays)} value={span(holidays)} />}
+        {holiday && <Row kind="holiday" label={holidayTitle(holiday.title)} value={isoLong(holiday.date)} />}
       </div>
 
       <button type="button" className="cd-more" aria-expanded={all} onClick={() => (haptic(), setAll((v) => !v))}>
-        {all ? 'Свернуть' : 'Весь учебный год'}
+        {all ? t('Свернуть') : t('Весь учебный год')}
         <ChevronRight className="cd-more-chevron" />
       </button>
 
@@ -120,21 +124,23 @@ export function AcademicCalendar({ periods, typical, title }: { periods: Period[
         <div className="cd-all">
           <div className="cd-list">
             {periods.map((p) => (
-              <Row key={p.start} kind={p.kind} label={p.title || KIND_TITLES[p.kind]} value={span(p)} />
+              <Row key={p.start} kind={p.kind} label={periodTitle(p)} value={span(p)} />
             ))}
           </div>
           <div className="cd-list">
-            <span className="cd-list-title">Праздничные выходные</span>
+            <span className="cd-list-title">{t('Праздничные выходные')}</span>
             {HOLIDAYS.filter((h) => h.date >= YEAR.start && h.date <= YEAR.end).map((h) => (
-              <Row key={h.date} kind="holiday" label={h.title} value={formatIsoLong(h.date)} />
+              <Row key={h.date} kind="holiday" label={holidayTitle(h.title)} value={isoLong(h.date)} />
             ))}
           </div>
         </div>
       )}
 
       <p className="cal-note cd-source">
-        {typical ? 'Типовой график 1 курса бакалавриата. ' : `${title}. `}
-        {exact ? `Даты ${SOURCE_TITLES.doc}.` : 'Даты примерные — по расписанию и типовому графику ГУУ, уточняются.'}
+        {typical ? `${t('Типовой график 1 курса бакалавриата.')} ` : `${title}. `}
+        {exact
+          ? t('Даты {source}.', { source: sourceTitle('doc') })
+          : t('Даты примерные — по расписанию и типовому графику ГУУ, уточняются.')}
       </p>
     </div>
   )

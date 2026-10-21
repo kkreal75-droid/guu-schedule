@@ -10,12 +10,14 @@ const INIT_DATA_MAX_AGE_S = 24 * 60 * 60
 const INIT_DATA_FUTURE_S = 5 * 60
 
 // кто это: ник и имя из Telegram
-export type Profile = { id: number; username: string | null; name: string | null }
+// lang — language_code из Telegram (язык интерфейса Telegram у человека)
+export type Profile = { id: number; username: string | null; name: string | null; lang?: string | null }
 
 export const profileOf = (user: TgUser): Profile => ({
   id: user.id,
   username: user.username || null,
   name: [user.first_name, user.last_name].filter(Boolean).join(' ').slice(0, 64) || null,
+  lang: typeof user.language_code === 'string' ? user.language_code.slice(0, 16) : null,
 })
 
 export const isOwner = (env: Env, userId: number | undefined) =>

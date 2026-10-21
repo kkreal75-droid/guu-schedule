@@ -3,6 +3,7 @@ import { teacherKey } from '../../shared/schedule-core'
 import type { TeacherInfo } from '../data'
 import { TeacherPicker } from '../onboarding/TeacherPicker'
 import { ScheduleViewer } from './ScheduleViewer'
+import { t } from '../i18n'
 
 // «Ещё → Расписание преподавателя»: поиск по фамилии, расписание по неделям (у пар — группы)
 export function TeacherSchedulePage({ initial }: { initial?: { id: string; name: string } }) {
@@ -15,11 +16,11 @@ export function TeacherSchedulePage({ initial }: { initial?: { id: string; name:
         <div className="viewer-head">
           <div className="viewer-title">
             <span className="viewer-name">{picked.name}</span>
-            <span className="viewer-sub">Расписание по файлам ГУУ · у пар — группы</span>
+            <span className="viewer-sub">{t('Расписание по файлам ГУУ · у пар — группы')}</span>
           </div>
           <div className="viewer-actions">
             <button type="button" className="chip" onClick={() => setPicked(null)}>
-              Другой преподаватель
+              {t('Другой преподаватель')}
             </button>
           </div>
         </div>

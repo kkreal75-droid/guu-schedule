@@ -12,22 +12,27 @@ import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from '
 import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
 import { readCloud, readLocal } from './storage'
 import { checkIn, initTelegram, type CheckIn } from './telegram'
+import { setLang, t, useLang } from './i18n'
+import { bootLang, chooseLang, savedLang } from './language'
 import { useTheme } from './theme'
 
 if (import.meta.env.DEV) installTelegramMock()
 initTelegram()
+// язык — сразу (скелетон и ошибки запуска уже на нём), уточняем после облака и бота
+setLang(bootLang(null, null))
 // параллельно: визит для статистики и проверка бана, настройки и «знакомство видел» из облака Telegram
 const status = checkIn()
 const fromCloud = (key: string) => Promise.race([readCloud(key), new Promise<null>((r) => setTimeout(() => r(null), 1500))])
 const cloudPrefs = fromCloud('prefs')
 const cloudIntro = fromCloud('intro')
+const cloudLang = savedLang() ? Promise.resolve(null) : fromCloud('lang')
 
 const root = createRoot(document.getElementById('root')!)
 
 // Пока грузится расписание — каркас главного экрана (скелетон), а не пустой экран с надписью
 function Skeleton() {
   return (
-    <div className="app skeleton" aria-busy="true" aria-label="Загружаю расписание">
+    <div className="app skeleton" aria-busy="true" aria-label={t('Загружаю расписание')}>
       <div className="screen-head">
         <span className="sk sk-title" />
         <span className="sk-row">
@@ -69,13 +74,14 @@ type Phase =
 
 // что уже выбрано — для «Это твоя группа?» в знакомстве
 function currentChoice(prefs: Prefs): Current {
-  if (prefs.role === 'teacher' && prefs.teacher) return { role: 'teacher', teacher: prefs.teacher, name: prefs.teacherName ?? 'Преподаватель' }
+  if (prefs.role === 'teacher' && prefs.teacher) return { role: 'teacher', teacher: prefs.teacher, name: prefs.teacherName ?? t('Преподаватель') }
   return { role: 'student', group: prefs.group }
 }
 
 let versions = 0
 
 function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: Extras; initial: Phase }) {
+  useLang() // смена языка — перерисовать всё
   const [phase, setPhase] = useState<Phase>(initial)
   // тема из настроек — и для знакомства (в приложении её дальше ведёт App)
   useTheme(readPrefs().theme)
@@ -110,6 +116,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
       <IntroFlow
         current={phase.registered ? currentChoice(readPrefs()) : null}
         onChoice={choose}
+        onLang={chooseLang}
         onFinish={async () => {
           markIntroDone()
           await openApp()
@@ -152,12 +159,13 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
 let AppLazy: typeof import('./App').default
 
 async function boot() {
-  const [checked, cloud, cloudIntroSeen] = await Promise.all([status, cloudPrefs, cloudIntro])
+  const [checked, cloud, cloudIntroSeen, cloudLangValue] = await Promise.all([status, cloudPrefs, cloudIntro, cloudLang])
+  setLang(bootLang(cloudLangValue, checked?.me?.lang))
   if (checked?.banned) {
     root.render(
       <div className="boot">
-        <p className="boot-title">Доступ ограничен</p>
-        <p>Владелец бота ограничил вам доступ к расписанию.</p>
+        <p className="boot-title">{t('Доступ ограничен')}</p>
+        <p>{t('Владелец бота ограничил вам доступ к расписанию.')}</p>
       </div>,
     )
     return
@@ -166,7 +174,7 @@ async function boot() {
   if (checked?.maintenance) {
     root.render(
       <div className="boot">
-        <p className="boot-title">🛠 Технические работы</p>
+        <p className="boot-title">{t('🛠 Технические работы')}</p>
         <p className="boot-text">{checked.maintenance}</p>
       </div>,
     )
@@ -208,7 +216,7 @@ async function boot() {
       if (!(err instanceof GroupMissingError)) throw err
       initial = needIntro
         ? { kind: 'intro', registered: false }
-        : { kind: 'onboarding', first: true, reason: 'Твоей группы больше нет в расписании ГУУ — выбери заново.' }
+        : { kind: 'onboarding', first: true, reason: t('Твоей группы больше нет в расписании ГУУ — выбери заново.') }
     }
   }
   AppLazy = (await import('./App')).default
@@ -223,9 +231,9 @@ boot().catch((err) => {
   console.error(err)
   root.render(
     <div className="boot">
-      <p>Не удалось загрузить расписание. Проверьте интернет.</p>
+      <p>{t('Не удалось загрузить расписание. Проверьте интернет.')}</p>
       <button type="button" className="boot-retry" onClick={() => location.reload()}>
-        Повторить
+        {t('Повторить')}
       </button>
     </div>,
   )

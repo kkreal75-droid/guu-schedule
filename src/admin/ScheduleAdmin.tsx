@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { MB_GROUPS, MB_IDS } from '../../shared/groups'
 import { Segmented } from '../components/Segmented'
 import { Section } from '../components/Section'
-import { WEEKDAYS_FULL, formatDate, formatStamp } from '../format'
+import { formatDate, formatStamp, weekdayFull } from '../format'
 import { dayFromIso, inSemester, isoFromDay, lessonsOn, moscowNow, weekOf, weekdayOf } from '../schedule'
 import { confirmAction, haptic, openLink } from '../telegram'
 import { describeEdit } from '../../shared/edits-core'
@@ -26,7 +26,7 @@ function FileEditRow({ edit }: { edit: FileEdit }) {
     <div className="row admin-msg">
       <div className="admin-msg-body">
         <div className="admin-msg-meta">
-          <span className="badge-file">из файла</span> {WEEKDAYS_FULL[edit.weekday]}, все недели · {shortGroup(edit.group)} · пары ГУУ
+          <span className="badge-file">из файла</span> {weekdayFull(edit.weekday)}, все недели · {shortGroup(edit.group)} · пары ГУУ
           заменены
         </div>
         <div className="admin-msg-text file-edit">
@@ -191,7 +191,7 @@ export function ScheduleAdmin() {
             }}
           />
           <p className="form-hint">
-            {WEEKDAYS_FULL[weekdayOf(day)]}, {formatDate(day)} · пар: {pairs.length}
+            {weekdayFull(weekdayOf(day))}, {formatDate(day)} · пар: {pairs.length}
           </p>
           <Segmented
             label="Что сделать"

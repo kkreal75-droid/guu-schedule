@@ -3,6 +3,7 @@ import { normalizeGroup, shortName } from '../../shared/groups'
 import { Section } from '../components/Section'
 import { botAvailable, callBot } from '../api'
 import { confirmAction, haptic, openLink } from '../telegram'
+import { t } from '../i18n'
 
 type Status = { connected: false } | { connected: true; url: string; group: string }
 
@@ -19,11 +20,11 @@ export function CalendarPage({ group }: { group: string }) {
     if (!botAvailable()) return
     callBot<Status>('/cal/status')
       .then(setStatus)
-      .catch(() => setError('Не получилось связаться с ботом. Попробуйте позже.'))
+      .catch(() => setError(t('Не получилось связаться с ботом. Попробуйте позже.')))
   }, [])
 
   if (!botAvailable()) {
-    return <p className="lead">Откройте расписание в Telegram — подключить календарь можно только оттуда.</p>
+    return <p className="lead">{t('Откройте расписание в Telegram — подключить календарь можно только оттуда.')}</p>
   }
 
   const run = async (action: () => Promise<Status>) => {
@@ -33,7 +34,7 @@ export function CalendarPage({ group }: { group: string }) {
       setStatus(await action())
       haptic('light')
     } catch {
-      setError('Не получилось. Попробуйте ещё раз.')
+      setError(t('Не получилось. Попробуйте ещё раз.'))
     } finally {
       setBusy(false)
     }
@@ -42,7 +43,7 @@ export function CalendarPage({ group }: { group: string }) {
   const toggle = async () => {
     if (!status) return
     if (!status.connected) return run(() => callBot<Status>('/cal/connect', { group }))
-    if (await confirmAction('Отключить календарь? Старая ссылка перестанет работать, пары пропадут из календаря.')) {
+    if (await confirmAction(t('Отключить календарь? Старая ссылка перестанет работать, пары пропадут из календаря.'))) {
       await run(() => callBot<Status>('/cal/disconnect'))
     }
   }
@@ -63,11 +64,11 @@ export function CalendarPage({ group }: { group: string }) {
 
   return (
     <div className="page-body">
-      <p className="lead">Пары появятся в календаре телефона и будут обновляться сами — без бота и приложения.</p>
+      <p className="lead">{t('Пары появятся в календаре телефона и будут обновляться сами — без бота и приложения.')}</p>
 
       <Section>
         <label className="row row-switch">
-          <span className="row-label">Подключить</span>
+          <span className="row-label">{t('Подключить')}</span>
           <input
             type="checkbox"
             className="switch"
@@ -78,7 +79,7 @@ export function CalendarPage({ group }: { group: string }) {
         </label>
         {status?.connected && (
           <div className="row">
-            <span>Группа</span>
+            <span>{t('Группа')}</span>
             <span className="row-value">{short(status.group)}</span>
           </div>
         )}
@@ -90,34 +91,32 @@ export function CalendarPage({ group }: { group: string }) {
         <>
           {normalizeGroup(status.group) !== group && (
             <button type="button" className="button-secondary" disabled={busy} onClick={() => run(() => callBot<Status>('/cal/connect', { group }))}>
-              Переключить на {short(group)} (как в профиле)
+              {t('Переключить на {group} (как в профиле)', { group: short(group) })}
             </button>
           )}
           {/* Telegram открывает только http(s): страница бота сама передаст webcal:// Календарю */}
           <button type="button" className="button-primary" onClick={() => openLink(status.url.replace(/\.ics$/, '/apple'))}>
-            Apple Календарь
+            {t('Apple Календарь')}
           </button>
           <button
             type="button"
             className="button-primary"
             onClick={() => openLink(`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`)}
           >
-            Google Календарь
+            {t('Google Календарь')}
           </button>
           <button type="button" className="button-secondary" onClick={() => copy(status.url)}>
-            {copied ? 'Скопировано ✓' : 'Скопировать ссылку'}
+            {copied ? t('Скопировано ✓') : t('Скопировать ссылку')}
           </button>
           <input className="cal-url" readOnly value={status.url} onFocus={(e) => e.currentTarget.select()} />
 
-          <Section title="Как добавить">
+          <Section title={t('Как добавить')}>
             <div className="row row-text">
-              iPhone — «Apple Календарь» → «Подписаться». Android — «Google Календарь» → «Добавить». В других
-              приложениях добавьте календарь по ссылке.
+              {t('iPhone — «Apple Календарь» → «Подписаться». Android — «Google Календарь» → «Добавить». В других приложениях добавьте календарь по ссылке.')}
             </div>
           </Section>
           <p className="section-footer">
-            Google и iPhone обновляют подписки сами: Google — бывает, что и раз в сутки. Срочные изменения смотрите в
-            боте.
+            {t('Google и iPhone обновляют подписки сами: Google — бывает, что и раз в сутки. Срочные изменения смотрите в боте.')}
           </p>
         </>
       )}

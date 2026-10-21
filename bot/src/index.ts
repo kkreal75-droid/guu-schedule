@@ -5,7 +5,8 @@
 //                   inline-запросы — inline.ts, кнопки рассылки — broadcast.ts.
 //   POST /seen    — мини-приложение при открытии присылает initData (+ выбранную группу);
 //                   проверяем подпись, отмечаем визит, отвечаем {banned, admin, me, …}.
-//   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts); POST /intro — знакомство просмотрено.
+//   POST /profile — выбор в онбординге: роль, группа или преподаватель (profile.ts); POST /intro — знакомство просмотрено;
+//   POST /lang — язык интерфейса (ru / en).
 //   POST /cal/status|connect|disconnect — подписка на календарь (calendar.ts);
 //   GET  /cal/<токен>.ics — сам календарь для Apple/Google; /cal/<токен>/apple — страница «Подписаться» для iPhone.
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
@@ -47,7 +48,7 @@ import { detectChanges, runDigests } from './digest'
 import { extrasFor, loadExtras } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
-import { handleIntro, handleProfile } from './profile'
+import { handleIntro, handleLang, handleProfile } from './profile'
 import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { cleanupHidden, handleHiddenApi, userHidden } from './hidden'
 import { loadSettings } from './settings'
@@ -265,6 +266,7 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env, request))
   if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env, request))
   if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
+  if (url.pathname === '/lang' && request.method === 'POST') return guarded(env, 'Язык', () => handleLang(env, request))
   if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
   if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
   const hidden = url.pathname.match(/^\/hidden\/(add|delete)$/)

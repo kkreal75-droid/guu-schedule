@@ -1,4 +1,6 @@
-// Форматирование дат и недель по-русски — общее для мини-приложения и бота.
+// Форматирование дат и недель — общее для мини-приложения и бота. lang — язык (по умолчанию русский),
+// сами даты — через Intl (shared/i18n-core.ts).
+import { dayMonth, dayMonthYear, pluralForm, type Lang } from './i18n-core'
 import { DAY_MS } from './schedule-core'
 
 export const MONTHS_GEN = [
@@ -15,27 +17,23 @@ export function dateOf(day: number) {
   return { date: d.getUTCDate(), month: d.getUTCMonth(), year: d.getUTCFullYear() }
 }
 
-export const formatDate = (day: number) => {
-  const { date, month } = dateOf(day)
-  return `${date} ${MONTHS_GEN[month]}`
-}
+// «21 октября» / «21 October»
+export const formatDate = (day: number, lang: Lang = 'ru') => dayMonth(day, lang)
 
-export const formatFullDate = (day: number) => {
-  const { date, month, year } = dateOf(day)
-  return `${date} ${MONTHS_GEN[month]} ${year}`
-}
+// «21 октября 2026» / «21 October 2026»
+export const formatFullDate = (day: number, lang: Lang = 'ru') => dayMonthYear(day, lang)
 
 export const isEvenWeek = (week: number) => week % 2 === 0
 
-export const weekTitle = (week: number) => `${isEvenWeek(week) ? 'Чётная' : 'Нечётная'}, ${week}-я неделя`
+// «Чётная, 8-я неделя» / «Even week · Week 8»
+export const weekTitle = (week: number, lang: Lang = 'ru') =>
+  lang === 'en'
+    ? `${isEvenWeek(week) ? 'Even' : 'Odd'} week · Week ${week}`
+    : `${isEvenWeek(week) ? 'Чётная' : 'Нечётная'}, ${week}-я неделя`
 
-export function pluralPairs(n: number) {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return `${n} пара`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} пары`
-  return `${n} пар`
-}
+// «1 пара / 2 пары / 5 пар» / «1 class / 2 classes»
+export const pluralPairs = (n: number, lang: Lang = 'ru') =>
+  `${n} ${pluralForm(lang, n, lang === 'en' ? 'class|classes' : 'пара|пары|пар')}`
 
 // «19.10 12:06» по Москве; на неразборчивую дату — null
 export function formatStamp(at: string | number): string | null {
