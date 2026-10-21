@@ -56,6 +56,15 @@ describe('приветствие', () => {
   })
 })
 
+describe('сброс онбординга', () => {
+  it('забывает выбранный язык — знакомство начнётся с выбора языка', async () => {
+    await postAs(OWNER, '/lang', { lang: 'en' })
+    expect((await sql('SELECT lang FROM users WHERE id = ?', OWNER).first())?.lang).toBe('en')
+    expect((await postAs(OWNER, '/admin/reset-intro')).status).toBe(200)
+    expect(await sql('SELECT lang, intro_version FROM users WHERE id = ?', OWNER).first()).toEqual({ lang: null, intro_version: 0 })
+  })
+})
+
 describe('/today и inline', () => {
   it('/today по-английски: день недели и месяц по-английски, без «Пар нет»', async () => {
     const id = newUser()

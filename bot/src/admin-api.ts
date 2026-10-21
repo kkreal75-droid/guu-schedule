@@ -154,7 +154,8 @@ async function reviewBan({ env, req }: Call): Promise<Response> {
 
 // «Сбросить мой онбординг» — владелец снова увидит знакомство (для проверки); CloudStorage чистит приложение
 async function resetIntro({ env, req }: Call): Promise<Response> {
-  await env.DB.prepare('UPDATE users SET intro_version = 0 WHERE id = ?').bind(req.profile.id).run()
+  // и выбранный язык: знакомство после сброса начнётся с «Выбери язык / Choose language»
+  await env.DB.prepare('UPDATE users SET intro_version = 0, lang = NULL WHERE id = ?').bind(req.profile.id).run()
   return json({ ok: true })
 }
 

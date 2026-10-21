@@ -15,6 +15,7 @@ import { checkIn, initTelegram, type CheckIn } from './telegram'
 import { getLang, setLang, t, useLang } from './i18n'
 import { loadEnglishNames } from './guu'
 import { bootLang, chooseLang, savedLang } from './language'
+import { isLang } from '../shared/i18n-core'
 import { useTheme } from './theme'
 
 if (import.meta.env.DEV) installTelegramMock()
@@ -72,7 +73,7 @@ type Tab = import('./components/TabBar').Tab
 // onboarding — только выбор группы / роли («Сменить группу / роль», группа пропала из расписания)
 type Phase =
   | { kind: 'app'; version: number; tab?: Tab }
-  | { kind: 'intro'; registered: boolean }
+  | { kind: 'intro'; registered: boolean; askLang: boolean } // askLang — первым экраном выбор языка
   | { kind: 'onboarding'; first: boolean; reason?: string; search?: boolean }
 
 // что уже выбрано — для «Это твоя группа?» в знакомстве
@@ -118,6 +119,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
     return (
       <IntroFlow
         current={phase.registered ? currentChoice(readPrefs()) : null}
+        askLang={phase.askLang}
         onChoice={choose}
         onLang={chooseLang}
         onFinish={async () => {
@@ -153,7 +155,7 @@ function Root({ checked, extras, initial }: { checked: CheckIn | null; extras: E
         await choose(choice)
         await openApp('profile')
       }}
-      onShowIntro={() => setPhase({ kind: 'intro', registered: true })}
+      onShowIntro={() => setPhase({ kind: 'intro', registered: true, askLang: true })}
     />
   )
 }
@@ -163,6 +165,8 @@ let AppLazy: typeof import('./App').default
 
 async function boot() {
   const [checked, cloud, cloudIntroSeen, cloudLangValue] = await Promise.all([status, cloudPrefs, cloudIntro, cloudLang])
+  // выбирал ли человек язык сам (на устройстве, в облаке, у бота) — нет: в знакомстве спросим
+  const langChosen = Boolean(savedLang() || isLang(cloudLangValue) || isLang(checked?.me?.lang))
   setLang(bootLang(cloudLangValue, checked?.me?.lang))
   // английский: названия ГУУ — до первого показа (не дольше 1,5 с; не успели — перерисуем, когда загрузятся)
   if (getLang() === 'en') await Promise.race([loadEnglishNames(), new Promise((r) => setTimeout(r, 1500))])
@@ -211,12 +215,12 @@ async function boot() {
     } else if (me?.group) {
       savePrefs({ ...(merged ?? defaultPrefs()), role: 'student', group: me.group, at: Date.now() })
     } else if (me?.onboarding || (!checked && !hasLocalTraces())) {
-      initial = { kind: 'intro', registered: false }
+      initial = { kind: 'intro', registered: false, askLang: true }
     }
   }
   // знакомство новой версии — всем один раз, включая старых пользователей и МБ (им — «Это твоя группа?»)
   const needIntro = introSeen(cloudIntroSeen, me?.intro) < INTRO_VERSION
-  if (initial.kind === 'app' && needIntro) initial = { kind: 'intro', registered: true }
+  if (initial.kind === 'app' && needIntro) initial = { kind: 'intro', registered: true, askLang: !langChosen }
 
   // своё расписание грузим сразу (и для знакомства — к его концу оно уже будет готово)
   if (initial.kind === 'app' || (initial.kind === 'intro' && initial.registered)) {
@@ -226,7 +230,7 @@ async function boot() {
       // группы больше нет в расписании ГУУ — выбрать заново
       if (!(err instanceof GroupMissingError)) throw err
       initial = needIntro
-        ? { kind: 'intro', registered: false }
+        ? { kind: 'intro', registered: false, askLang: true }
         : { kind: 'onboarding', first: true, reason: t('Твоей группы больше нет в расписании ГУУ — выбери заново.') }
     }
   }

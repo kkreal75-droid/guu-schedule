@@ -189,6 +189,7 @@ export type Current = { role: 'student'; group: string } | { role: 'teacher'; te
 
 type Props = {
   current: Current // что уже выбрано (null — новый пользователь)
+  askLang: boolean // первым экраном — «Выбери язык / Choose language»
   onChoice: (choice: Choice) => Promise<void> // сохранить выбор (настройки, бот)
   onLang: (lang: Lang) => void // язык выбран («Далее»): сохранить на устройстве, в облаке и в боте
   onFinish: () => Promise<void> // знакомство пройдено — открыть расписание
@@ -196,13 +197,14 @@ type Props = {
 
 type Stage = 'lang' | 'author' | 'confirm' | 'register' | 'tour' | 'finish'
 
-export function IntroFlow({ current, onChoice, onLang, onFinish }: Props) {
+export function IntroFlow({ current, askLang, onChoice, onLang, onFinish }: Props) {
   useLang()
-  // новым — сначала язык (предвыбран по Telegram), уже зарегистрированным — нет: язык из Telegram, сменить — в профиле
-  const [stage, setStage] = useState<Stage>(current ? 'author' : 'lang')
+  // сначала язык — новым, тем, кто язык ещё не выбирал, и при повторном знакомстве («Показать знакомство ещё раз»,
+  // сброс онбординга); новым он предвыбран по Telegram, остальным — текущий язык интерфейса
+  const [stage, setStage] = useState<Stage>(askLang ? 'lang' : 'author')
   useEffect(() => {
-    if (!current) setLang(telegramLang())
-  }, [current]) // предвыбор — по языку Telegram
+    if (askLang && !current) setLang(telegramLang())
+  }, [askLang, current])
   const [chosen, setChosen] = useState(current)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -236,7 +238,7 @@ export function IntroFlow({ current, onChoice, onLang, onFinish }: Props) {
       <Stories
         key="author"
         stories={author()}
-        onBack={current ? undefined : () => setStage('lang')}
+        onBack={askLang ? () => setStage('lang') : undefined}
         onDone={() => setStage(chosen ? 'confirm' : 'register')}
       />
     )

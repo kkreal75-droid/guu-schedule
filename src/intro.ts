@@ -2,7 +2,7 @@
 // видел — в localStorage, CloudStorage Telegram ('intro') и у бота (users.intro_version): берём наибольшее,
 // так что на новом устройстве знакомство не повторится. Владелец может сбросить себе в админке.
 import { botAvailable, callBot } from './api'
-import { cloudSet, readLocal, writeLocal } from './storage'
+import { cloudRemove, cloudSet, readLocal, writeLocal } from './storage'
 
 export const INTRO_VERSION = 2
 const KEY = 'intro'
@@ -21,9 +21,11 @@ export function markIntroDone() {
   if (botAvailable()) callBot('/intro', { version: INTRO_VERSION }).catch(() => {})
 }
 
-// «Сбросить мой онбординг» (админка): всё обнулить и перезапустить приложение
+// «Сбросить мой онбординг» (админка): всё обнулить (и выбранный язык — знакомство начнётся с него)
+// и перезапустить приложение
 export async function resetIntro() {
   await callBot('/admin/reset-intro')
   writeLocal(KEY, '0')
-  await cloudSet(KEY, '0')
+  writeLocal('lang', '')
+  await Promise.all([cloudSet(KEY, '0'), cloudRemove('lang')])
 }
