@@ -74,6 +74,9 @@ export type Me = {
 
 // edits — ручные правки расписания; hidden — пары, скрытые владельцем для всей группы; myHidden — свои
 // скрытые пары («Это не моя пара»; null — бот их не прислал); notice — объявление-плашка; maintenance — техработы
+// объявление: text_en — для английского интерфейса (нет — и английским русский текст)
+export type Notice = { id: number; text: string; text_en?: string | null }
+
 export type CheckIn = {
   banned: boolean
   admin: boolean
@@ -83,8 +86,9 @@ export type CheckIn = {
   tags: LessonTag[]
   hidden: HiddenLesson[]
   myHidden: HiddenLesson[] | null
-  notice: { id: number; text: string } | null
+  notice: Notice | null
   maintenance: string | null
+  maintenanceEn: string | null // английский вариант техработ; нет — и английским русский
   channel: string | null // «Другое → Канал новостей» (ссылка из админки)
 }
 
@@ -114,7 +118,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       signal: controller.signal,
     })
     if (!res.ok) return null
-    const data = (await res.json()) as Partial<CheckIn> & { my_hidden?: unknown }
+    const data = (await res.json()) as Partial<CheckIn> & { my_hidden?: unknown; maintenance_en?: unknown }
     return {
       banned: Boolean(data.banned),
       admin: Boolean(data.admin),
@@ -126,6 +130,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       myHidden: Array.isArray(data.my_hidden) ? (data.my_hidden as HiddenLesson[]) : null,
       notice: data.notice ?? null,
       maintenance: data.maintenance ?? null,
+      maintenanceEn: typeof data.maintenance_en === 'string' ? data.maintenance_en : null,
       channel: typeof data.channel === 'string' ? data.channel : null,
     }
   } catch {

@@ -180,7 +180,13 @@ async function boot() {
     root.render(
       <div className="boot">
         <p className="boot-title">{t('🛠 Технические работы')}</p>
-        <p className="boot-text">{checked.maintenance}</p>
+        {getLang() === 'en' && checked.maintenanceEn ? (
+          <p className="boot-text">{checked.maintenanceEn}</p>
+        ) : (
+          <p className="boot-text" lang="ru">
+            {checked.maintenance}
+          </p>
+        )}
       </div>,
     )
     return

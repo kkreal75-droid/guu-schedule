@@ -7,7 +7,8 @@ import { logAdmin } from './journal'
 import { economyMode, usageText, usageToday } from './usage'
 import { reportError, safely } from './errors'
 import { formatDay, groupsFor, loadTimetable, personalKey, personalize, todayMsk } from './schedule'
-import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
+import { DEFAULT_GREETINGS, GREETINGS_EN, loadSettings, renderGreeting } from './settings'
+import { langOf, localeFor, tr, type Lang } from './i18n'
 import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 import { handleSupportReply } from './support'
@@ -16,18 +17,24 @@ import { deleteMeCommand } from './privacy'
 
 export const BANNED_REPLY = 'Доступ к боту ограничен.'
 
-type Context = { env: Env; ctx: ExecutionContext; message: TgMessage; args: string }
+// lang — язык человека (выбранный в приложении или язык Telegram)
+type Context = { env: Env; ctx: ExecutionContext; message: TgMessage; args: string; lang: Lang }
 type Handler = (c: Context) => Promise<void>
 
 // ---------- для всех ----------
 
-// Приветствие — одно из трёх (тексты меняются в админ-панели). Telegram не принял HTML —
-// шлём стандартное, а владельцу — ошибку.
-export async function sendGreeting(env: Env, chatId: number, firstName: string | undefined, index?: number): Promise<void> {
-  const name = escapeHtml(firstName?.trim() || 'брат')
+// Приветствие — одно из трёх (русские тексты меняются в админ-панели, английские — GREETINGS_EN).
+// Telegram не принял HTML — шлём стандартное, а владельцу — ошибку.
+export async function sendGreeting(env: Env, chatId: number, firstName: string | undefined, index?: number, lang: Lang = 'ru'): Promise<void> {
+  const name = escapeHtml(firstName?.trim() || tr(lang, 'брат'))
+  const extra = { reply_markup: { inline_keyboard: [[{ text: tr(lang, '📅 Открыть расписание'), web_app: { url: env.WEBAPP_URL } }]] } }
+  if (lang === 'en') {
+    const i = index ?? Math.floor(Math.random() * GREETINGS_EN.length)
+    await sendMessage(env, chatId, renderGreeting(GREETINGS_EN[i] ?? GREETINGS_EN[0], name), extra)
+    return
+  }
   const { greetings } = await loadSettings(env).catch(() => ({ greetings: DEFAULT_GREETINGS }))
   const i = index ?? Math.floor(Math.random() * greetings.length)
-  const extra = { reply_markup: { inline_keyboard: [[{ text: '📅 Открыть расписание', web_app: { url: env.WEBAPP_URL } }]] } }
   try {
     await sendMessage(env, chatId, renderGreeting(greetings[i], name), extra)
   } catch (err) {
@@ -37,18 +44,18 @@ export async function sendGreeting(env: Env, chatId: number, firstName: string |
   }
 }
 
-const start = ({ env, message }: Context) => sendGreeting(env, message.chat.id, message.from?.first_name)
+const start = ({ env, message, lang }: Context) => sendGreeting(env, message.chat.id, message.from?.first_name, undefined, lang)
 
 // /today, /tomorrow — для группы, выбранной в приложении (преподавателю — его пары);
 // не выбрана — для МБ(МП) 1-1 и 1-2
 const dayCommand =
   (offset: number): Handler =>
-  async ({ env, message }) => {
+  async ({ env, message, lang }) => {
     const user = await getUser(env.DB, message.from!.id)
     const group = personalKey(user)
-    // в личке — как в приложении: свои подгруппы и скрытые пары
-    const [tt, personal] = await Promise.all([loadTimetable(env, groupsFor(group)), personalOf(env.DB, message.from!.id)])
-    await sendMessage(env, message.chat.id, formatDay(personalize(tt, personal.hidden), todayMsk() + offset, group, personal.mine))
+    // в личке — как в приложении: свои подгруппы, скрытые пары и язык
+    const [tt, personal, loc] = await Promise.all([loadTimetable(env, groupsFor(group)), personalOf(env.DB, message.from!.id), localeFor(env, lang)])
+    await sendMessage(env, message.chat.id, formatDay(personalize(tt, personal.hidden), todayMsk() + offset, group, personal.mine, loc))
   }
 
 const PUBLIC: Record<string, Handler> = {
@@ -82,18 +89,24 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
 
   // учёт не должен мешать ответу: база недоступна — сообщаем владельцу и отвечаем как обычно
   let banned = false
+  let lang = langOf(null, from.language_code)
   try {
     // режим экономии: пишем только /start, остальное — чтение
-    banned =
-      economyMode() && command !== '/start'
-        ? Boolean((await getUser(env.DB, from.id))?.banned)
-        : (await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')).banned
+    if (economyMode() && command !== '/start') {
+      const row = await getUser(env.DB, from.id)
+      banned = Boolean(row?.banned)
+      lang = langOf(row, from.language_code)
+    } else {
+      const seen = await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')
+      banned = seen.banned
+      lang = langOf(seen.me, from.language_code)
+    }
   } catch (err) {
     await reportError(env, 'Учёт пользователя', err)
   }
   // удалить свои данные можно и с баном (бан при этом остаётся)
-  if (command === '/deleteme') return void (await safely(env, 'Команда /deleteme', message.chat.id, () => deleteMeCommand(env, message)))
-  if (banned && !owner) return void (await sendMessage(env, message.chat.id, BANNED_REPLY))
+  if (command === '/deleteme') return void (await safely(env, 'Команда /deleteme', message.chat.id, () => deleteMeCommand(env, message, lang), lang))
+  if (banned && !owner) return void (await sendMessage(env, message.chat.id, tr(lang, BANNED_REPLY)))
   // владелец отвечает на обращение в поддержку (ответом на «✍️ Ответ на обращение №…»)
   if (owner && !command && message.reply_to_message) {
     let handled = false
@@ -110,13 +123,13 @@ export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, mess
   if (owner && ADMIN[command] && command !== '/usage' && command !== '/stats' && command !== '/bans' && command !== '/broadcasts') {
     await logAdmin(env, from.id, command, null, args.slice(0, 300))
   }
-  await safely(env, `Команда ${command}`, message.chat.id, () => handler({ env, ctx, message, args }))
+  await safely(env, `Команда ${command}`, message.chat.id, () => handler({ env, ctx, message, args, lang }), lang)
 }
 
 export async function handleBannedCallback(env: Env, query: TgCallbackQuery): Promise<boolean> {
   if (isOwner(env, query.from.id)) return false
   const user = await getUser(env.DB, query.from.id)
   if (!user?.banned) return false
-  await answerCallback(env, query.id, BANNED_REPLY)
+  await answerCallback(env, query.id, tr(langOf(user, query.from.language_code), BANNED_REPLY))
   return true
 }

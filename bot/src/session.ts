@@ -4,12 +4,14 @@
 // и запускает обычную рассылку пользователям этих групп — с кнопкой, которая открывает экран сессии.
 import { normalizeGroup } from '../../shared/groups'
 import { systemBroadcast } from './broadcast'
+import { tr } from './i18n'
 import { sendMessage } from './telegram'
 
 type Status = { current_year: string; groups: string[] }
 
 const KEY = 'session-notified'
 const TEXT = '📚 Опубликовано расписание сессии — смотри в приложении'
+const BUTTON = 'Открыть расписание сессии'
 
 export async function notifySessions(env: Env): Promise<number> {
   const res = await fetch(new URL('data/session_status.json', env.WEBAPP_URL).toString(), {
@@ -27,9 +29,11 @@ export async function notifySessions(env: Env): Promise<number> {
   await env.KV.put(KEY, JSON.stringify({ year: status.current_year, groups: [...known, ...fresh] }))
   const url = new URL(env.WEBAPP_URL)
   url.searchParams.set('open', 'session')
+  // английским получателям — по-английски (drainBroadcasts выбирает текст по языку)
   const { id, total } = await systemBroadcast(env, {
     text: TEXT,
-    button: { text: 'Открыть расписание сессии', url: url.toString() },
+    text_en: tr('en', TEXT),
+    button: { text: BUTTON, text_en: tr('en', BUTTON), url: url.toString() },
     audience: { groups: fresh },
   })
   await sendMessage(

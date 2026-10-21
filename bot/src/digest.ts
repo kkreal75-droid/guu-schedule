@@ -6,13 +6,13 @@
 // Расписание и настройки читаем только в те минуты, когда есть что делать, и только для групп,
 // к которым привязаны беседы. Снимки «пары на 7 дней» — в D1 (group_snapshots): групп много,
 // а у KV всего 1000 записей в сутки.
-import { WEEKDAYS_FULL, formatDate } from '../../shared/format-core'
 import { dayLessons, type DayLesson } from '../../shared/edits-core'
 import { isoFromDay, moscowNow, toMinutes } from '../../shared/schedule-core'
 import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
-import { holidayTexts } from './academic'
+import { holidayEnds } from './academic'
 import { reportError } from './errors'
-import { formatDay, formatLesson, formatWeek, loadTimetable, type BotTimetable } from './schedule'
+import { RU, localeFor, tr, type Locale } from './i18n'
+import { dayTitle, formatDay, formatLesson, formatWeek, loadTimetable, localizeLessonLine, type BotTimetable } from './schedule'
 import { sendMessage } from './telegram'
 import { escapeHtml } from './util'
 
@@ -21,7 +21,8 @@ const LATE_WINDOW = 10 // cron опоздал — досылаем в течен
 const MAX_SENDS = 20 // за один запуск (лимит 50 подзапросов делим с рассылками)
 const MAX_GROUPS = 15 // файлов групп за запуск сверки изменений (каждый — подзапрос к сайту)
 
-type Slot = { id: string; chats: [string, ChatSettings][]; text: (tt: BotTimetable, group: string) => string | null }
+// text — на языке беседы (loc)
+type Slot = { id: string; chats: [string, ChatSettings][]; text: (tt: BotTimetable, group: string, loc: Locale) => string | null }
 
 function dueSlots(day: number, minutes: number, weekday: number, chats: Record<string, ChatSettings>): Slot[] {
   const enabled = Object.entries(chats).filter(([, c]) => c.group && c.time)
@@ -33,12 +34,12 @@ function dueSlots(day: number, minutes: number, weekday: number, chats: Record<s
       slots.push({
         id: `daily-${time}`,
         chats: enabled.filter(([, c]) => c.time === time),
-        text: (tt, group) => {
+        text: (tt, group, loc) => {
           if (!tt.inSemester(tt.weekOf(day))) return null // каникулы — молчим
           const lessons = dayLessons(tt, group, day, tt.extras).lessons
           return lessons.length
-            ? `☀️ ${formatDay(tt, day, group)}`
-            : `☀️ <b>${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}</b> · ${escapeHtml(group)}\nСегодня пар нет 🎉`
+            ? `☀️ ${formatDay(tt, day, group, null, loc)}`
+            : `☀️ <b>${dayTitle(loc, weekday, day)}</b> · ${escapeHtml(group)}\n${tr(loc.lang, 'Сегодня пар нет 🎉')}`
         },
       })
     }
@@ -47,7 +48,7 @@ function dueSlots(day: number, minutes: number, weekday: number, chats: Record<s
     slots.push({
       id: 'weekly',
       chats: enabled,
-      text: (tt, group) => (tt.inSemester(tt.weekOf(day + 2)) ? formatWeek(tt, day + 2, group) : null),
+      text: (tt, group, loc) => (tt.inSemester(tt.weekOf(day + 2)) ? formatWeek(tt, day + 2, group, null, loc) : null),
     })
   }
   return slots
@@ -89,19 +90,23 @@ export async function runDigests(env: Env, now: number): Promise<number> {
   }
   if (!plan.length) return 0
   const groups = [...new Set(plan.flatMap((p) => p.todo.map(([, c]) => c.group!)))]
-  const tt = await loadTimetable(env, groups)
+  // английские беседы — с переводом названий (словари с сайта, кэш 10 минут)
+  const english = plan.some((p) => p.todo.some(([, c]) => c.lang === 'en'))
+  const [tt, en] = await Promise.all([loadTimetable(env, groups), english ? localeFor(env, 'en') : RU])
   // первый день каникул по учебному графику — вместо пар «🎉 Каникулы! Пар нет до ДД.ММ»
   const daily = plan.some((p) => p.slot.id.startsWith('daily-'))
   const holidays = daily
-    ? await holidayTexts(env, groups, day).catch((err) => (reportError(env, 'Учебный график в сводке', err), new Map<string, string>()))
+    ? await holidayEnds(env, groups, day).catch((err) => (reportError(env, 'Учебный график в сводке', err), new Map<string, string>()))
     : new Map<string, string>()
   let sends = 0
   for (const { slot, key, sent, todo } of plan) {
     for (const [chatId, settings] of todo) {
       sent.add(chatId)
       // нет файла группы (пропала из расписания ГУУ) — молчим
-      const holiday = slot.id.startsWith('daily-') ? holidays.get(settings.group!) : undefined
-      const text = holiday ?? (tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!) : null)
+      const loc = settings.lang === 'en' ? en : RU
+      const holidayEnd = slot.id.startsWith('daily-') ? holidays.get(settings.group!) : undefined
+      const holiday = holidayEnd ? tr(loc.lang, '🎉 Каникулы! Пар нет до {date}', { date: holidayEnd }) : null
+      const text = holiday ?? (tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!, loc) : null)
       if (!text) continue
       sends++
       await deliver(env, chatId, settings, text, 'Сводка')
@@ -129,7 +134,8 @@ function snapshot(tt: BotTimetable, group: string, today: number): Snapshot {
   return result
 }
 
-function describeChanges(previous: Snapshot, current: Snapshot): string[] {
+// строки снимков — по-русски (так они хранятся в D1); для английской беседы — переводим
+function describeChanges(previous: Snapshot, current: Snapshot, loc: Locale): string[] {
   const blocks: string[] = []
   for (const [iso, lessons] of Object.entries(current)) {
     const before = previous[iso]
@@ -140,12 +146,13 @@ function describeChanges(previous: Snapshot, current: Snapshot): string[] {
     const [y, m, d] = iso.split('-').map(Number)
     const day = Date.UTC(y, m - 1, d) / 86_400_000
     const weekday = (((day - 4) % 7) + 7) % 7
+    const line = (l: string) => localizeLessonLine(l, loc)
     blocks.push(
       [
-        `<b>${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}</b>`,
-        ...removed.map((l) => `❌ было: ${l}`),
-        ...added.map((l) => `✅ стало: ${l}`),
-        ...(lessons.length ? [] : ['Теперь в этот день пар нет 🎉']),
+        `<b>${dayTitle(loc, weekday, day)}</b>`,
+        ...removed.map((l) => `❌ ${tr(loc.lang, 'было:')} ${line(l)}`),
+        ...added.map((l) => `✅ ${tr(loc.lang, 'стало:')} ${line(l)}`),
+        ...(lessons.length ? [] : [tr(loc.lang, 'Теперь в этот день пар нет 🎉')]),
       ].join('\n'),
     )
   }
@@ -184,14 +191,24 @@ export async function detectChanges(env: Env, now: number): Promise<number> {
       ).bind(group, JSON.stringify(current), now),
     )
     if (!previous) continue
-    const blocks = describeChanges(previous, current)
-    if (!blocks.length) continue
+    if (!describeChanges(previous, current, RU).length) continue
 
-    const text = `⚠️ <b>Изменение в расписании</b> · ${escapeHtml(tt.nameOf(group))}\n\n${blocks.join('\n\n')}`.slice(0, 4000)
+    // текст — на языке беседы (английский — только если есть такие беседы)
+    const texts = new Map<string, string>()
+    const textIn = async (lang: 'ru' | 'en') => {
+      let text = texts.get(lang)
+      if (text === undefined) {
+        const loc = lang === 'en' ? await localeFor(env, 'en') : RU
+        const blocks = describeChanges(previous, current, loc)
+        text = `⚠️ <b>${tr(lang, 'Изменение в расписании')}</b> · ${escapeHtml(tt.nameOf(group))}\n\n${blocks.join('\n\n')}`.slice(0, 4000)
+        texts.set(lang, text)
+      }
+      return text
+    }
     for (const [chatId, settings] of Object.entries(chats)) {
       if (settings.group !== group || !settings.time || sends >= MAX_SENDS) continue
       sends++
-      await deliver(env, chatId, settings, text, '«Изменение в расписании»')
+      await deliver(env, chatId, settings, await textIn(settings.lang ?? 'ru'), '«Изменение в расписании»')
     }
   }
   if (writes.length) await env.DB.batch(writes)

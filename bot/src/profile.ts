@@ -4,6 +4,7 @@
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { isLang } from '../../shared/i18n-core'
 import { json, readApi } from './api'
+import { forgetCalendarOf } from './calendar'
 import { getUser, meOf } from './db'
 import { loadGroupFile, loadTeacherFile } from './schedule'
 
@@ -72,5 +73,6 @@ export async function handleLang(env: Env, request: Request): Promise<Response> 
   )
     .bind(req.profile.id, req.profile.username, req.profile.name, now, req.body.lang, req.profile.lang ?? null)
     .run()
+  forgetCalendarOf(req.profile.id) // календарь на телефоне — на новом языке
   return json({ ok: true, lang: req.body.lang })
 }

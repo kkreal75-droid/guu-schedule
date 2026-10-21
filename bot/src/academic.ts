@@ -63,8 +63,9 @@ export async function academicReset(env: Env, body: Record<string, unknown>): Pr
   return json({ ok: true, edits: await loadCalendarEdits(env) })
 }
 
-// Группы, у которых сегодня первый день каникул → текст для утренней сводки (3 подзапроса на всех)
-export async function holidayTexts(env: Env, groups: string[], day: number): Promise<Map<string, string>> {
+// Группы, у которых сегодня первый день каникул → последний день каникул «ДД.ММ» для утренней сводки
+// («🎉 Каникулы! Пар нет до ДД.ММ», текст — на языке беседы, digest.ts); 3 подзапроса на всех
+export async function holidayEnds(env: Env, groups: string[], day: number): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   if (!groups.length) return out
   const [index, computed, edits] = await Promise.all([loadGroupsIndex(env), loadComputedCalendar(env), loadCalendarEdits(env)])
@@ -73,7 +74,7 @@ export async function holidayTexts(env: Env, groups: string[], day: number): Pro
     const g = index.groups.find((x) => x.id === id)
     if (!g) continue
     const holidays = holidaysStartingOn(periodsFor(g, computed, edits), today)
-    if (holidays) out.set(id, `🎉 Каникулы! Пар нет до ${formatIsoShort(holidays.end)}`)
+    if (holidays) out.set(id, formatIsoShort(holidays.end))
   }
   return out
 }

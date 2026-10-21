@@ -525,6 +525,7 @@ export const EN: Record<string, string> = {
   "Добавить": "Add",
   "Лекция": "Lecture",
   "Лабораторная": "Lab",
+  "Актовый зал": "Assembly hall",
   "Практика": "Seminar",
   "{date} (весь день)": "{date} (whole day)",
   "Отмена: {when}": "Cancelled: {when}",

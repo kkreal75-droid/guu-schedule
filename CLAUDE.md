@@ -112,7 +112,7 @@ LibreOffice ставится, только если изменился .doc (н�
   30 дней, каждую минуту — ответы поддержки из очереди, остаток лимита — досылка рассылок (≤30 сообщений за запуск,
   пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0023`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram), 0023 — `translations` (правки переводов)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0024`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram), 0023 — `translations` (правки переводов), 0024 — `broadcasts.text_en` (английский текст рассылки)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_*` (бывший чат: не используются, сообщения стираются через 30 дней),
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`, `tg_updates` (повторы обновлений Telegram), `admin_log` (действия владельца,
 в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии), `hidden_lessons` (скрытые пары: свои и `user_id = 0` — для всей группы). Группа (`users.grp` и т. п.) — id.
@@ -232,6 +232,14 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   места — `places.json` `name_en/address_en/howto_en/note_en`. Новый предмет без перевода — update.py присылает
   владельцу тревогу; перевести — в «Переводах» или в `data/i18n/subjects.en.json`. Данные, что остаются русскими
   (коды групп и аудиторий), — `lang="ru"` в разметке; проверка экранов — `?scan` в dev (`src/dev/i18n-scan.ts`).
+  Бот (`bot/src/i18n.ts`): tr(lang, 'русская строка'), перевод — `bot/src/i18n-en.ts` (новая строка tr() без перевода —
+  падает `npm run i18n`); язык человека — `langOf(user, from.language_code)`, беседы — `ChatSettings.lang` (/setup,
+  нет — русский); пары — `formatDay/formatWeek/formatLesson(…, loc)`, `loc = await localeFor(env, lang)` (словари с
+  сайта, кэш 10 мин). Снимки «Изменений» в D1 — русские строки, для английской беседы — `localizeLessonLine`.
+  Сообщения владельцу (ошибки, отчёты, админские команды) — по-русски. Рассылки: `broadcasts.text_en` (`/broadcast
+  текст` + строка `/en` + английский; в админке — поле), получателю с английским — он, нет — русский. Объявление и
+  техработы — `settings.notice.text_en`, `maintenance.text_en`. Английские приветствия — `GREETINGS_EN` (settings.ts),
+  описание и меню команд с language_code=en — `bot/src/setup.ts` (`GET /?force`).
 - Коммиты — по-русски, по смыслу этапа.
 
 ## Состояние (21.10.2026)

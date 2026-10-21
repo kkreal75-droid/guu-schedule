@@ -78,6 +78,26 @@ STATE_FILE = ROOT / "data" / "state.json"
 IDS_FILE = ROOT / "data" / "group_ids.json"
 HISTORY_FILE = ROOT / "data" / "teacher_history.json"
 I18N_SUBJECTS = ROOT / "data" / "i18n" / "subjects.en.json"  # английские названия предметов (этап 11)
+
+
+def override_subjects() -> set:
+    """Предметы из ручных правок (overrides.json, overrides/*.json) — их пары тоже показываются (этап 11)."""
+    found = set()
+
+    def walk(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if k == "subject" and isinstance(v, str) and v.strip():
+                    found.add(v)
+                else:
+                    walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+
+    for path in [ROOT / "overrides.json", *sorted((ROOT / "overrides").glob("*.json"))]:
+        walk(load_json(path, {}))
+    return found
 DOC_CACHE = ROOT / "data" / "doc-cache"
 LEGACY_FILE = ROOT / "schedule.json"
 OVERRIDES_FILE = ROOT / "overrides.json"
@@ -1022,7 +1042,9 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
         writer.write(OUT / "parse_report.json", dump_pretty(report))
     # 8б. английская версия (этап 11): все предметы — public/data/subjects.json (админ-панель → «Переводы»);
     #     предметов нет в data/i18n/subjects.en.json — тревога владельцу (тот же набор — та же тревога, бот не повторит)
-    all_subjects = sorted({l["subject"] for ls in group_lessons.values() for l in ls if l["subject"].strip()}, key=str.lower)
+    all_subjects = {l["subject"] for ls in group_lessons.values() for l in ls if l["subject"].strip()}
+    all_subjects |= override_subjects()  # пары из ручных правок (overrides.json, замены четвергов) — тоже на экране
+    all_subjects = sorted(all_subjects, key=str.lower)
     dictionary = load_json(I18N_SUBJECTS, {}) or {}
     untranslated = [x for x in all_subjects if x not in dictionary]
     writer.write(OUT / "subjects.json", dump(stable(OUT / "subjects.json", {

@@ -27,6 +27,52 @@ async function ensurePrivacyLine(env: Env): Promise<{ updated: boolean; descript
   return { updated: true, description: next }
 }
 
+// Английская версия (этап 11): описание, короткое описание и меню команд для тех, у кого Telegram по-английски
+// (language_code=en). Описание — публичное (экран «Что умеет этот бот?»), ставим только если отличается.
+const DESCRIPTION_EN = `The whole GUU schedule 📅
+• your group's classes for the day and week
+• even/odd weeks calculated automatically
+• teachers' schedules and free classrooms
+• campus buildings and how to get there
+• teacher ratings
+• classes in your phone calendar
+
+Free, no subscriptions. Data from the official GUU website, updated automatically. Unofficial student project, not affiliated with GUU administration.
+
+The bot counts visits for statistics; data is never shared.`
+const SHORT_DESCRIPTION_EN = 'Free schedule for the whole GUU: classes, teachers, rooms and buildings. Student project.'
+
+async function ensureEnglishDescription(env: Env): Promise<boolean> {
+  const [long, short] = await Promise.all([
+    tg<{ description?: string }>(env, 'getMyDescription', { language_code: 'en' }),
+    tg<{ short_description?: string }>(env, 'getMyShortDescription', { language_code: 'en' }),
+  ])
+  let updated = false
+  if (long.description !== DESCRIPTION_EN) {
+    await tg(env, 'setMyDescription', { description: DESCRIPTION_EN, language_code: 'en' })
+    updated = true
+  }
+  if (short.short_description !== SHORT_DESCRIPTION_EN) {
+    await tg(env, 'setMyShortDescription', { short_description: SHORT_DESCRIPTION_EN, language_code: 'en' })
+    updated = true
+  }
+  return updated
+}
+
+const PUBLIC_COMMANDS_EN = [
+  { command: 'start', description: 'Open the schedule' },
+  { command: 'today', description: "Today's classes" },
+  { command: 'tomorrow', description: "Tomorrow's classes" },
+]
+
+const GROUP_COMMANDS_EN = [
+  { command: 'today', description: "Today's classes" },
+  { command: 'tomorrow', description: "Tomorrow's classes" },
+  { command: 'setup', description: 'Set up: /setup or /setup group name' },
+  { command: 'here', description: 'Send the schedule to this topic' },
+  { command: 'off', description: 'Turn off automatic messages' },
+]
+
 const PUBLIC_COMMANDS = [
   { command: 'start', description: 'Открыть расписание' },
   { command: 'today', description: 'Пары на сегодня' },
@@ -64,10 +110,13 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
     await tg(env, 'setMyCommands', { commands: PUBLIC_COMMANDS, scope: { type: 'default' } })
     await tg(env, 'setMyCommands', { commands: GROUP_COMMANDS, scope: { type: 'all_group_chats' } })
     await tg(env, 'setMyCommands', { commands: ADMIN_COMMANDS, scope: { type: 'chat', chat_id: Number(env.OWNER_ID) } })
+    await tg(env, 'setMyCommands', { commands: PUBLIC_COMMANDS_EN, scope: { type: 'default' }, language_code: 'en' })
+    await tg(env, 'setMyCommands', { commands: GROUP_COMMANDS_EN, scope: { type: 'all_group_chats' }, language_code: 'en' })
     info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
     changed = true
   }
   const description = await ensurePrivacyLine(env)
+  const englishUpdated = await ensureEnglishDescription(env)
   // имя бота нужно для ссылок t.me/<бот>/schedule — сверяем с настройкой BOT_USERNAME
   const me = await tg<{ username: string; supports_inline_queries?: boolean }>(env, 'getMe', {})
   return {
@@ -79,6 +128,7 @@ export async function setupBot(env: Env, origin: string, force: boolean) {
     // описание бота (экран «Что умеет этот бот?») — публичное
     description_updated: description.updated,
     description: description.description,
+    description_en_updated: englishUpdated,
     webhook: info.url,
     allowed_updates: info.allowed_updates ?? [],
     pending_update_count: info.pending_update_count ?? 0,

@@ -4,6 +4,8 @@
 // анонимного чата, пока их не стёр cron) остаются, но обезличиваются: вместо id — случайный отрицательный номер (связь с человеком теряется, в том числе для
 // владельца). Если у человека бан — остаётся только строка с баном (иначе /deleteme снимал бы бан).
 // Заметки хранятся в облаке Telegram у самого пользователя — бот их не видит и удалить не может.
+import { isLang } from '../../shared/i18n-core'
+import { langOf, tr, type Lang } from './i18n'
 import { sendMessage, tg, type TgCallbackQuery, type TgMessage } from './telegram'
 
 const ASK = `🗑 <b>Удалить твои данные?</b>
@@ -13,10 +15,11 @@ const ASK = `🗑 <b>Удалить твои данные?</b>
 
 Заметки к парам хранятся в облаке Telegram в твоём аккаунте — бот их не видит; удалить их можно в приложении.`
 
-export async function deleteMeCommand(env: Env, message: TgMessage): Promise<void> {
-  await sendMessage(env, message.chat.id, ASK, {
+// язык — в кнопке (dm:yes:en): после удаления спросить его у базы будет не у кого
+export async function deleteMeCommand(env: Env, message: TgMessage, lang: Lang = 'ru'): Promise<void> {
+  await sendMessage(env, message.chat.id, tr(lang, ASK), {
     reply_markup: {
-      inline_keyboard: [[{ text: 'Да, удалить', callback_data: 'dm:yes' }, { text: 'Отмена', callback_data: 'dm:no' }]],
+      inline_keyboard: [[{ text: tr(lang, 'Да, удалить'), callback_data: `dm:yes:${lang}` }, { text: tr(lang, 'Отмена'), callback_data: `dm:no:${lang}` }]],
     },
   })
 }
@@ -38,7 +41,9 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
     return
   }
   await tg(env, 'answerCallbackQuery', { callback_query_id: query.id })
-  if (query.data !== 'dm:yes') return void (await edit(env, query, 'Хорошо, ничего не удаляю.'))
+  const [, answer, code] = (query.data ?? '').split(':')
+  const lang = isLang(code) ? code : langOf(null, query.from.language_code)
+  if (answer !== 'yes') return void (await edit(env, query, tr(lang, 'Хорошо, ничего не удаляю.')))
 
   const id = query.from.id
   const anon = anonId()
@@ -73,5 +78,5 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
       `DELETE FROM users WHERE id = ?1 AND banned = 0 AND COALESCE(review_banned_until, 0) < ?2`,
     ).bind(id, now),
   ])
-  await edit(env, query, '✅ Готово: твои данные удалены. Отзывы остались без связи с тобой.')
+  await edit(env, query, tr(lang, '✅ Готово: твои данные удалены. Отзывы остались без связи с тобой.'))
 }

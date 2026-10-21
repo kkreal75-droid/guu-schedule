@@ -5,13 +5,18 @@ import { json, readApi } from './api'
 import { isOwner } from './auth'
 import { cleanText } from './text-filter'
 import { getUser, userLabel } from './db'
+import { langOf, tr, type Lang } from './i18n'
 import { answerCallback, isUnreachable, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
 
 const DAY_MS = 86_400_000
 const PER_DAY = 5
 const PROMPT = '✍️ Ответ на обращение №'
-const answerText = (text: string) => `💬 <b>Ответ на твоё обращение</b>\n\n${escapeHtml(text)}`
+// ответ — с заголовком на языке автора (текст ответа пишет владелец)
+const answerText = (text: string, lang: Lang) => `💬 <b>${tr(lang, 'Ответ на твоё обращение')}</b>\n\n${escapeHtml(text)}`
+// автор обращения и его язык
+const AUTHOR = 'SELECT s.user_id, u.lang, u.lang_code FROM support_messages s LEFT JOIN users u ON u.id = s.user_id'
+type Author = { user_id: number; lang: string | null; lang_code: string | null }
 
 export async function handleSupport(env: Env, request: Request): Promise<Response> {
   const req = await readApi<{ text?: unknown }>(env, request, { write: true })
@@ -29,10 +34,12 @@ export async function handleSupport(env: Env, request: Request): Promise<Respons
     .first<{ id: number }>()
   const user = req.user ?? (await getUser(env.DB, req.profile.id))
   const who = user ? userLabel(user, escapeHtml) : escapeHtml(req.profile.name ?? `id ${req.profile.id}`)
+  // английский интерфейс — владельцу пометка: отвечать лучше по-английски
+  const english = langOf(user, req.profile.lang) === 'en' ? ' · 🇬🇧 English' : ''
   await sendMessage(
     env,
     Number(env.OWNER_ID),
-    `🆘 <b>Обращение №${row!.id}</b>\nОт: ${who} (id ${req.profile.id})${user?.grp ? ` · ${escapeHtml(user.grp)}` : ''}\n\n<blockquote>${escapeHtml(text)}</blockquote>`,
+    `🆘 <b>Обращение №${row!.id}</b>\nОт: ${who} (id ${req.profile.id})${user?.grp ? ` · ${escapeHtml(user.grp)}` : ''}${english}\n\n<blockquote>${escapeHtml(text)}</blockquote>`,
     { reply_markup: { inline_keyboard: [[{ text: '↩️ Ответить', callback_data: `sp:reply:${row!.id}` }]] } },
   )
   return json({ ok: true, id: row!.id })
@@ -55,13 +62,13 @@ export async function handleSupportReply(env: Env, message: TgMessage & { reply_
   if (!message.from || !isOwner(env, message.from.id) || !prompt.startsWith(PROMPT)) return false
   const id = Number(prompt.slice(PROMPT.length).match(/^\d+/)?.[0])
   const text = (message.text ?? '').trim()
-  const row = await env.DB.prepare('SELECT user_id FROM support_messages WHERE id = ?').bind(id).first<{ user_id: number }>()
+  const row = await env.DB.prepare(`${AUTHOR} WHERE s.id = ?`).bind(id).first<Author>()
   if (!row || !text) {
     await sendMessage(env, message.chat.id, 'Не нашёл обращение или ответ пустой.')
     return true
   }
   try {
-    await sendMessage(env, row.user_id, answerText(text))
+    await sendMessage(env, row.user_id, answerText(text, langOf(row)))
     await env.DB.prepare('UPDATE support_messages SET answered_at = ? WHERE id = ?').bind(Date.now(), id).run()
     await sendMessage(env, message.chat.id, `✅ Ответ на обращение №${id} отправлен.`)
   } catch (err) {
@@ -74,14 +81,15 @@ export async function handleSupportReply(env: Env, message: TgMessage & { reply_
 // cron: ответы из очереди (reply_text) — автору, владельцу — отметка, что ушло. Возвращает число подзапросов
 export async function sendQueuedReplies(env: Env): Promise<number> {
   const { results } = await env.DB.prepare(
-    'SELECT id, user_id, reply_text FROM support_messages WHERE reply_text IS NOT NULL AND answered_at IS NULL ORDER BY id LIMIT 3',
-  ).all<{ id: number; user_id: number; reply_text: string }>()
+    `SELECT s.id, s.reply_text, ${AUTHOR.slice('SELECT '.length)}
+     WHERE s.reply_text IS NOT NULL AND s.answered_at IS NULL ORDER BY s.id LIMIT 3`,
+  ).all<Author & { id: number; reply_text: string }>()
   let used = 1
   for (const row of results) {
     const text = row.reply_text.trim()
     let delivered = true
     try {
-      if (text) await sendMessage(env, row.user_id, answerText(text))
+      if (text) await sendMessage(env, row.user_id, answerText(text, langOf(row)))
     } catch (err) {
       if (!isUnreachable(err)) throw err
       delivered = false

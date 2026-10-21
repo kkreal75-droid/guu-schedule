@@ -143,8 +143,13 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
     subgroups: extras.subgroups,
     tags: extras.tags,
     hidden: extras.hidden ?? [],
-    notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
+    // английский вариант — приложение выберет по языку интерфейса (его можно сменить без перезапуска)
+    notice:
+      settings.notice.on && settings.notice.text
+        ? { id: settings.notice.id, text: settings.notice.text, text_en: settings.notice.text_en || null }
+        : null,
     maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
+    maintenance_en: settings.maintenance.on && !admin ? settings.maintenance.text_en || null : null,
     channel: settings.channel || null,
   }
 }

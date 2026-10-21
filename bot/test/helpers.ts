@@ -11,6 +11,8 @@ import teacherOther from '../../public/data/teachers/adamova-g-a.json'
 import overrides from '../../overrides.json'
 import thursday11 from '../../overrides/thursday.json'
 import thursday12 from '../../overrides/thursday-1-2.json'
+import subjectsEn from '../../data/i18n/subjects.en.json'
+import guuEn from '../../data/i18n/guu.en.json'
 
 export const OWNER = 7
 export const MINE_TEACHER = 'ahremchik-d-v' // ведёт у МБ(МП) 1-1
@@ -27,6 +29,8 @@ const SITE: Record<string, unknown> = {
   '/overrides.json': overrides,
   '/overrides/thursday.json': thursday11,
   '/overrides/thursday-1-2.json': thursday12,
+  '/data/i18n/subjects.en.json': subjectsEn,
+  '/data/i18n/guu.en.json': guuEn,
 }
 
 // что воркер отправил в Telegram — для проверок

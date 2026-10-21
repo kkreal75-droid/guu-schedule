@@ -77,6 +77,7 @@ export type BroadcastRow = {
   id: number
   created_at: number
   text: string
+  text_en: string | null
   photo: boolean
   audience: string | null
   audience_title: string
@@ -104,8 +105,8 @@ export type FileEdit = { file: string; group: string; weekday: number; even: Fil
 
 export type Settings = {
   greetings: string[]
-  maintenance: { on: boolean; text: string }
-  notice: { on: boolean; id: number; text: string }
+  maintenance: { on: boolean; text: string; text_en?: string }
+  notice: { on: boolean; id: number; text: string; text_en?: string }
   channel?: string
 }
 
@@ -151,8 +152,9 @@ export const adminApi = {
   broadcastCount: (audience: Audience) => callBot<{ count: number }>('/admin/broadcast-count', { audience }),
   access: (id: number, access: AdminUser['access']) => callBot<UserCard>('/admin/access', { id, access }),
   starosta: (id: number, group: string | null) => callBot<UserCard>('/admin/starosta', { id, group }),
-  broadcast: (text: string, photo: string | null, audience: Audience | null) =>
-    callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
+  // textEn — английский вариант (получателям с английским языком); пусто — всем русский
+  broadcast: (text: string, textEn: string, photo: string | null, audience: Audience | null) =>
+    callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, text_en: textEn.trim() || null, photo, audience }),
   schedule: () => callBot<ScheduleStatus>('/admin/schedule'),
   hidden: () => callBot<HiddenOverview>('/admin/hidden'),
   translations: () => callBot<{ edits: TranslationEdit[] }>('/admin/translations'),
@@ -166,7 +168,7 @@ export const adminApi = {
     callBot<{ edits: ScheduleStatus['edits'] }>('/admin/edit-add', edit),
   editDelete: (id: number) => callBot<{ edits: ScheduleStatus['edits'] }>('/admin/edit-delete', { id }),
   settings: () => callBot<{ settings: Settings }>('/admin/settings'),
-  saveSettings: (settings: Omit<Settings, 'notice'> & { notice: { on: boolean; text: string } }) =>
+  saveSettings: (settings: Omit<Settings, 'notice'> & { notice: { on: boolean; text: string; text_en?: string } }) =>
     callBot<{ settings: Settings }>('/admin/settings-save', settings),
   greetingPreview: (text: string) => callBot('/admin/greeting-preview', { text }),
 }

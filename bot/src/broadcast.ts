@@ -1,8 +1,11 @@
 // Рассылки: /broadcast → предпросмотр с кнопками аудитории → отправка пачками → отчёт.
 // На бесплатном тарифе один вызов воркера — максимум 50 подзапросов (Telegram, D1, KV),
 // поэтому за раз отправляем BATCH сообщений, остальное досылает cron раз в минуту.
+// Английский текст (этап 11) — broadcasts.text_en: в /broadcast — после строки «/en», в админ-панели — своё поле.
+// Получателю с английским языком — text_en, а если его нет — русский текст.
 import { isOwner } from './auth'
 import { MB_GROUPS, describeAudience, matchGroups, type AudienceFilter } from '../../shared/groups'
+import { langOf } from './i18n'
 import { loadGroupsIndex } from './schedule'
 import { TelegramError, answerCallback, sendMessage, tg, tgForm, type Keyboard, type TgCallbackQuery, type TgMessage } from './telegram'
 import { entitiesToHtml, escapeHtml, formatMsk, hasFormatting, stripCommand } from './util'
@@ -59,9 +62,10 @@ export type BroadcastRow = {
   id: number
   created_at: number
   text: string
+  text_en: string | null // английский текст; нет — английским получателям уходит русский
   photo: string | null
   audience: string | null // 'all' | '1-1' | '1-2' | JSON {t, f}
-  button: string | null // JSON {text, url} — кнопка мини-приложения под сообщением
+  button: string | null // JSON {text, text_en?, url} — кнопка мини-приложения под сообщением
   status: 'draft' | 'sending' | 'done' | 'cancelled'
   preview_chat: number | null
   preview_message: number | null
@@ -104,16 +108,32 @@ const audienceKeyboard = (id: number, counts: Record<ButtonAudience, number>): K
   ],
 })
 
-// Отправка одного сообщения рассылки (и предпросмотра — тем же способом)
-function deliver(env: Env, chatId: number, row: Pick<BroadcastRow, 'text' | 'photo'> & { button?: string | null }, extra: object = {}) {
+type Message = Pick<BroadcastRow, 'text' | 'photo'> & { text_en?: string | null; button?: string | null }
+
+// Отправка одного сообщения рассылки (и предпросмотра — тем же способом); en — получатель с английским языком
+function deliver(env: Env, chatId: number, row: Message, extra: object = {}, en = false) {
+  const text = en && row.text_en ? row.text_en : row.text
   if (row.button) {
-    const b = JSON.parse(row.button) as { text: string; url: string }
-    extra = { reply_markup: { inline_keyboard: [[{ text: b.text, web_app: { url: b.url } }]] }, ...extra }
+    const b = JSON.parse(row.button) as { text: string; text_en?: string; url: string }
+    extra = { reply_markup: { inline_keyboard: [[{ text: en && b.text_en ? b.text_en : b.text, web_app: { url: b.url } }]] }, ...extra }
   }
   return row.photo
-    ? tg<TgMessage>(env, 'sendPhoto', { chat_id: chatId, photo: row.photo, caption: row.text, parse_mode: 'HTML', ...extra })
-    : tg<TgMessage>(env, 'sendMessage', { chat_id: chatId, text: row.text, parse_mode: 'HTML', ...extra })
+    ? tg<TgMessage>(env, 'sendPhoto', { chat_id: chatId, photo: row.photo, caption: text, parse_mode: 'HTML', ...extra })
+    : tg<TgMessage>(env, 'sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', ...extra })
 }
+
+// «Русский текст\n/en\nEnglish text» → два текста; строки «/en» нет — английского нет
+export function splitLangs(html: string): { ru: string; en: string | null } {
+  const m = html.match(/^([\s\S]*?)\n[ \t]*\/en[ \t]*(?:\n|$)([\s\S]*)$/)
+  if (!m) return { ru: html.trim(), en: null }
+  return { ru: m[1].trim(), en: m[2].trim() || null }
+}
+
+// Слишком длинный текст — что сказать владельцу; всё в порядке — null
+const tooLong = (text: string, photo: unknown, what = '') =>
+  text.length > (photo ? CAPTION_LIMIT : TEXT_LIMIT)
+    ? `Слишком длинно: ${photo ? 'подпись к фото' : 'сообщение'}${what} — до ${photo ? CAPTION_LIMIT : TEXT_LIMIT} символов`
+    : null
 
 // /broadcast <текст> или фото с подписью «/broadcast <текст>»
 export async function startBroadcast(env: Env, message: TgMessage): Promise<void> {
@@ -122,33 +142,43 @@ export async function startBroadcast(env: Env, message: TgMessage): Promise<void
     ? stripCommand(message.caption ?? '', message.caption_entities)
     : stripCommand(message.text ?? '', message.entities)
   // выделили текст средствами Telegram — переводим в HTML; иначе считаем, что теги написаны руками
-  const html = (hasFormatting(source.entities) ? entitiesToHtml(source.text, source.entities) : source.text).trim()
+  const all = (hasFormatting(source.entities) ? entitiesToHtml(source.text, source.entities) : source.text).trim()
+  const { ru: html, en } = splitLangs(all)
   const photo = message.photo?.at(-1)?.file_id ?? null
 
   if (!html && !photo) {
     await sendMessage(
       env,
       chatId,
-      'Напишите так: <code>/broadcast текст</code>\nМожно с HTML (<code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, ссылки) или с фото — отправьте фото с подписью «/broadcast текст».',
+      'Напишите так: <code>/broadcast текст</code>\nМожно с HTML (<code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, ссылки) или с фото — отправьте фото с подписью «/broadcast текст».\nАнглийский вариант — с новой строки после <code>/en</code>: <code>/broadcast Привет!\n/en\nHello!</code> (без него английским пользователям уйдёт русский текст).',
     )
     return
   }
-  if (html.length > (photo ? CAPTION_LIMIT : TEXT_LIMIT)) {
-    await sendMessage(env, chatId, `Слишком длинно: ${photo ? 'подпись к фото' : 'сообщение'} — до ${photo ? CAPTION_LIMIT : TEXT_LIMIT} символов.`)
+  const long = tooLong(html, photo) ?? (en ? tooLong(en, photo, ' (английская)') : null)
+  if (long) {
+    await sendMessage(env, chatId, `${long}.`)
     return
   }
 
   const draft = await env.DB.prepare(
-    `INSERT INTO broadcasts (created_at, text, photo, status) VALUES (?, ?, ?, 'draft') RETURNING id`,
+    `INSERT INTO broadcasts (created_at, text, text_en, photo, status) VALUES (?, ?, ?, ?, 'draft') RETURNING id`,
   )
-    .bind(Date.now(), html, photo)
+    .bind(Date.now(), html, en, photo)
     .first<{ id: number }>()
   const id = draft!.id
   const counts = await audienceCounts(env.DB)
 
-  await sendMessage(env, chatId, `📣 <b>Предпросмотр рассылки #${id}</b> — так её увидят. Кому отправить?`)
+  await sendMessage(
+    env,
+    chatId,
+    en
+      ? `📣 <b>Предпросмотр рассылки #${id}</b> — так её увидят: сначала по-русски, потом по-английски. Кому отправить?`
+      : `📣 <b>Предпросмотр рассылки #${id}</b> — так её увидят (английского текста нет — всем уйдёт этот). Кому отправить?`,
+  )
   try {
-    const preview = await deliver(env, chatId, { text: html, photo }, { reply_markup: audienceKeyboard(id, counts) })
+    // оба варианта: Telegram проверит HTML каждого; кнопки аудитории — под последним
+    if (en) await deliver(env, chatId, { text: html, photo })
+    const preview = await deliver(env, chatId, { text: html, text_en: en, photo }, { reply_markup: audienceKeyboard(id, counts) }, Boolean(en))
     await env.DB.prepare('UPDATE broadcasts SET preview_chat = ?, preview_message = ? WHERE id = ?')
       .bind(chatId, preview.message_id, id)
       .run()
@@ -214,21 +244,21 @@ async function enqueue(env: Env, id: number, audience: Audience, skip: number | 
 
 // ---------- из админ-панели ----------
 
-export type PanelBroadcast = { text: string; photo: Uint8Array | null; audience: Audience | null }
+export type PanelBroadcast = { text: string; text_en?: string | null; photo: Uint8Array | null; audience: Audience | null }
 
-// Сначала — копия владельцу: так Telegram проверит HTML, а фото загрузится один раз (file_id).
-// audience null — только предпросмотр. Ошибка HTML — { error }.
+// Сначала — копия владельцу (и английская, если есть): так Telegram проверит HTML, а фото загрузится один раз
+// (file_id). audience null — только предпросмотр. Ошибка HTML — { error }.
 export async function panelBroadcast(
   env: Env,
   ctx: ExecutionContext,
-  { text, photo, audience }: PanelBroadcast,
+  { text, text_en, photo, audience }: PanelBroadcast,
 ): Promise<{ id?: number; total?: number; error?: string }> {
   const owner = Number(env.OWNER_ID)
   const html = text.trim()
+  const en = text_en?.trim() || null
   if (!html && !photo) return { error: 'Напишите текст или добавьте фото' }
-  if (html.length > (photo ? CAPTION_LIMIT : TEXT_LIMIT)) {
-    return { error: `Слишком длинно: ${photo ? 'подпись к фото' : 'сообщение'} — до ${photo ? CAPTION_LIMIT : TEXT_LIMIT} символов` }
-  }
+  const long = tooLong(html, photo) ?? (en ? tooLong(en, photo, ' (английская)') : null)
+  if (long) return { error: long }
   let fileId: string | null = null
   try {
     if (photo) {
@@ -248,12 +278,20 @@ export async function panelBroadcast(
     if (err instanceof TelegramError && err.code === 400) return { error: `Telegram не принял сообщение: ${err.description}` }
     throw err
   }
+  if (en) {
+    try {
+      await deliver(env, owner, { text: html, text_en: en, photo: fileId }, {}, true)
+    } catch (err) {
+      if (err instanceof TelegramError && err.code === 400) return { error: `Telegram не принял английский текст: ${err.description}` }
+      throw err
+    }
+  }
   if (!audience) return {}
 
   const row = await env.DB.prepare(
-    `INSERT INTO broadcasts (created_at, text, photo, status) VALUES (?, ?, ?, 'draft') RETURNING id`,
+    `INSERT INTO broadcasts (created_at, text, text_en, photo, status) VALUES (?, ?, ?, ?, 'draft') RETURNING id`,
   )
-    .bind(Date.now(), html, fileId)
+    .bind(Date.now(), html, en, fileId)
     .first<{ id: number }>()
   const id = row!.id
   const total = await enqueue(env, id, audience, owner)
@@ -264,12 +302,17 @@ export async function panelBroadcast(
 // Рассылка от самого бота (например, «Опубликовано расписание сессии»): без предпросмотра владельцу, с кнопкой.
 export async function systemBroadcast(
   env: Env,
-  { text, button, audience }: { text: string; button: { text: string; url: string } | null; audience: Audience },
+  {
+    text,
+    text_en = null,
+    button,
+    audience,
+  }: { text: string; text_en?: string | null; button: { text: string; text_en?: string; url: string } | null; audience: Audience },
 ): Promise<{ id: number; total: number }> {
   const row = await env.DB.prepare(
-    `INSERT INTO broadcasts (created_at, text, photo, status, button) VALUES (?, ?, NULL, 'draft', ?) RETURNING id`,
+    `INSERT INTO broadcasts (created_at, text, text_en, photo, status, button) VALUES (?, ?, ?, NULL, 'draft', ?) RETURNING id`,
   )
-    .bind(Date.now(), text, button ? JSON.stringify(button) : null)
+    .bind(Date.now(), text, text_en, button ? JSON.stringify(button) : null)
     .first<{ id: number }>()
   const id = row!.id
   return { id, total: await enqueue(env, id, audience) }
@@ -289,14 +332,15 @@ export async function drainBroadcasts(env: Env, batch = BATCH): Promise<number> 
       `UPDATE broadcast_queue SET status = 'failed', error = 'забанен'
        WHERE status = 'pending' AND user_id IN (SELECT id FROM users WHERE banned = 1)`,
     ),
+    // язык получателя — какой текст ему отправить
     env.DB.prepare(
-      `SELECT q.broadcast_id, q.user_id, b.text, b.photo, b.button
-       FROM broadcast_queue q JOIN broadcasts b ON b.id = q.broadcast_id
+      `SELECT q.broadcast_id, q.user_id, b.text, b.text_en, b.photo, b.button, u.lang, u.lang_code
+       FROM broadcast_queue q JOIN broadcasts b ON b.id = q.broadcast_id LEFT JOIN users u ON u.id = q.user_id
        WHERE q.status = 'pending' AND b.status = 'sending'
        ORDER BY q.broadcast_id LIMIT ?`,
     ).bind(batch),
   ])
-  const pending = picked.results as { broadcast_id: number; user_id: number; text: string; photo: string | null; button: string | null }[]
+  const pending = picked.results as (Message & { broadcast_id: number; user_id: number; lang: string | null; lang_code: string | null })[]
   if (!pending.length) {
     await finishCompleted(env) // вдруг вся очередь отпала из-за банов
     return 0
@@ -310,7 +354,7 @@ export async function drainBroadcasts(env: Env, batch = BATCH): Promise<number> 
     let status = 'delivered'
     let error: string | null = null
     try {
-      await deliver(env, item.user_id, item)
+      await deliver(env, item.user_id, item, {}, langOf(item) === 'en')
     } catch (err) {
       if (err instanceof TelegramError && err.code === 429) break // Telegram просит подождать — продолжит cron
       error = err instanceof Error ? err.message.slice(0, 300) : String(err)
@@ -389,7 +433,7 @@ export async function listBroadcasts(env: Env, chatId: number): Promise<void> {
   const lines = results.map((row) => {
     const plain = row.text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
     const snippet = plain.length > 60 ? `${plain.slice(0, 60)}…` : plain
-    return `<b>#${row.id}</b> · ${formatMsk(row.created_at)} · ${escapeHtml(audienceTitle(row.audience))} · ${status(row)}${row.photo ? ' · 🖼' : ''}\n«${escapeHtml(snippet || 'без текста')}»`
+    return `<b>#${row.id}</b> · ${formatMsk(row.created_at)} · ${escapeHtml(audienceTitle(row.audience))} · ${status(row)}${row.photo ? ' · 🖼' : ''}${row.text_en ? ' · 🇬🇧' : ''}\n«${escapeHtml(snippet || 'без текста')}»`
   })
   await sendMessage(env, chatId, `📣 <b>Последние рассылки</b>\n\n${lines.join('\n\n')}`)
 }

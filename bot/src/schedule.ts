@@ -3,6 +3,7 @@
 // Плюс ручные правки из админ-панели (edits.ts).
 import type { ComputedCalendar } from '../../shared/calendar-core'
 import { WEEKDAYS_FULL, formatDate, weekTitle } from '../../shared/format-core'
+import { weekdayName } from '../../shared/i18n-core'
 import { MB_IDS, normalizeGroup, type GroupsIndex } from '../../shared/groups'
 import {
   makeTimetable,
@@ -19,6 +20,7 @@ import {
 } from '../../shared/schedule-core'
 import { NO_EXTRAS, dayLessons, shortWhen, type DayLesson, type Extras, type HiddenLesson } from '../../shared/edits-core'
 import { loadExtras } from './edits'
+import { RU, kindIn, looksLikeNames, peopleIn, roomIn, subjectIn, tr, type Locale } from './i18n'
 import { escapeHtml } from './util'
 
 // extras — ручные правки, подгруппы, метки пар (edits.ts); replacements — замены дней целиком из файлов
@@ -160,62 +162,83 @@ export const personalize = (tt: BotTimetable, hidden: HiddenLesson[]): BotTimeta
 
 // Пары дня с правками: отменённая — зачёркнута, перенесённая — «перенесена на …», добавленная — ➕,
 // пометки — 📌, подгруппа — в скобках. Пометки ко всему дню — сверху. mine — выбранные подгруппы.
-function dayLines(tt: BotTimetable, group: string, day: number, mine: number[] | null): { lines: string[]; count: number } {
+function dayLines(tt: BotTimetable, group: string, day: number, mine: number[] | null, loc: Locale): { lines: string[]; count: number } {
   const view = dayLessons(tt, group, day, tt.extras, mine)
   const lines = view.notes.map((n) => `📌 ${escapeHtml(n)}`)
   for (const lesson of view.lessons) {
     const pair = lesson.pair ?? (lesson.added || lesson.movedFrom ? null : tt.pairNumber(lesson))
-    const line = `${pair ? `${pair}. ` : '• '}${formatLesson(lesson)}`
-    if (lesson.cancel) lines.push(`<s>${line}</s>\n   ❌ Отменена${lesson.cancel.text ? `: ${escapeHtml(lesson.cancel.text)}` : ''}`)
-    else if (lesson.movedTo) lines.push(`<s>${line}</s>\n   ↪️ Перенесена на ${shortWhen(lesson.movedTo.date, lesson.movedTo.start)}`)
+    const line = `${pair ? `${pair}. ` : '• '}${formatLesson(lesson, loc)}`
+    if (lesson.cancel) lines.push(`<s>${line}</s>\n   ❌ ${tr(loc.lang, 'Отменена')}${lesson.cancel.text ? `: ${escapeHtml(lesson.cancel.text)}` : ''}`)
+    else if (lesson.movedTo) lines.push(`<s>${line}</s>\n   ↪️ ${tr(loc.lang, 'Перенесена на {when}', { when: shortWhen(lesson.movedTo.date, lesson.movedTo.start) })}`)
     else lines.push(line)
-    if (lesson.added) lines.push('   ➕ Добавлена')
-    if (lesson.movedFrom) lines.push(`   ↩️ Перенос с ${shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}`)
+    if (lesson.added) lines.push(`   ➕ ${tr(loc.lang, 'Добавлена')}`)
+    if (lesson.movedFrom) lines.push(`   ↩️ ${tr(loc.lang, 'Перенос с {when}', { when: shortWhen(lesson.movedFrom.date, lesson.movedFrom.start) })}`)
     for (const note of lesson.notes) lines.push(`   📌 ${escapeHtml(note)}`)
   }
   return { lines, count: view.lessons.length }
 }
 
-// «09:00–10:30 · Математика (Лекция) · У-349 · Дадашов Ч.М.»
-export function formatLesson(lesson: Lesson | DayLesson): string {
+// «09:00–10:30 · Математика (Лекция) · У-349 · Дадашов Ч.М.»; по-английски — «… · History of Russia (Lecture) · ЛК-405 · Kriukova E.V.»
+export function formatLesson(lesson: Lesson | DayLesson, loc: Locale = RU): string {
   const sub = 'subgroup' in lesson && lesson.subgroup ? ` [${escapeHtml(lesson.subgroup.name)}]` : ''
-  const title = `<b>${escapeHtml(lesson.subject)}</b>${lesson.kind ? ` (${escapeHtml(lesson.kind)})` : ''}${sub}`
+  const title = `<b>${escapeHtml(subjectIn(loc, lesson.subject))}</b>${lesson.kind ? ` (${escapeHtml(kindIn(loc, lesson.kind))})` : ''}${sub}`
   const teacher = lesson.teachers?.join(', ') ?? lesson.teacher
-  const extra = [lesson.room, teacher].filter(Boolean).map((s) => escapeHtml(s!))
+  const extra = [lesson.room && roomIn(loc, lesson.room), teacher && peopleIn(loc, teacher)].filter(Boolean).map((s) => escapeHtml(s!))
   return [`${lesson.start}–${lesson.end}`, title, ...extra].join(' · ')
 }
 
+// Строка formatLesson по-русски (так хранятся снимки «пары на 7 дней», digest.ts) → на языке беседы
+const unescapeHtml = (text: string) => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+export function localizeLessonLine(line: string, loc: Locale): string {
+  if (loc.lang === 'ru') return line
+  const m = line.match(/^(\S+) · <b>(.*?)<\/b>(?: \(([^)]*)\))?((?: \[[^\]]*\])?)(.*)$/)
+  if (!m) return line
+  const [, time, subject, kind, sub, rest] = m
+  const title = `<b>${escapeHtml(subjectIn(loc, unescapeHtml(subject)))}</b>${kind ? ` (${escapeHtml(kindIn(loc, unescapeHtml(kind)))})` : ''}${sub}`
+  // аудитория и преподаватель (formatLesson пишет их по порядку); одно из двух — по виду: ФИО или аудитория
+  const parts = rest.split(' · ').slice(1).map(unescapeHtml)
+  const extra = parts.map((part, i) =>
+    escapeHtml((parts.length > 1 ? i === 1 : looksLikeNames(part)) ? peopleIn(loc, part) : roomIn(loc, part)),
+  )
+  return [time, title, ...extra].join(' · ')
+}
+
+// день недели: по-русски — как раньше, по-английски — Intl
+const weekdayIn = (loc: Locale, weekday: number) => (loc.lang === 'en' ? weekdayName(weekday, 'en') : WEEKDAYS_FULL[weekday])
+// «Среда, 21 октября» / «Wednesday, 21 October»
+export const dayTitle = (loc: Locale, weekday: number, day: number) => `${weekdayIn(loc, weekday)}, ${formatDate(day, loc.lang)}`
+
 // Пары на день для одной группы или для всех загруженных (если группа не выбрана) — HTML.
-// mine — подгруппы человека (личные /today, inline): чужие пары подгрупп не показываем.
-export function formatDay(tt: BotTimetable, day: number, group: string | null, mine: number[] | null = null): string {
+// mine — подгруппы человека (личные /today, inline): чужие пары подгрупп не показываем. loc — язык сообщения.
+export function formatDay(tt: BotTimetable, day: number, group: string | null, mine: number[] | null = null, loc: Locale = RU): string {
   const week = tt.weekOf(day)
   const weekday = tt.weekdayOf(day)
-  const header = `📅 <b>${WEEKDAYS_FULL[weekday]}, ${formatDate(day)}</b>`
+  const header = `📅 <b>${dayTitle(loc, weekday, day)}</b>`
   if (group && !tt.schedule.groups.includes(group)) {
-    return `${header}\nНе нашёл расписание вашей группы — откройте приложение и выберите группу заново.`
+    return `${header}\n${tr(loc.lang, 'Не нашёл расписание вашей группы — откройте приложение и выберите группу заново.')}`
   }
-  if (!tt.inSemester(week)) return `${header}\nВне учебного семестра.`
-  const lines = [`${header} · ${weekTitle(week).toLowerCase()}`]
+  if (!tt.inSemester(week)) return `${header}\n${tr(loc.lang, 'Вне учебного семестра.')}`
+  const lines = [`${header} · ${weekTitle(week, loc.lang).toLowerCase()}`]
   for (const g of group ? [group] : tt.schedule.groups) {
     if (!group) lines.push('', `<b>${escapeHtml(tt.nameOf(g))}</b>`)
-    const day_ = dayLines(tt, g, day, mine)
-    if (!day_.count) lines.push(weekday === 6 ? 'Воскресенье — выходной 🌿' : 'Пар нет 🎉')
+    const day_ = dayLines(tt, g, day, mine, loc)
+    if (!day_.count) lines.push(tr(loc.lang, weekday === 6 ? 'Воскресенье — выходной 🌿' : 'Пар нет 🎉'))
     lines.push(...day_.lines)
   }
   return lines.join('\n')
 }
 
 // Неделя одной группы: Пн–Сб по дням — HTML
-export function formatWeek(tt: BotTimetable, monday: number, group: string, mine: number[] | null = null): string {
+export function formatWeek(tt: BotTimetable, monday: number, group: string, mine: number[] | null = null, loc: Locale = RU): string {
   const week = tt.weekOf(monday)
-  const range = `${formatDate(monday)} – ${formatDate(monday + 5)}`
-  const header = `🗓 <b>Неделя ${range}</b>`
-  if (!tt.inSemester(week)) return `${header}\nВне учебного семестра.`
-  const lines = [`${header} · ${weekTitle(week).toLowerCase()}`, `<b>${escapeHtml(tt.nameOf(group))}</b>`]
+  const range = `${formatDate(monday, loc.lang)} – ${formatDate(monday + 5, loc.lang)}`
+  const header = `🗓 <b>${tr(loc.lang, 'Неделя {range}', { range })}</b>`
+  if (!tt.inSemester(week)) return `${header}\n${tr(loc.lang, 'Вне учебного семестра.')}`
+  const lines = [`${header} · ${weekTitle(week, loc.lang).toLowerCase()}`, `<b>${escapeHtml(tt.nameOf(group))}</b>`]
   for (let weekday = 0; weekday < 6; weekday++) {
-    const day_ = dayLines(tt, group, monday + weekday, mine)
-    lines.push('', `<b>${WEEKDAYS_FULL[weekday]}, ${formatDate(monday + weekday)}</b>`)
-    if (!day_.count) lines.push('Пар нет 🎉')
+    const day_ = dayLines(tt, group, monday + weekday, mine, loc)
+    lines.push('', `<b>${dayTitle(loc, weekday, monday + weekday)}</b>`)
+    if (!day_.count) lines.push(tr(loc.lang, 'Пар нет 🎉'))
     lines.push(...day_.lines)
   }
   const text = lines.join('\n')

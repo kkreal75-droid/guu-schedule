@@ -1,7 +1,7 @@
 // Пользователи в D1 (схема — migrations/0001_init.sql).
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import type { HiddenLesson, HideScope } from '../../shared/edits-core'
-import { isLang, type Lang } from '../../shared/i18n-core'
+import { effectiveLang, isLang, type Lang } from '../../shared/i18n-core'
 import type { Profile } from './auth'
 
 export type UserRow = {
@@ -174,19 +174,20 @@ export const hiddenFromRow = (r: HiddenRow): HiddenLesson => ({
   ...(r.user_id === 0 ? { all: true } : {}),
 })
 
-// Личное у человека: выбранные подгруппы и скрытые пары — календарь, inline, /today в личке (один запрос к D1)
-export async function personalOf(db: D1Database, id: number): Promise<{ mine: number[] | null; hidden: HiddenLesson[] }> {
+// Личное у человека: выбранные подгруппы, скрытые пары и язык — календарь, inline, /today в личке (один запрос к D1)
+export async function personalOf(db: D1Database, id: number): Promise<{ mine: number[] | null; hidden: HiddenLesson[]; lang: Lang }> {
   const [user, hidden] = await db.batch([
-    db.prepare('SELECT subgroups FROM users WHERE id = ?').bind(id),
+    db.prepare('SELECT subgroups, lang, lang_code FROM users WHERE id = ?').bind(id),
     db.prepare(`SELECT ${HIDDEN_COLUMNS} FROM hidden_lessons WHERE user_id = ?`).bind(id),
   ])
+  const row = user.results[0] as { subgroups?: string | null; lang?: string | null; lang_code?: string | null } | undefined
   let mine: number[] | null = null
   try {
-    const raw = (user.results[0] as { subgroups?: string | null } | undefined)?.subgroups
+    const raw = row?.subgroups
     const list = raw ? (JSON.parse(raw) as unknown) : null
     mine = Array.isArray(list) ? list.filter((x): x is number => Number.isSafeInteger(x)) : null
   } catch {
     mine = null
   }
-  return { mine, hidden: (hidden.results as HiddenRow[]).map(hiddenFromRow) }
+  return { mine, hidden: (hidden.results as HiddenRow[]).map(hiddenFromRow), lang: effectiveLang(row?.lang, row?.lang_code) }
 }

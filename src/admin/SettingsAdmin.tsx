@@ -26,7 +26,7 @@ export function SettingsAdmin() {
       const res = await adminApi.saveSettings({
         greetings: form.greetings,
         maintenance: form.maintenance,
-        notice: { on: form.notice.on, text: form.notice.text },
+        notice: { on: form.notice.on, text: form.notice.text, text_en: form.notice.text_en ?? '' },
         channel: form.channel ?? '',
       })
       setForm(res.settings)
@@ -66,7 +66,7 @@ export function SettingsAdmin() {
         </div>
       </Section>
 
-      <Section title="Технические работы" footer="Все, кроме вас, увидят вместо приложения этот текст. Бот в чатах работает как обычно.">
+      <Section title="Технические работы" footer="Все, кроме вас, увидят вместо приложения этот текст (с английским интерфейсом — английский, если он есть). Бот в чатах работает как обычно.">
         <label className="row row-switch">
           <span className="row-label">Включить</span>
           <input
@@ -84,9 +84,19 @@ export function SettingsAdmin() {
             onChange={(e) => setForm({ ...form, maintenance: { ...form.maintenance, text: e.target.value } })}
           />
         </div>
+        <div className="row row-form">
+          <textarea
+            className="input textarea"
+            rows={2}
+            lang="en"
+            placeholder="🇬🇧 По-английски (необязательно)"
+            value={form.maintenance.text_en ?? ''}
+            onChange={(e) => setForm({ ...form, maintenance: { ...form.maintenance, text_en: e.target.value } })}
+          />
+        </div>
       </Section>
 
-      <Section title="Объявление" footer="Тонкая плашка над расписанием. Закрыл — больше не видит; новый текст покажется всем снова.">
+      <Section title="Объявление" footer="Тонкая плашка над расписанием. Закрыл — больше не видит; новый текст покажется всем снова. Английский — для английского интерфейса, пусто — им русский.">
         <label className="row row-switch">
           <span className="row-label">Показывать</span>
           <input
@@ -103,6 +113,16 @@ export function SettingsAdmin() {
             maxLength={300}
             value={form.notice.text}
             onChange={(e) => setForm({ ...form, notice: { ...form.notice, text: e.target.value } })}
+          />
+        </div>
+        <div className="row row-form">
+          <input
+            className="input"
+            lang="en"
+            placeholder="🇬🇧 По-английски (необязательно)"
+            maxLength={300}
+            value={form.notice.text_en ?? ''}
+            onChange={(e) => setForm({ ...form, notice: { ...form.notice, text_en: e.target.value } })}
           />
         </div>
       </Section>

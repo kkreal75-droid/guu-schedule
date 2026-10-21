@@ -3,7 +3,9 @@
 import { dayLessons, shortWhen } from '../../shared/edits-core'
 import { isoFromDay } from '../../shared/schedule-core'
 import { MB_IDS, normalizeGroup, shortName } from '../../shared/groups'
+import { langFromCode } from '../../shared/i18n-core'
 import { json, readApi } from './api'
+import { RU, kindIn, langOf, localeFor, peopleIn, roomIn, subjectIn, tr, type Lang, type Locale } from './i18n'
 import { loadGroupFile, loadTimetable, personalize, type BotTimetable } from './schedule'
 import { personalOf } from './db'
 import { economyMode } from './usage'
@@ -71,16 +73,18 @@ const MOSCOW_TZ = [
 ]
 
 // .ics одной группы на весь семестр — с правками (отмена → STATUS:CANCELLED, перенос, добавленные пары),
-// подгруппами владельца ссылки (mine: чужие пары подгрупп не показываем) и его скрытыми парами (tt.extras.hidden)
-export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null = null): string {
+// подгруппами владельца ссылки (mine: чужие пары подгрупп не показываем), его скрытыми парами (tt.extras.hidden)
+// и на его языке (loc): по-английски — названия предметов из словаря, а русское — в описании
+export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null = null, loc: Locale = RU): string {
   const stamp = utcStamp(tt.schedule.updated_at)
+  const lang = loc.lang
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//guu-schedule//Расписание ГУУ//RU',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeText(`Расписание ${tt.nameOf(group)}`)}`,
+    `X-WR-CALNAME:${escapeText(tr(lang, 'Расписание {group}', { group: tt.nameOf(group) }))}`,
     'X-WR-TIMEZONE:Europe/Moscow',
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     'X-PUBLISHED-TTL:PT1H',
@@ -93,20 +97,24 @@ export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null 
       const view = dayLessons(tt, group, day, tt.extras, mine)
       for (const lesson of view.lessons) {
         const status = lesson.cancel
-          ? `Отменена${lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}`
+          ? `${tr(lang, 'Отменена')}${lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}`
           : lesson.movedTo
-            ? `Перенесена на ${shortWhen(lesson.movedTo.date, lesson.movedTo.start)}`
+            ? tr(lang, 'Перенесена на {when}', { when: shortWhen(lesson.movedTo.date, lesson.movedTo.start) })
             : lesson.movedFrom
-              ? `Перенос с ${shortWhen(lesson.movedFrom.date, lesson.movedFrom.start)}`
+              ? tr(lang, 'Перенос с {when}', { when: shortWhen(lesson.movedFrom.date, lesson.movedFrom.start) })
               : lesson.added
-                ? 'Добавлена'
+                ? tr(lang, 'Добавлена')
                 : null
         const pair = lesson.pair ?? (lesson.added || lesson.movedFrom ? null : tt.pairNumber(lesson))
+        const teacher = lesson.teachers?.join(', ') ?? lesson.teacher
+        const subject = subjectIn(loc, lesson.subject)
         const description = [
           ...[status, ...view.notes, ...lesson.notes].filter(Boolean).map((n) => `⚠️ ${n}`),
-          [lesson.kind, lesson.teachers?.join(', ') ?? lesson.teacher, lesson.subgroup?.name, pair ? `${pair} пара` : null]
+          [lesson.kind && kindIn(loc, lesson.kind), teacher && peopleIn(loc, teacher), lesson.subgroup?.name, pair ? tr(lang, '{n} пара', { n: pair }) : null]
             .filter(Boolean)
             .join(' · '),
+          // по-английски — и название из файла ГУУ (так оно написано в официальном расписании)
+          ...(subject !== lesson.subject ? [lesson.subject] : []),
         ].join('\n')
         lines.push(
           'BEGIN:VEVENT',
@@ -114,8 +122,8 @@ export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null 
           `DTSTAMP:${stamp}`,
           `DTSTART;TZID=Europe/Moscow:${localStamp(iso, lesson.start)}`,
           `DTEND;TZID=Europe/Moscow:${localStamp(iso, lesson.end)}`,
-          `SUMMARY:${escapeText(lesson.subject)}`,
-          ...(lesson.room ? [`LOCATION:${escapeText(lesson.room)}`] : []),
+          `SUMMARY:${escapeText(subject)}`,
+          ...(lesson.room ? [`LOCATION:${escapeText(roomIn(loc, lesson.room))}`] : []),
           `DESCRIPTION:${escapeText(description)}`,
           ...(lesson.cancel || lesson.movedTo ? ['STATUS:CANCELLED'] : ['STATUS:CONFIRMED']),
           'END:VEVENT',
@@ -179,7 +187,7 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
 const ICS_TTL_MS = 10 * 60_000
 const icsCache = new Map<string, { at: number; ics: string; group: string; user: number }>()
 
-// человек скрыл или вернул пару — его календарь в этом изоляте собираем заново (в остальных — через ≤ 10 минут)
+// человек скрыл или вернул пару, сменил язык — его календарь в этом изоляте собираем заново (в остальных — через ≤ 10 минут)
 export function forgetCalendarOf(userId: number) {
   for (const [token, hit] of icsCache) if (hit.user === userId) icsCache.delete(token)
 }
@@ -193,7 +201,7 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
     const row = await env.DB.prepare('SELECT * FROM calendar_tokens WHERE token = ?').bind(token).first<TokenRow>()
     if (!row) {
       icsCache.delete(token)
-      return new Response('Календарь отключён', { status: 404 })
+      return new Response('Календарь отключён · Calendar disconnected', { status: 404 })
     }
     const now = Date.now()
     ctx.waitUntil(
@@ -206,7 +214,8 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
     )
     const group = normalizeGroup(row.grp) ?? row.grp
     const [tt, personal] = await Promise.all([loadTimetable(env, [group]), personalOf(env.DB, row.user_id)])
-    hit = { at: now, ics: buildIcs(personalize(tt, personal.hidden), group, personal.mine), group, user: row.user_id }
+    const loc = await localeFor(env, personal.lang)
+    hit = { at: now, ics: buildIcs(personalize(tt, personal.hidden), group, personal.mine, loc), group, user: row.user_id }
     icsCache.set(token, hit)
     if (icsCache.size > 300) icsCache.delete(icsCache.keys().next().value!)
   }
@@ -224,12 +233,18 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
 // http(s)-ссылки, поэтому кнопка «Apple Календарь» ведёт сюда, а страница уже открывает
 // webcal:// — Календарь предлагает подписаться.
 export async function handleAppleSubscribe(env: Env, request: Request, token: string): Promise<Response> {
-  const row = await env.DB.prepare('SELECT grp FROM calendar_tokens WHERE token = ?').bind(token).first<{ grp: string }>()
+  const row = await env.DB.prepare(
+    'SELECT c.grp, u.lang, u.lang_code FROM calendar_tokens c LEFT JOIN users u ON u.id = c.user_id WHERE c.token = ?',
+  )
+    .bind(token)
+    .first<{ grp: string; lang: string | null; lang_code: string | null }>()
+  // язык — владельца ссылки; ссылки нет — по языку браузера
+  const lang: Lang = row ? langOf(row) : langFromCode(request.headers.get('Accept-Language')?.split(',')[0] ?? null)
   const html = (body: string, status = 200) =>
     new Response(
-      `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+      `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Подписка на расписание</title>
+<title>${tr(lang, 'Подписка на расписание')}</title>
 <style>
 body{margin:0;padding:40px 20px;font:17px/1.4 -apple-system,system-ui,sans-serif;text-align:center;background:#f2f2f7;color:#111}
 h1{font-size:22px;margin:0 0 12px}p{color:#666;margin:8px 0}
@@ -238,14 +253,14 @@ a.btn{display:inline-block;margin:20px 0 8px;padding:14px 24px;border-radius:12p
 </style></head><body>${body}</body></html>`,
       { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
     )
-  if (!row) return html('<h1>Календарь отключён</h1><p>Подключите его заново в приложении: Ещё → Календарь на телефоне.</p>', 404)
+  if (!row) return html(`<h1>${tr(lang, 'Календарь отключён')}</h1><p>${tr(lang, 'Подключите его заново в приложении: Ещё → Календарь на телефоне.')}</p>`, 404)
   const webcal = feedUrl(new URL(request.url).origin, token).replace(/^https?:/, 'webcal:')
   const group = normalizeGroup(row.grp) ?? row.grp
   const title = (await loadGroupFile(env, group).catch(() => null))?.name ?? group
-  return html(`<h1>📅 Расписание ${escapeHtmlText(title)}</h1>
-<p>Сейчас откроется Календарь — нажмите «Подписаться».</p>
-<a class="btn" href="${webcal}">Подписаться в Календаре</a>
-<p>Если ничего не открылось — нажмите кнопку.</p>
+  return html(`<h1>📅 ${tr(lang, 'Расписание {group}', { group: escapeHtmlText(title) })}</h1>
+<p>${tr(lang, 'Сейчас откроется Календарь — нажмите «Подписаться».')}</p>
+<a class="btn" href="${webcal}">${tr(lang, 'Подписаться в Календаре')}</a>
+<p>${tr(lang, 'Если ничего не открылось — нажмите кнопку.')}</p>
 <script>location.href = ${JSON.stringify(webcal)}</script>`)
 }
 

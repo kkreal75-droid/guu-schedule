@@ -80,13 +80,17 @@ export const trTeacher = (name: string) => (en() ? translit(name) : name)
 
 // Аудитория на языке интерфейса: по-русски — как в файле; по-английски код — как есть, этаж — «floor»,
 // корпус — английское название из «Корпусов ГУУ» («ЛК-405 · Laboratory building»); место целиком
-// («Спортивный комплекс») — только английским названием. code: null — код не показывать
+// («Спортивный комплекс») — только английским названием, зал в корпусе — «Assembly hall · Lecture hall building».
+// code: null — код не показывать
 export function roomLabel(room: string): { code: string | null; building: string | null } {
   if (!en()) return { code: room, building: null }
   const floor = room.match(/^(.+), (\d+) этаж$/) // i18n-ignore — формат места из update.py
   const place = places.length ? placeForRoom(places, room) : null
   const building = place?.name_en ?? null
-  if (!/\d/.test(room) && building) return { code: null, building }
+  if (!/\d/.test(room) && building) {
+    const hall = place!.name.toLowerCase() === room.trim().toLowerCase() ? null : tKnown(room)
+    return { code: null, building: hall ? `${hall} · ${building}` : building }
+  }
   return { code: floor ? `${floor[1]}, floor ${floor[2]}` : room, building }
 }
 

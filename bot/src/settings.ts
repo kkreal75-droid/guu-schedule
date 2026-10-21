@@ -3,8 +3,9 @@
 
 export type Settings = {
   greetings: string[] // HTML, {имя} — имя пользователя
-  maintenance: { on: boolean; text: string }
-  notice: { on: boolean; id: number; text: string } // плашка над расписанием; новый текст — новый id
+  // text_en — для английского интерфейса (этап 11); пусто — английским тоже русский текст
+  maintenance: { on: boolean; text: string; text_en?: string }
+  notice: { on: boolean; id: number; text: string; text_en?: string } // плашка над расписанием; новый текст — новый id
   channel: string // «Другое → Канал новостей»: ссылка https://t.me/…; пусто — пункта нет
 }
 
@@ -26,6 +27,28 @@ export const DEFAULT_GREETINGS = [
   `<b>Ооо, {имя}! Здарова, брат!</b> 🫂
 Как сам, дорогой? Давно не виделись.
 Держи расписание — бесплатно, как для своих 👇`,
+]
+
+// Английские приветствия (этап 11) — для тех, у кого язык английский; одно из трёх, случайно
+export const GREETINGS_EN = [
+  `<b>{name}, what's up, bro!</b> 🤝
+
+How are you doing, my friend? Hope you got some sleep 😴
+
+Here's your <b>free schedule</b> for the whole GUU — no subscriptions,
+no SMS 🎁
+
+📅 your group's classes for the day and week
+🧑‍🏫 teachers and their ratings
+🏛 buildings and free classrooms
+
+Tap the button and pick your group 👇`,
+  `<b>Hey {name}!</b> 👊 How's life? All good?
+Here's the GUU schedule — free, from the heart ❤️ 👇`,
+  `<b>Yo {name}!</b> 🫡
+Being late because you couldn't find room ЛК-405 is so last century.
+Now you've got the whole GUU schedule with a campus map — for free 🎁
+Let's go 👇`,
 ]
 
 const DEFAULTS: Settings = {
@@ -59,7 +82,7 @@ export async function saveSettings(env: Env, settings: Settings): Promise<void> 
 }
 
 // {имя} → имя (уже экранированное) жирным не делаем — жирность задаёт сам текст
-export const renderGreeting = (template: string, name: string) => template.replaceAll('{имя}', name)
+export const renderGreeting = (template: string, name: string) => template.replaceAll('{имя}', name).replaceAll('{name}', name)
 
 // Telegram отклонит сообщение с неизвестным или незакрытым тегом — проверяем заранее
 const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'a', 'code', 'pre', 'tg-spoiler', 'blockquote'])

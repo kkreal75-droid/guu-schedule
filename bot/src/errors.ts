@@ -1,4 +1,5 @@
 // Ошибки: пользователю — «Что-то сломалось 🛠», владельцу в личку — текст ошибки.
+import { tr, type Lang } from './i18n'
 import { sendMessage } from './telegram'
 import { escapeHtml } from './util'
 
@@ -15,13 +16,13 @@ export async function reportError(env: Env, where: string, err: unknown): Promis
   }
 }
 
-// Выполняет обработчик; при ошибке отвечает в чат (если он известен) и пишет владельцу
-export async function safely(env: Env, where: string, chatId: number | null, run: () => Promise<void>): Promise<void> {
+// Выполняет обработчик; при ошибке отвечает в чат (если он известен) на языке человека и пишет владельцу
+export async function safely(env: Env, where: string, chatId: number | null, run: () => Promise<void>, lang: Lang = 'ru'): Promise<void> {
   try {
     await run()
   } catch (err) {
     if (chatId !== null) {
-      await sendMessage(env, chatId, ERROR_REPLY).catch((sendErr) => console.error('Не удалось ответить об ошибке:', sendErr))
+      await sendMessage(env, chatId, tr(lang, ERROR_REPLY)).catch((sendErr) => console.error('Не удалось ответить об ошибке:', sendErr))
     }
     await reportError(env, where, err)
   }

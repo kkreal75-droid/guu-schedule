@@ -195,6 +195,7 @@ async function broadcastInfo({ env }: Call): Promise<Response> {
       id: row.id,
       created_at: row.created_at,
       text: row.text,
+      text_en: row.text_en ?? null,
       photo: Boolean(row.photo),
       audience: row.audience,
       audience_title: audienceTitle(row.audience),
@@ -248,7 +249,8 @@ async function broadcast({ env, ctx, req }: Call): Promise<Response> {
   const photo = decodeImage(req.body.photo)
   if (photo === 'bad') return fail(400, 'Не получилось прочитать фото')
   const text = typeof req.body.text === 'string' ? req.body.text : ''
-  const result = await panelBroadcast(env, ctx, { text, photo, audience })
+  const textEn = typeof req.body.text_en === 'string' ? req.body.text_en : null
+  const result = await panelBroadcast(env, ctx, { text, text_en: textEn, photo, audience })
   if (result.error) return json({ ok: false, error: result.error }, 400)
   return json({ ok: true, id: result.id ?? null, total: result.total ?? null })
 }
@@ -406,8 +408,8 @@ const str = (value: unknown, max: number) => (typeof value === 'string' ? value.
 async function settingsSave({ env, req }: Call): Promise<Response> {
   const body = req.body as {
     greetings?: unknown
-    maintenance?: { on?: unknown; text?: unknown }
-    notice?: { on?: unknown; text?: unknown }
+    maintenance?: { on?: unknown; text?: unknown; text_en?: unknown }
+    notice?: { on?: unknown; text?: unknown; text_en?: unknown }
     channel?: unknown
   }
   const greetings = Array.isArray(body.greetings) ? body.greetings.map((g) => str(g, 3500)) : []
@@ -423,15 +425,24 @@ async function settingsSave({ env, req }: Call): Promise<Response> {
     return json({ ok: false, error: 'Канал новостей: нужна ссылка вида https://t.me/имя_канала или @имя_канала' }, 400)
   }
   const noticeText = str(body.notice?.text, 300)
+  const noticeEn = str(body.notice?.text_en, 300)
   const noticeOn = body.notice?.on === true && Boolean(noticeText)
   const next: Settings = {
     greetings,
-    maintenance: { on: body.maintenance?.on === true, text: str(body.maintenance?.text, 500) || current.maintenance.text },
+    maintenance: {
+      on: body.maintenance?.on === true,
+      text: str(body.maintenance?.text, 500) || current.maintenance.text,
+      text_en: str(body.maintenance?.text_en, 500),
+    },
     // новый текст или повторное включение — снова показываем всем (даже тем, кто закрыл прошлое)
     notice: {
       on: noticeOn,
       text: noticeText,
-      id: noticeOn && (!current.notice.on || noticeText !== current.notice.text) ? Date.now() : current.notice.id,
+      text_en: noticeEn,
+      id:
+        noticeOn && (!current.notice.on || noticeText !== current.notice.text || noticeEn !== (current.notice.text_en ?? ''))
+          ? Date.now()
+          : current.notice.id,
     },
     channel,
   }
