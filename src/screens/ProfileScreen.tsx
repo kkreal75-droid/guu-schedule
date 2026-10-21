@@ -9,7 +9,10 @@ import { CalendarPage } from '../more/CalendarPage'
 import { AccountForm } from '../onboarding/AccountForm'
 import type { Choice } from '../onboarding/Onboarding'
 import type { Prefs, ThemeMode } from '../prefs'
-import { groupName, schedule } from '../schedule'
+import { groupName, isoFromDay, moscowNow, schedule } from '../schedule'
+import { WEEKDAYS_SHORT } from '../format'
+import { hideScopeTitle } from '../../shared/edits-core'
+import type { HiddenLesson } from '../hidden'
 import { cloudAvailable } from '../storage'
 import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
 import { useBackButton } from '../useBackButton'
@@ -58,11 +61,46 @@ type Props = {
   onSearchGroup: () => void // «Знаю свою группу» — поиск группы
   noteCount: number
   extras: Extras
+  hidden: HiddenLesson[] // свои скрытые пары («Это не моя пара»)
+  onUnhide: (id: number) => void
   onShowIntro: () => void // «Показать знакомство ещё раз»
 }
 
+// «Скрытые пары»: что человек скрыл у себя — вернуть одним нажатием. «Только в этот день» из прошлого не показываем
+function HiddenSection({ hidden, home, nameOf, onUnhide }: { hidden: HiddenLesson[]; home: string; nameOf: (g: string) => string; onUnhide: (id: number) => void }) {
+  const today = isoFromDay(moscowNow().day)
+  const list = hidden.filter((h) => h.scope !== 'day' || (h.date ?? '') >= today)
+  return (
+    <Section
+      title="Скрытые пары"
+      footer={
+        list.length
+          ? 'Скрытые пары не видны ни в приложении, ни в календаре на телефоне, ни в inline. Другим ничего не меняется.'
+          : 'Пара не твоя (например, язык у потока в нескольких окнах)? Нажми «⋯» на карточке пары → «Это не моя пара».'
+      }
+    >
+      {list.length === 0 && <div className="row row-text hidden-empty">Ничего не скрыто</div>}
+      {list.map((h) => (
+        <div key={h.id} className="row">
+          <span className="hidden-row">
+            <span className="hidden-row-title">{h.subject}</span>
+            <span className="hidden-row-sub">
+              {[h.group !== home ? nameOf(h.group) : null, `${WEEKDAYS_SHORT[h.weekday]} ${h.start}`, h.kind, hideScopeTitle(h)]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </span>
+          <button type="button" className="link-btn" disabled={h.id < 0} onClick={() => (haptic(), onUnhide(h.id))}>
+            Вернуть
+          </button>
+        </div>
+      ))}
+    </Section>
+  )
+}
+
 export function ProfileScreen({
-  prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, onShowIntro,
+  prefs, onChange, onSaveChoice, onSearchGroup, noteCount, extras, hidden, onUnhide, onShowIntro,
 }: Props) {
   const [sub, setSub] = useState<'calendar' | null>(null)
   const closeSub = useCallback(() => {
@@ -151,6 +189,15 @@ export function ProfileScreen({
             </div>
           ))}
         </Section>
+      )}
+
+      {botAvailable() && (
+        <HiddenSection
+          hidden={hidden}
+          home={teacher ? `t-${prefs.teacher}` : prefs.group}
+          nameOf={(g) => (g.startsWith('t-') ? 'расписание преподавателя' : nameOf(g))}
+          onUnhide={onUnhide}
+        />
       )}
 
       <Section title="Тема" footer={inTelegram ? 'Системная — как в Telegram.' : 'Системная — как в настройках устройства.'}>

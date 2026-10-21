@@ -41,8 +41,20 @@ KIND_TOKEN = r"(?:ЛЗ|ЛР|ПЗ|Л)"
 
 # «/» на отдельной строке (как в parser.py) или «//» между занятиями (магистратура)
 PART_SPLIT = re.compile(r"\n\s*/{1,2}\s*\n|\s+//\s*(?:\n|$)|\n\s*//\s+")
-# аудитории: «У-432», «ЛК-105/107», «ЦИТ-216», «БЦ-305» + особые места
-ROOM = re.compile(r"\b[А-ЯЁ]{1,3}-\d{2,3}(?:/\d{2,3})?|Спортивный комплекс|Актовый зал|ЦК ГУУ")
+# аудитории: «У-432», «ЛК-105/107», «ЦИТ-216», «БЦ-305» + особые места; у языков потока — этаж корпуса
+# («ЛК-6 этаж», «У 6 этаж»: аудиторию дают на кафедре)
+ROOM = re.compile(r"\b[А-ЯЁ]{1,3}-\d{2,3}(?:/\d{2,3})?|\b[А-ЯЁ]{1,3}[-\s]\d{1,2}\s*этаж|Спортивный комплекс|Актовый зал|ЦК ГУУ")
+FLOOR = re.compile(r"^([А-ЯЁ]{1,3})[-\s]+(\d{1,2})\s*этаж$")
+
+
+def pick_room(rooms: list[str]) -> str | None:
+    """Первая аудитория; этаж («ЛК-6 этаж» → «ЛК, 6 этаж») — только если настоящей аудитории в тексте нет
+    (в ячейке «(французский) ЛК-6 этаж (китайский) … У-343» остаётся У-343, как раньше)."""
+    real = [r for r in rooms if not FLOOR.match(r)]
+    if real or not rooms:
+        return real[0] if real else None
+    m = FLOOR.match(rooms[0])
+    return f"{m.group(1)}, {m.group(2)} этаж"
 TIME = re.compile(r"(\d{1,2})[.:](\d{2})\s*[-–—]\s*(\d{1,2})[.:](\d{2})")
 # в сессии время бывает и без минут: «9-11», «9-10.30», «15-18»
 LOOSE_TIME = re.compile(r"(?<![\d.])(\d{1,2})(?:[.:](\d{2}))?\s*[-–—]\s*(\d{1,2})(?:[.:](\d{2}))?(?![\d.])")
@@ -203,7 +215,7 @@ def parse_part(text: str) -> list[dict]:
         if since:
             subject = clean(subject[: since.start()])
         return [dict(subject=subject or text, kind=None, weeks=weeks, explicit=[], teacher=teacher,
-                     room=rooms[0] if rooms else None, fallback=True)]
+                     room=pick_room(rooms), fallback=True)]
 
     subject = clean(text[: parens[0]["start"]]).strip(" ,;")
     out = []
@@ -219,7 +231,7 @@ def parse_part(text: str) -> list[dict]:
                 weeks=parse_weeks(spec) or None,
                 explicit=[int(x) for x in re.split(r"[,\s]+", spec) if x.isdigit()],
                 teacher=teacher,
-                room=rooms[0] if rooms else None,
+                room=pick_room(rooms),
                 fallback=False,
             ))
     return out

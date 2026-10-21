@@ -1,5 +1,5 @@
 import type { ScheduleEdit, Subgroup } from './edits'
-import type { LessonTag } from '../shared/edits-core'
+import type { HiddenLesson, LessonTag } from '../shared/edits-core'
 import { groupsToLoad } from './schedule'
 import { readPrefs } from './prefs'
 
@@ -70,7 +70,8 @@ export type Me = {
   intro: number // какую версию знакомства уже видел (этап 7.1)
 }
 
-// edits — ручные правки расписания; notice — объявление-плашка; maintenance — текст техработ
+// edits — ручные правки расписания; hidden — пары, скрытые владельцем для всей группы; myHidden — свои
+// скрытые пары («Это не моя пара»; null — бот их не прислал); notice — объявление-плашка; maintenance — техработы
 export type CheckIn = {
   banned: boolean
   admin: boolean
@@ -78,6 +79,8 @@ export type CheckIn = {
   edits: ScheduleEdit[]
   subgroups: Subgroup[]
   tags: LessonTag[]
+  hidden: HiddenLesson[]
+  myHidden: HiddenLesson[] | null
   notice: { id: number; text: string } | null
   maintenance: string | null
   channel: string | null // «Другое → Канал новостей» (ссылка из админки)
@@ -109,7 +112,7 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       signal: controller.signal,
     })
     if (!res.ok) return null
-    const data = (await res.json()) as Partial<CheckIn>
+    const data = (await res.json()) as Partial<CheckIn> & { my_hidden?: unknown }
     return {
       banned: Boolean(data.banned),
       admin: Boolean(data.admin),
@@ -117,6 +120,8 @@ export async function checkIn(timeoutMs = 2500): Promise<CheckIn | null> {
       edits: Array.isArray(data.edits) ? data.edits : [],
       subgroups: Array.isArray(data.subgroups) ? data.subgroups : [],
       tags: Array.isArray(data.tags) ? data.tags : [],
+      hidden: Array.isArray(data.hidden) ? data.hidden : [],
+      myHidden: Array.isArray(data.my_hidden) ? (data.my_hidden as HiddenLesson[]) : null,
       notice: data.notice ?? null,
       maintenance: data.maintenance ?? null,
       channel: typeof data.channel === 'string' ? data.channel : null,

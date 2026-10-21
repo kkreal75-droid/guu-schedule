@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AddGroupSheet } from './components/AddGroupSheet'
 import { loadTeachers } from './data'
 import type { Choice } from './onboarding/Onboarding'
 import { teacherKey } from '../shared/schedule-core'
 import { NoticeBar } from './components/NoticeBar'
-import type { Extras } from './edits'
+import { ApiError, botAvailable } from './api'
+import type { DayLesson, Extras } from './edits'
+import { cachedHidden, hideLesson, rememberHidden, unhideLesson, type HiddenLesson, type HideScope } from './hidden'
 import { formatStamp } from './format'
 import { useNotes } from './notes'
 import { MAX_FAVORITES, usePrefs } from './prefs'
@@ -54,8 +56,55 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
       edits: [...cur.edits.filter((e) => e.group !== group), ...next.edits],
       subgroups: [...cur.subgroups.filter((s) => s.group !== group), ...next.subgroups],
       tags: [...cur.tags.filter((t) => t.group !== group), ...next.tags],
+      hidden: next.hidden ? [...(cur.hidden ?? []).filter((h) => h.group !== group), ...next.hidden] : cur.hidden,
     }))
   }, [])
+
+  // «Это не моя пара»: свои скрытые пары (бот + копия на устройстве) поверх скрытых для всей группы
+  const [myHidden, setMyHidden] = useState<HiddenLesson[]>(cachedHidden)
+  const shownExtras = useMemo(
+    () => (myHidden.length ? { ...extras, hidden: [...(extras.hidden ?? []), ...myHidden] } : extras),
+    [extras, myHidden],
+  )
+  const saveHidden = (list: HiddenLesson[]) => {
+    setMyHidden(list)
+    rememberHidden(list)
+  }
+  const hideError = (err: unknown) =>
+    showAlert(err instanceof ApiError && err.status === 400 ? err.code : err instanceof ApiError && err.status === 429 ? 'Слишком часто — подожди минуту.' : 'Что-то сломалось 🛠')
+  // скрываем сразу, бот подтверждает; не вышло — возвращаем как было
+  const onHide = useCallback(async (lesson: DayLesson, date: string, scope: HideScope): Promise<number | null> => {
+    const temp: HiddenLesson = {
+      id: -Date.now(),
+      group: lesson.group,
+      weekday: lesson.weekday,
+      start: lesson.start,
+      subject: lesson.subject,
+      kind: lesson.kind,
+      scope,
+      date: scope === 'day' ? date : null,
+    }
+    setMyHidden((cur) => [...cur, temp])
+    try {
+      const res = await hideLesson({ group: lesson.group, date, start: lesson.start, subject: lesson.subject, kind: lesson.kind, scope })
+      saveHidden(res.hidden)
+      return res.id
+    } catch (err) {
+      setMyHidden((cur) => cur.filter((h) => h.id !== temp.id))
+      hideError(err)
+      return null
+    }
+  }, [])
+  const onUnhide = async (id: number) => {
+    const before = myHidden
+    setMyHidden(before.filter((h) => h.id !== id))
+    try {
+      saveHidden((await unhideLesson(id)).hidden)
+    } catch (err) {
+      setMyHidden(before)
+      hideError(err)
+    }
+  }
   const { notes, setNote } = useNotes()
   useTheme(prefs.theme)
 
@@ -120,7 +169,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
       {tab === 'schedule' && status?.notice && <NoticeBar notice={status.notice} />}
       {tab === 'schedule' ? (
         <ScheduleScreen
-          extras={extras}
+          extras={shownExtras}
           mine={shownGroup === prefs.group ? prefs.subgroups : null}
           group={shownGroup}
           groups={schedule.groups}
@@ -133,6 +182,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           onCursorChange={setCursor}
           notes={notes}
           onSaveNote={setNote}
+          onHide={botAvailable() ? onHide : undefined}
+          onUnhide={onUnhide}
         />
       ) : tab === 'more' ? (
         <MoreScreen
@@ -156,6 +207,8 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
           noteCount={Object.keys(notes).length}
           prefs={prefs}
           extras={extras}
+          hidden={myHidden}
+          onUnhide={onUnhide}
           onChange={(patch) => {
             updatePrefs(patch)
             if (patch.favorites) setFavoritesChanged(true)

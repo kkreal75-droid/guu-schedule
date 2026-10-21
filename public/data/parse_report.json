@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-20T22:59:54+03:00",
+ "generated_at": "2026-10-21T10:27:08+03:00",
  "files": [
   {
    "key": "schedule:1 курс бакалавриат офо",
@@ -1123,6 +1123,10 @@
    "dropped": "2-курс-магистратура-ОФО-28.xlsx · 2 к. маг ИЭФ, ИГУИП · K"
   }
  ],
+ "lang_blocks": {
+  "lessons": 345,
+  "groups": 170
+ },
  "summary": {
   "groups": 375,
   "teachers": 565,

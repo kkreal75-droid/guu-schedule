@@ -10,13 +10,14 @@ beforeAll(() => mockOutbound())
 
 const PRIVATE = [
   '/seen', '/profile', '/support', '/intro', '/my-subgroups', '/extras', '/starosta/info', '/cal/status',
-  '/reviews/top', '/admin/dashboard',
+  '/reviews/top', '/admin/dashboard', '/hidden/add', '/hidden/delete',
 ]
 const ADMIN_ACTIONS = [
   'dashboard', 'users', 'user', 'ban', 'unban', 'review-ban', 'reset-intro', 'places', 'academic',
   'academic-save', 'academic-reset', 'place-save', 'place-reset', 'access', 'starosta', 'export', 'broadcast-info',
   'broadcast-count', 'broadcast', 'reviews', 'review-moderate', 'schedule', 'update-now',
-  'edit-add', 'edit-delete', 'settings', 'settings-save', 'greeting-preview', 'nonexistent',
+  'edit-add', 'edit-delete', 'settings', 'settings-save', 'greeting-preview', 'hidden', 'hidden-group-add',
+  'hidden-group-delete', 'nonexistent',
 ]
 const PAYLOADS = [
   `'); DROP TABLE users; --`,

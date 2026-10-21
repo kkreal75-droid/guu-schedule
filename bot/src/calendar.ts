@@ -4,8 +4,8 @@ import { dayLessons, shortWhen } from '../../shared/edits-core'
 import { isoFromDay } from '../../shared/schedule-core'
 import { MB_IDS, normalizeGroup, shortName } from '../../shared/groups'
 import { json, readApi } from './api'
-import { loadGroupFile, loadTimetable, type BotTimetable } from './schedule'
-import { userSubgroups } from './db'
+import { loadGroupFile, loadTimetable, personalize, type BotTimetable } from './schedule'
+import { personalOf } from './db'
 import { economyMode } from './usage'
 
 type TokenRow = { token: string; user_id: number; grp: string; created_at: number } // grp — id группы
@@ -70,8 +70,8 @@ const MOSCOW_TZ = [
   'END:VTIMEZONE',
 ]
 
-// .ics одной группы на весь семестр — с правками (отмена → STATUS:CANCELLED, перенос, добавленные пары)
-// и подгруппами владельца ссылки (mine: чужие пары подгрупп не показываем)
+// .ics одной группы на весь семестр — с правками (отмена → STATUS:CANCELLED, перенос, добавленные пары),
+// подгруппами владельца ссылки (mine: чужие пары подгрупп не показываем) и его скрытыми парами (tt.extras.hidden)
 export function buildIcs(tt: BotTimetable, group: string, mine: number[] | null = null): string {
   const stamp = utcStamp(tt.schedule.updated_at)
   const lines = [
@@ -177,7 +177,12 @@ export async function handleCalendarApi(env: Env, request: Request, action: stri
 // Готовый .ics в памяти изолята на 10 минут: Apple и Google спрашивают часто, а календарь меняется редко.
 // «Отключить» убирает ссылку из кэша этого изолята; в остальных она умрёт сама за ≤ 10 минут.
 const ICS_TTL_MS = 10 * 60_000
-const icsCache = new Map<string, { at: number; ics: string; group: string }>()
+const icsCache = new Map<string, { at: number; ics: string; group: string; user: number }>()
+
+// человек скрыл или вернул пару — его календарь в этом изоляте собираем заново (в остальных — через ≤ 10 минут)
+export function forgetCalendarOf(userId: number) {
+  for (const [token, hit] of icsCache) if (hit.user === userId) icsCache.delete(token)
+}
 const FETCH_MARK_MS = 60 * 60_000 // last_fetch_at обновляем не чаще раза в час — меньше записей в D1
 
 // GET /cal/<токен>.ics — забирают сами календари
@@ -200,8 +205,8 @@ export async function handleIcs(env: Env, ctx: ExecutionContext, token: string):
         .run(),
     )
     const group = normalizeGroup(row.grp) ?? row.grp
-    const [tt, mine] = await Promise.all([loadTimetable(env, [group]), userSubgroups(env.DB, row.user_id)])
-    hit = { at: now, ics: buildIcs(tt, group, mine), group }
+    const [tt, personal] = await Promise.all([loadTimetable(env, [group]), personalOf(env.DB, row.user_id)])
+    hit = { at: now, ics: buildIcs(personalize(tt, personal.hidden), group, personal.mine), group, user: row.user_id }
     icsCache.set(token, hit)
     if (icsCache.size > 300) icsCache.delete(icsCache.keys().next().value!)
   }

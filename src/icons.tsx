@@ -115,6 +115,21 @@ export const SendIcon = (p: P) => (
   </svg>
 )
 
+// «⋯» на карточке пары — действия с парой
+export const DotsIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M6 12h.01M12 12h.01M18 12h.01" strokeWidth="3" />
+  </svg>
+)
+
+// перечёркнутый глаз: скрытые пары («Это не моя пара»)
+export const EyeOffIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.5-2.4 3.8M6.6 6.6C4.6 7.9 3.1 9.9 2.5 12c1 2.8 4.5 7 9.5 7 1.9 0 3.6-.6 5-1.5" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </svg>
+)
+
 export const CloseIcon = (p: P) => (
   <svg {...base} {...p}>
     <path d="M6 6l12 12M18 6 6 18" />

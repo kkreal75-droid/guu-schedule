@@ -17,7 +17,7 @@ import {
   type Overrides,
   type Timetable,
 } from '../../shared/schedule-core'
-import { NO_EXTRAS, dayLessons, shortWhen, type DayLesson, type Extras } from '../../shared/edits-core'
+import { NO_EXTRAS, dayLessons, shortWhen, type DayLesson, type Extras, type HiddenLesson } from '../../shared/edits-core'
 import { loadExtras } from './edits'
 import { escapeHtml } from './util'
 
@@ -153,6 +153,10 @@ export async function loadTimetable(env: Env, groups: string[]): Promise<BotTime
   const timetable = makeTimetable(scheduleFromGroups(found), extra.overrides, extra.replacements)
   return { ...timetable, extras, replacements: extra.replacements }
 }
+
+// Расписание человека: его скрытые пары («Это не моя пара») поверх общих правок — календарь, inline, /today в личке
+export const personalize = (tt: BotTimetable, hidden: HiddenLesson[]): BotTimetable =>
+  hidden.length ? { ...tt, extras: { ...tt.extras, hidden: [...(tt.extras.hidden ?? []), ...hidden] } } : tt
 
 // Пары дня с правками: отменённая — зачёркнута, перенесённая — «перенесена на …», добавленная — ➕,
 // пометки — 📌, подгруппа — в скобках. Пометки ко всему дню — сверху. mine — выбранные подгруппы.

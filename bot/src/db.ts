@@ -1,5 +1,6 @@
 // Пользователи в D1 (схема — migrations/0001_init.sql).
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
+import type { HiddenLesson, HideScope } from '../../shared/edits-core'
 import type { Profile } from './auth'
 
 export type UserRow = {
@@ -140,12 +141,45 @@ export function userLabel(user: Pick<UserRow, 'id' | 'username' | 'name'>, escap
 }
 
 // Подгруппы, которые человек выбрал в профиле (только свои пары); null — не выбирал
-export async function userSubgroups(db: D1Database, id: number): Promise<number[] | null> {
-  const row = await db.prepare('SELECT subgroups FROM users WHERE id = ?').bind(id).first<{ subgroups: string | null }>()
+// Скрытые пары («Это не моя пара», hidden.ts): строка D1 → правило (kind и date — '' вместо NULL)
+export type HiddenRow = {
+  id: number
+  user_id: number // 0 — для всей группы (владелец)
+  grp: string
+  weekday: number
+  start: string
+  subject: string
+  kind: string
+  scope: HideScope
+  date: string
+}
+export const HIDDEN_COLUMNS = 'id, user_id, grp, weekday, start, subject, kind, scope, date'
+
+export const hiddenFromRow = (r: HiddenRow): HiddenLesson => ({
+  id: r.id,
+  group: r.grp,
+  weekday: r.weekday,
+  start: r.start,
+  subject: r.subject,
+  kind: r.kind || null,
+  scope: r.scope,
+  date: r.date || null,
+  ...(r.user_id === 0 ? { all: true } : {}),
+})
+
+// Личное у человека: выбранные подгруппы и скрытые пары — календарь, inline, /today в личке (один запрос к D1)
+export async function personalOf(db: D1Database, id: number): Promise<{ mine: number[] | null; hidden: HiddenLesson[] }> {
+  const [user, hidden] = await db.batch([
+    db.prepare('SELECT subgroups FROM users WHERE id = ?').bind(id),
+    db.prepare(`SELECT ${HIDDEN_COLUMNS} FROM hidden_lessons WHERE user_id = ?`).bind(id),
+  ])
+  let mine: number[] | null = null
   try {
-    const list = row?.subgroups ? (JSON.parse(row.subgroups) as unknown) : null
-    return Array.isArray(list) ? list.filter((x): x is number => Number.isSafeInteger(x)) : null
+    const raw = (user.results[0] as { subgroups?: string | null } | undefined)?.subgroups
+    const list = raw ? (JSON.parse(raw) as unknown) : null
+    mine = Array.isArray(list) ? list.filter((x): x is number => Number.isSafeInteger(x)) : null
   } catch {
-    return null
+    mine = null
   }
+  return { mine, hidden: (hidden.results as HiddenRow[]).map(hiddenFromRow) }
 }

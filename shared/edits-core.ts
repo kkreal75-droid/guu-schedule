@@ -4,6 +4,8 @@
 // Правки делают владелец (админ-панель) и старосты (только своей группы). Хранятся в D1
 // schedule_edits — автообновление их не трогает. Подгруппы (языки и т. п.) — пары, помеченные
 // подгруппой, студент видит, только если выбрал её (или не выбрал ни одной).
+// «Это не моя пара» — скрытые пары (D1 hidden_lessons): свои — только у себя (приложение, календарь, inline,
+// /today в личке), для всей группы (владелец, админ-панель) — у всех, и в беседе группы тоже.
 import { dayFromIso, isoFromDay, type Lesson, type Timetable } from './schedule-core'
 
 export type EditKind = 'cancel' | 'note' | 'add' | 'move'
@@ -34,8 +36,52 @@ export type Subgroup = { id: number; group: string; name: string }
 // пара из файла ГУУ, которая относится к подгруппе: день недели, время, предмет (и преподаватель)
 export type LessonTag = { id: number; group: string; weekday: number; start: string; subject: string; teacher: string | null; subgroup: number }
 
-export type Extras = { edits: ScheduleEdit[]; subgroups: Subgroup[]; tags: LessonTag[] }
-export const NO_EXTRAS: Extras = { edits: [], subgroups: [], tags: [] }
+// Скрытая пара: день недели, начало, предмет и вид — как в файле ГУУ. day — только в эту дату,
+// even / odd — по чётным / нечётным неделям, always — всегда. all — для всей группы (владелец)
+export type HideScope = 'day' | 'even' | 'odd' | 'always'
+export type HiddenLesson = {
+  id: number
+  group: string
+  weekday: number
+  start: string
+  subject: string
+  kind: string | null
+  scope: HideScope
+  date: string | null // ГГГГ-ММ-ДД, только у day
+  all?: boolean
+}
+export const HIDE_SCOPES: readonly HideScope[] = ['day', 'even', 'odd', 'always']
+
+// hidden — скрытые для всей группы (у приложения к ним добавляются свои)
+export type Extras = { edits: ScheduleEdit[]; subgroups: Subgroup[]; tags: LessonTag[]; hidden?: HiddenLesson[] }
+export const NO_EXTRAS: Extras = { edits: [], subgroups: [], tags: [], hidden: [] }
+
+type LessonKey = Pick<Lesson, 'group' | 'weekday' | 'start' | 'subject' | 'kind'>
+
+// Под какое правило пара попадает в этот день (iso, неделя week); null — не скрыта
+export function hiddenRule(rules: HiddenLesson[] | undefined, lesson: LessonKey, iso: string, week: number): HiddenLesson | null {
+  if (!rules?.length) return null
+  return (
+    rules.find(
+      (h) =>
+        h.group === lesson.group &&
+        h.weekday === lesson.weekday &&
+        h.start === lesson.start &&
+        h.subject === lesson.subject &&
+        (h.kind ?? null) === (lesson.kind ?? null) &&
+        (h.scope === 'always' ||
+          (h.scope === 'even' && week % 2 === 0) ||
+          (h.scope === 'odd' && week % 2 === 1) ||
+          (h.scope === 'day' && h.date === iso)),
+    ) ?? null
+  )
+}
+
+// «по чётным неделям», «только 21.10» — для профиля и админки
+export function hideScopeTitle(h: Pick<HiddenLesson, 'scope'> & { date?: string | null }): string {
+  if (h.scope === 'day') return h.date ? `только ${h.date.slice(8, 10)}.${h.date.slice(5, 7)}` : 'только в один день'
+  return { even: 'по чётным неделям', odd: 'по нечётным неделям', always: 'всегда' }[h.scope]
+}
 
 export type DayLesson = Lesson & {
   cancel: { text: string } | null // отменена
@@ -65,14 +111,17 @@ export function subgroupOf(lesson: Lesson, extras: Extras): Subgroup | null {
 }
 
 // Пары группы на день со всеми правками. mine — выбранные подгруппы: пары чужих подгрупп скрываем
-// (пусто или null — показываем все).
+// (пусто или null — показываем все). Скрытые пары («Это не моя пара», extras.hidden) не показываем;
+// перенесённая пара скрыта, если скрыта исходная.
 export function dayLessons(tt: Timetable, group: string, day: number, extras: Extras, mine: number[] | null = null): DayView {
   const iso = isoFromDay(day)
   const week = tt.weekOf(day)
   const weekday = tt.weekdayOf(day)
   const edits = extras.edits.filter((e) => e.group === group)
   const today = edits.filter((e) => e.date === iso)
-  const base: DayLesson[] = (tt.inSemester(week) ? tt.lessonsOn(group, week, weekday) : []).map((l) => ({
+  const hidden = extras.hidden?.filter((h) => h.group === group)
+  const lessons = tt.inSemester(week) ? tt.lessonsOn(group, week, weekday) : []
+  const base: DayLesson[] = lessons.filter((l) => !hiddenRule(hidden, l, iso, week)).map((l) => ({
     ...l,
     cancel: null,
     movedTo: null,
@@ -92,7 +141,7 @@ export function dayLessons(tt: Timetable, group: string, day: number, extras: Ex
   for (const e of edits.filter((x) => isMove(x) && x.data.to_date === iso) as (ScheduleEdit & { data: MoveData })[]) {
     const fromDay = dayFromIso(e.date)
     const original = tt.lessonsOn(group, tt.weekOf(fromDay), tt.weekdayOf(fromDay)).find((l) => l.start === e.start)
-    if (!original) continue
+    if (!original || hiddenRule(hidden, original, e.date, tt.weekOf(fromDay))) continue
     base.push({
       ...original,
       weekday,
@@ -111,6 +160,7 @@ export function dayLessons(tt: Timetable, group: string, day: number, extras: Ex
   }
   // добавленные
   for (const e of today.filter(isAdd)) {
+    if (hiddenRule(hidden, { group, weekday, start: e.data.start, subject: e.data.subject, kind: e.data.kind ?? null }, iso, week)) continue
     base.push({
       group,
       weekday,

@@ -2,11 +2,11 @@
 import { banCommand, exportUsers, listBans, sendStats, unbanCommand } from './admin'
 import { isOwner, profileOf } from './auth'
 import { listBroadcasts, startBroadcast } from './broadcast'
-import { getUser, touchUser, userSubgroups } from './db'
+import { getUser, personalOf, touchUser } from './db'
 import { logAdmin } from './journal'
 import { economyMode, usageText, usageToday } from './usage'
 import { reportError, safely } from './errors'
-import { formatDay, groupsFor, loadTimetable, personalKey, todayMsk } from './schedule'
+import { formatDay, groupsFor, loadTimetable, personalKey, personalize, todayMsk } from './schedule'
 import { DEFAULT_GREETINGS, loadSettings, renderGreeting } from './settings'
 import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
 import { escapeHtml } from './util'
@@ -46,8 +46,9 @@ const dayCommand =
   async ({ env, message }) => {
     const user = await getUser(env.DB, message.from!.id)
     const group = personalKey(user)
-    const [tt, mine] = await Promise.all([loadTimetable(env, groupsFor(group)), userSubgroups(env.DB, message.from!.id)])
-    await sendMessage(env, message.chat.id, formatDay(tt, todayMsk() + offset, group, mine))
+    // в личке — как в приложении: свои подгруппы и скрытые пары
+    const [tt, personal] = await Promise.all([loadTimetable(env, groupsFor(group)), personalOf(env.DB, message.from!.id)])
+    await sendMessage(env, message.chat.id, formatDay(personalize(tt, personal.hidden), todayMsk() + offset, group, personal.mine))
   }
 
 const PUBLIC: Record<string, Handler> = {

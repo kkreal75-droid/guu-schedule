@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
 import { DayStrip } from '../components/DayStrip'
 import { GroupChips } from '../components/GroupChips'
 import { LessonCard } from '../components/LessonCard'
+import { LessonMenu } from '../components/LessonMenu'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
 import { WeekCard } from '../components/WeekCard'
 import { WEEKDAYS_FULL, WEEKDAYS_SHORT, formatDate, formatDuration, pluralPairs } from '../format'
 import { CalendarIcon, NoteIcon } from '../icons'
 import { dayLessons } from '../../shared/edits-core'
-import type { Extras } from '../edits'
+import type { DayLesson, Extras } from '../edits'
+import type { HideScope } from '../hidden'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import { dayFromIso, getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
 import type { Timetable } from '../../shared/schedule-core'
@@ -56,11 +58,21 @@ type Props = {
   // чужое расписание (группа из поиска, преподаватель): своё расписание, без заметок и шапки
   tt?: Timetable
   readOnly?: boolean
+  // «Это не моя пара»: скрыть у себя (id правила — для «Вернуть»; null — не вышло) и вернуть; нет — нельзя
+  onHide?: (lesson: DayLesson, date: string, scope: HideScope) => Promise<number | null>
+  onUnhide?: (id: number) => void
+}
+
+const HIDDEN_TOAST: Record<HideScope, string> = {
+  day: 'Пара скрыта в этот день',
+  even: 'Пара скрыта по чётным неделям',
+  odd: 'Пара скрыта по нечётным неделям',
+  always: 'Пара скрыта',
 }
 
 export function ScheduleScreen({
   extras, mine = null, group, groups, home, onGroupChange, onAddGroup, cursor, onCursorChange, notes, onSaveNote,
-  onTeacher, onRoom, tt, readOnly,
+  onTeacher, onRoom, tt, readOnly, onHide, onUnhide,
 }: Props) {
   const T = tt ?? getTimetable()
   const { dayOf, weekOf, weekdayOf, inSemester } = T
@@ -68,6 +80,14 @@ export function ScheduleScreen({
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
+  const [menu, setMenu] = useState<{ lesson: DayLesson; start: 'menu' | 'hide' } | null>(null)
+  // «Пара скрыта · Вернуть» — 5 секунд после скрытия
+  const [toast, setToast] = useState<{ text: string; id: number | null } | null>(null)
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
   const touch = useRef<{ x: number; y: number } | null>(null)
   const datePicker = useRef<HTMLInputElement>(null)
 
@@ -228,6 +248,14 @@ export function ScheduleScreen({
             lessons.map((lesson, i) => {
               const gap = i > 0 ? toMinutes(lesson.start) - toMinutes(lessons[i - 1].end) : 0
               const noteKey = lessonNoteKey(day, group, lesson)
+              const editNote = () => {
+                haptic()
+                setEditing({
+                  key: noteKey,
+                  title: lesson.subject,
+                  subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
+                })
+              }
               return (
                 <div key={`${lesson.start}|${lesson.subject}|${lesson.kind}`} className="day-item">
                   {gap > 0 && (
@@ -243,18 +271,8 @@ export function ScheduleScreen({
                     note={readOnly ? undefined : notes[noteKey]}
                     onTeacher={onTeacher}
                     onRoom={onRoom}
-                    onEditNote={
-                      readOnly
-                        ? undefined
-                        : () => {
-                            haptic()
-                            setEditing({
-                              key: noteKey,
-                              title: lesson.subject,
-                              subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
-                            })
-                          }
-                    }
+                    onEditNote={readOnly ? undefined : editNote}
+                    onMenu={readOnly ? undefined : (start) => (haptic(), setMenu({ lesson, start }))}
                   />
                 </div>
               )
@@ -262,6 +280,53 @@ export function ScheduleScreen({
           )}
         </div>
       </main>
+
+      {menu && (
+        <LessonMenu
+          lesson={menu.lesson}
+          subtitle={`${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${menu.lesson.start}–${menu.lesson.end}`}
+          week={week}
+          start={menu.start}
+          onNote={() => {
+            const lesson = menu.lesson
+            setMenu(null)
+            setEditing({
+              key: lessonNoteKey(day, group, lesson),
+              title: lesson.subject,
+              subtitle: `${WEEKDAYS_FULL[weekday]}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
+            })
+          }}
+          onHide={
+            onHide &&
+            (async (scope) => {
+              const lesson = menu.lesson
+              setMenu(null)
+              const id = await onHide(lesson, isoFromDay(day), scope)
+              if (id !== null) setToast({ text: HIDDEN_TOAST[scope], id })
+            })
+          }
+          onClose={() => setMenu(null)}
+        />
+      )}
+
+      {toast && (
+        <div className="toast" role="status">
+          <span>{toast.text}</span>
+          {toast.id !== null && onUnhide && (
+            <button
+              type="button"
+              className="toast-btn"
+              onClick={() => {
+                haptic()
+                onUnhide(toast.id!)
+                setToast(null)
+              }}
+            >
+              Вернуть
+            </button>
+          )}
+        </div>
+      )}
 
       {editing && (
         <NoteEditor

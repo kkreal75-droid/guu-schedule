@@ -1,8 +1,10 @@
 // Ручные правки расписания (владелец — админ-панель, старосты — «Правки группы»), подгруппы и метки
-// пар подгрупп. Видны в приложении, inline, беседах, /today и календаре (shared/edits-core.ts).
-// Таблицы — migrations/0004, 0007. Читаем всё разом и держим в памяти минуту.
+// пар подгрупп, пары, скрытые владельцем для всей группы (hidden.ts). Видны в приложении, inline, беседах,
+// /today и календаре (shared/edits-core.ts). Таблицы — migrations/0004, 0007, 0020. Читаем всё разом и
+// держим в памяти минуту.
 import { normalizeGroup } from '../../shared/groups'
 import type { AddData, Extras, LessonTag, MoveData, NewEdit, ScheduleEdit, Subgroup } from '../../shared/edits-core'
+import { HIDDEN_COLUMNS, hiddenFromRow, type HiddenRow } from './db'
 
 export type { ScheduleEdit } from '../../shared/edits-core'
 
@@ -48,7 +50,7 @@ const sinceIso = () => new Date(Date.now() + 3 * 3_600_000 - KEEP_DAYS * 86_400_
 export async function loadExtras(env: Env): Promise<Extras> {
   if (cached && Date.now() - cached.at < MEMORY_TTL_MS) return cached.extras
   const since = sinceIso()
-  const [edits, subgroups, tags] = await env.DB.batch([
+  const [edits, subgroups, tags, hidden] = await env.DB.batch([
     env.DB.prepare(
       `SELECT id, grp, date, start, kind, text, data, created_at, author_id, reverted_at FROM schedule_edits
        WHERE reverted_at IS NULL AND (date >= ?1 OR (kind = 'move' AND json_extract(data, '$.to_date') >= ?1))
@@ -56,6 +58,7 @@ export async function loadExtras(env: Env): Promise<Extras> {
     ).bind(since),
     env.DB.prepare('SELECT id, grp, name FROM subgroups WHERE deleted = 0 ORDER BY grp, name'),
     env.DB.prepare('SELECT id, grp, weekday, start, subject, teacher, subgroup_id FROM lesson_tags ORDER BY grp, weekday, start'),
+    env.DB.prepare(`SELECT ${HIDDEN_COLUMNS} FROM hidden_lessons WHERE user_id = 0 ORDER BY grp, weekday, start`),
   ])
   const extras: Extras = {
     edits: (edits.results as EditRow[]).map((r) => editFromRow(r)),
@@ -63,6 +66,7 @@ export async function loadExtras(env: Env): Promise<Extras> {
     tags: (tags.results as { id: number; grp: string; weekday: number; start: string; subject: string; teacher: string | null; subgroup_id: number }[]).map(
       (r): LessonTag => ({ id: r.id, group: r.grp, weekday: r.weekday, start: r.start, subject: r.subject, teacher: r.teacher, subgroup: r.subgroup_id }),
     ),
+    hidden: (hidden.results as HiddenRow[]).map(hiddenFromRow),
   }
   cached = { at: Date.now(), extras }
   return extras
@@ -82,6 +86,7 @@ export function extrasFor(extras: Extras, groups: string[]): Extras {
     edits: extras.edits.filter((e) => set.has(e.group)),
     subgroups: extras.subgroups.filter((s) => set.has(s.group)),
     tags: extras.tags.filter((t) => set.has(t.group)),
+    hidden: extras.hidden?.filter((h) => set.has(h.group)) ?? [],
   }
 }
 

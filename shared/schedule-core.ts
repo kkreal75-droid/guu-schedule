@@ -16,6 +16,7 @@ export type Lesson = {
   room: string | null
   teachers?: string[] // в ячейке несколько преподавателей (teacher — первый из них)
   pair?: number | null // номер пары, если известен заранее (в расписании преподавателя)
+  stream?: boolean // языковой блок потока: стоит у многих групп в нескольких окнах, студент ходит в одно (update.py)
 }
 
 export type Schedule = {

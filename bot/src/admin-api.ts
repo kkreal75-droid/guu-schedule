@@ -7,6 +7,7 @@ import { loadChats } from './chats'
 import { FOREVER, moderateReview, reviewStats, setReviewBan, type ReviewAction } from './reviews'
 import { academicReset, academicSave, loadCalendarEdits } from './academic'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
+import { hiddenOverview, hideForGroup, unhideForGroup } from './hidden'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
 import { ADMIN_LIMIT } from './guard'
@@ -459,8 +460,11 @@ async function greetingPreview({ env, req }: Call): Promise<Response> {
 // только чтение — в журнал не пишем
 const READ_ONLY = new Set([
   'dashboard', 'users', 'user', 'reviews', 'schedule', 'broadcast-info', 'broadcast-count', 'places',
-  'academic',
+  'academic', 'hidden',
 ])
+
+// «Скрытые пары»: что люди скрывают у себя (подсказка — ≥ 60% группы) и что скрыто для всей группы
+const hidden = async ({ env }: Call) => json({ ok: true, ...(await hiddenOverview(env)) })
 
 const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   dashboard,
@@ -491,6 +495,15 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   settings,
   'settings-save': settingsSave,
   'greeting-preview': greetingPreview,
+  hidden,
+  'hidden-group-add': async (call) => {
+    const problem = await hideForGroup(call.env, call.req.body)
+    return problem ? fail(400, problem) : hidden(call)
+  },
+  'hidden-group-delete': async (call) => {
+    await unhideForGroup(call.env, call.req.body.id)
+    return hidden(call)
+  },
 }
 
 export async function handleAdminApi(env: Env, ctx: ExecutionContext, request: Request, action: string): Promise<Response> {

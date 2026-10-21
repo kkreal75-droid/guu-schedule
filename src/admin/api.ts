@@ -3,7 +3,7 @@ import { normalizeGroup, shortName, type AudienceFilter } from '../../shared/gro
 import { callBot } from '../api'
 import type { CalendarEdit, PeriodDraft } from '../../shared/calendar-core'
 import type { PlaceEdit } from '../places'
-import type { ScheduleEdit } from '../../shared/edits-core'
+import type { HiddenLesson, HideScope, ScheduleEdit } from '../../shared/edits-core'
 
 export type Dashboard = {
   users: {
@@ -109,6 +109,22 @@ export type Settings = {
   channel?: string
 }
 
+// «Скрытые пары»: какие пары люди скрывают у себя (по группам) — подсказка, если скрыли ≥ 60% группы
+export type HiddenWindow = {
+  group: string
+  weekday: number
+  start: string
+  subject: string
+  kind: string | null
+  scope: HideScope
+  users: number
+  members: number
+  share: number
+  suggest: boolean
+  done: boolean // уже скрыта для всей группы
+}
+export type HiddenOverview = { windows: HiddenWindow[]; group: HiddenLesson[]; people: number; rules: number }
+
 export const adminApi = {
   dashboard: () => callBot<Dashboard>('/admin/dashboard'),
   users: () => callBot<{ users: AdminUser[] }>('/admin/users'),
@@ -134,6 +150,10 @@ export const adminApi = {
   broadcast: (text: string, photo: string | null, audience: Audience | null) =>
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
   schedule: () => callBot<ScheduleStatus>('/admin/schedule'),
+  hidden: () => callBot<HiddenOverview>('/admin/hidden'),
+  hideForGroup: (w: Pick<HiddenWindow, 'group' | 'weekday' | 'start' | 'subject' | 'kind' | 'scope'>) =>
+    callBot<HiddenOverview>('/admin/hidden-group-add', w),
+  unhideForGroup: (id: number) => callBot<HiddenOverview>('/admin/hidden-group-delete', { id }),
   updateNow: (force: boolean) => callBot('/admin/update-now', { force }),
   editAdd: (edit: { groups: string[]; date: string; start: string | null; kind: 'cancel' | 'note'; text: string }) =>
     callBot<{ edits: ScheduleStatus['edits'] }>('/admin/edit-add', edit),

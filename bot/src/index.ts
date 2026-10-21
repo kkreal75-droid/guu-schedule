@@ -11,12 +11,13 @@
 //   POST /reviews/<действие> — рейтинг преподавателей: отзывы, жалобы (reviews.ts).
 //   GET  /places  — правки мест «Корпусов ГУУ» поверх data/places.json (places.ts), правит владелец в админке.
 //   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
+//   POST /hidden/add|delete — «Это не моя пара»: свои скрытые пары (hidden.ts).
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
 //   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново (≤ 3 раз в минуту).
 //   GET  /health  — жив ли воркер и D1 (для мониторинга, без внутренних данных).
 // Вход защищает guard.ts: лимит тела, CORS только для приложения, лимиты запросов по IP и пользователю.
-//   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок,
+//   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок, ответы из очереди поддержки,
 //   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка журнала.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, GITHUB_TOKEN.
@@ -35,7 +36,7 @@ import { notifySessions } from './session'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { handleAcademicGet } from './academic'
 import { handlePlacesGet } from './places'
-import { handleSupport, onSupportButton } from './support'
+import { handleSupport, onSupportButton, sendQueuedReplies } from './support'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
 import { handleAppleSubscribe, handleCalendarApi, handleIcs } from './calendar'
 import { handleGroupMessage, handleMembership, onGroupSetupButton } from './chats'
@@ -48,6 +49,7 @@ import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
 import { handleIntro, handleProfile } from './profile'
 import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
+import { cleanupHidden, handleHiddenApi, userHidden } from './hidden'
 import { loadSettings } from './settings'
 import { setupBot } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
@@ -137,6 +139,7 @@ async function appExtras(env: Env, admin: boolean, version: number, groups: stri
             .map(({ id, group, date, start, kind, text }) => ({ id, group: groupOut(group), date, start, kind, text })),
     subgroups: extras.subgroups,
     tags: extras.tags,
+    hidden: extras.hidden ?? [],
     notice: settings.notice.on && settings.notice.text ? { id: settings.notice.id, text: settings.notice.text } : null,
     maintenance: settings.maintenance.on && !admin ? settings.maintenance.text : null,
     channel: settings.channel || null,
@@ -175,12 +178,14 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
     const seen = economyMode()
       ? getUser(env.DB, profile.id).then((row) => ({ banned: Boolean(row?.banned), me: meOf(row) }))
       : touchUser(env.DB, profile, 'open', group)
-    const [{ banned, me }, extras] = await Promise.all([
+    const [{ banned, me }, extras, myHidden] = await Promise.all([
       seen,
       // правки и настройки не должны мешать открытию приложения
       appExtras(env, admin, version, groups).catch((err) => (console.error('Правки и настройки в /seen:', err), {})),
+      // свои скрытые пары («Это не моя пара») — только новым версиям приложения
+      version >= 2 ? userHidden(env.DB, profile.id).catch((err) => (console.error('Скрытые пары в /seen:', err), null)) : null,
     ])
-    return json({ ok: true, banned: banned && !admin, admin, me, ...extras })
+    return json({ ok: true, banned: banned && !admin, admin, me, ...extras, ...(myHidden ? { my_hidden: myHidden } : {}) })
   } catch (err) {
     await reportError(env, 'Открытие приложения', err)
     return json({ ok: false }, 500)
@@ -262,6 +267,8 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
   if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
   if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
+  const hidden = url.pathname.match(/^\/hidden\/(add|delete)$/)
+  if (hidden && request.method === 'POST') return guarded(env, 'Скрытые пары', () => handleHiddenApi(env, request, hidden[1]))
   const starosta = url.pathname.match(/^\/starosta\/([a-z-]+)$/)
   if (starosta && request.method === 'POST') {
     const action = starosta[1]
@@ -327,8 +334,11 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
       used += await backupToOwner(env, now).catch((err) => (reportError(env, 'Бэкап базы', err), 0))
     }
     if (new Date(now).getUTCMinutes() === 35) {
-        used += await cleanupJournal(env, now).catch((err) => (reportError(env, 'Чистка журнала', err), 0))
+      used += await cleanupJournal(env, now).catch((err) => (reportError(env, 'Чистка журнала', err), 0))
+      await cleanupHidden(env, now).catch((err) => reportError(env, 'Чистка скрытых пар', err))
     }
+    // ответы на обращения, поставленные в очередь (support_messages.reply_text)
+    used += await sendQueuedReplies(env).catch((err) => (reportError(env, 'Ответы на обращения', err), 0))
     const batch = Math.max(0, BATCH - used)
     if (batch) await drainBroadcasts(env, batch).catch((err) => reportError(env, 'Досылка рассылок', err))
     await flushUsage(env)

@@ -1,4 +1,4 @@
-// Ручные правки расписания (владелец и старосты), подгруппы и пометки пар подгрупп.
+// Ручные правки расписания (владелец и старосты), подгруппы, пометки пар подгрупп, пары, скрытые для всей группы.
 // Приходят от бота при открытии (POST /seen) — только для групп, которые показывает приложение;
 // последнюю копию держим локально — на случай, если бот не ответил. Логика — shared/edits-core.ts.
 import { NO_EXTRAS, type Extras } from '../shared/edits-core'
@@ -20,6 +20,7 @@ export function cachedExtras(): Extras {
       edits: Array.isArray(saved.edits) ? saved.edits : [],
       subgroups: Array.isArray(saved.subgroups) ? saved.subgroups : [],
       tags: Array.isArray(saved.tags) ? saved.tags : [],
+      hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
     }
   } catch {
     return NO_EXTRAS

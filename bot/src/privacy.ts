@@ -1,5 +1,5 @@
 // /deleteme — удалить свои данные (только в личке, с подтверждением кнопкой).
-// Удаляется: профиль (группа, роль, имя, ник, подгруппы, староста), подписка на календарь, визиты,
+// Удаляется: профиль (группа, роль, имя, ник, подгруппы, староста), подписка на календарь, визиты, скрытые пары,
 // голоса «полезно», обращения в поддержку, очередь рассылок. Отзывы и жалобы (и последние сообщения бывшего
 // анонимного чата, пока их не стёр cron) остаются, но обезличиваются: вместо id — случайный отрицательный номер (связь с человеком теряется, в том числе для
 // владельца). Если у человека бан — остаётся только строка с баном (иначе /deleteme снимал бы бан).
@@ -8,7 +8,7 @@ import { sendMessage, tg, type TgCallbackQuery, type TgMessage } from './telegra
 
 const ASK = `🗑 <b>Удалить твои данные?</b>
 
-Удалятся: профиль (группа, роль, имя и ник), подписка на календарь, подгруппы, история визитов, обращения в поддержку.
+Удалятся: профиль (группа, роль, имя и ник), подписка на календарь, подгруппы, скрытые пары, история визитов, обращения в поддержку.
 Отзывы о преподавателях останутся, но без связи с тобой — даже для администратора.
 
 Заметки к парам хранятся в облаке Telegram в твоём аккаунте — бот их не видит; удалить их можно в приложении.`
@@ -50,6 +50,7 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
     env.DB.prepare('DELETE FROM broadcast_queue WHERE user_id = ?').bind(id),
     env.DB.prepare('DELETE FROM board_reactions WHERE user_id = ?').bind(id),
     env.DB.prepare('DELETE FROM review_votes WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM hidden_lessons WHERE user_id = ?').bind(id),
     env.DB.prepare('DELETE FROM board_members WHERE user_id = ?').bind(id),
     // бывший анонимный чат: сообщения доживают 30 дней (journal.ts) — тоже без автора
     env.DB.prepare('UPDATE board_aliases SET user_id = ? WHERE user_id = ?').bind(anon, id),

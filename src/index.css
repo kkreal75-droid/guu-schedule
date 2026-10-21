@@ -767,6 +767,129 @@ p {
   opacity: 1;
 }
 
+/* «⋯» — действия с парой; рядом с заметкой — без второго автоотступа */
+.lesson-note-btn + .lesson-more-btn {
+  margin-left: -2px;
+}
+
+/* долгое нажатие на карточку открывает действия — без выделения текста и системного меню */
+.lesson {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* языковая пара потока: подсказка, что окно может быть не твоим */
+.lesson-hint {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--hint);
+  text-align: left;
+}
+
+button.lesson-hint {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* ---------- действия с парой ---------- */
+
+.lesson-menu-text {
+  margin: 12px 2px 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--hint);
+}
+
+.lesson-menu-list {
+  margin: 10px -16px 0;
+}
+
+.lesson-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lesson-menu-label svg {
+  width: 20px;
+  height: 20px;
+  color: var(--hint);
+}
+
+.lesson-menu-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 12px 0 0 -6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.lesson-menu-back svg {
+  width: 20px;
+  height: 20px;
+}
+
+.lesson-menu-hint {
+  display: block;
+  margin: 8px 2px 4px;
+}
+
+/* «Пара скрыта · Вернуть» над нижним меню */
+.toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(86px + var(--safe-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: fit-content;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 10px 12px 10px 16px;
+  border-radius: 14px;
+  background: rgb(20 20 22 / 0.92);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  animation: fade-in 0.15s ease-out;
+}
+
+.toast-btn {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8ec5ff;
+}
+
+/* «Профиль → Скрытые пары» */
+.hidden-row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hidden-row-title {
+  overflow-wrap: anywhere;
+}
+
+.hidden-row-sub {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.hidden-empty {
+  color: var(--hint);
+}
+
 /* ---------- шторка редактора ---------- */
 
 .sheet-backdrop {

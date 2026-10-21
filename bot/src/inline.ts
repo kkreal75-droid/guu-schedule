@@ -1,12 +1,13 @@
 // Inline-режим: «@бот завтра» в любом чате → карточка с парами.
 // Запросы: пусто/сегодня, завтра, послезавтра, пн…сб (ближайший такой день), неделя.
+import { dayLessons } from '../../shared/edits-core'
 import { WEEKDAYS_FULL, dateOf, formatDate, pluralPairs } from '../../shared/format-core'
 import type { Timetable } from '../../shared/schedule-core'
 import { profileOf } from './auth'
-import { getUser, meOf, touchUser, userSubgroups } from './db'
+import { getUser, meOf, personalOf, touchUser } from './db'
 import { economyMode } from './usage'
 import { reportError } from './errors'
-import { formatDay, formatWeek, groupsFor, loadTimetable, personalKey, todayMsk, type BotTimetable } from './schedule'
+import { formatDay, formatWeek, groupsFor, loadTimetable, personalKey, personalize, todayMsk, type BotTimetable } from './schedule'
 import { tg, type TgUser } from './telegram'
 
 export type TgInlineQuery = { id: string; from: TgUser; query: string; chat_type?: string }
@@ -34,12 +35,13 @@ export function parseQuery(query: string, today: number, tt: Timetable): Target 
   return { kind: 'day', day: today, title: 'Сегодня' }
 }
 
-function summary(tt: BotTimetable, target: Target, group: string): string {
+// «Среда, 21.10 · 4 пары, 09:00–16:05» — те же пары, что в сообщении (правки, подгруппы, скрытые пары)
+function summary(tt: BotTimetable, target: Target, group: string, mine: number[] | null): string {
   if (target.kind === 'week') {
     const { date, month } = dateOf(target.monday + 5)
     return `${formatDate(target.monday)} – ${date}.${String(month + 1).padStart(2, '0')}`
   }
-  const lessons = tt.lessonsOn(group, tt.weekOf(target.day), tt.weekdayOf(target.day))
+  const lessons = dayLessons(tt, group, target.day, tt.extras, mine).lessons.filter((l) => !l.cancel && !l.movedTo)
   const when = `${WEEKDAYS_FULL[tt.weekdayOf(target.day)]}, ${formatDate(target.day)}`
   if (!tt.inSemester(tt.weekOf(target.day))) return `${when} · вне семестра`
   return lessons.length
@@ -76,10 +78,13 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
     return
   }
 
-  const [tt, mine] = await Promise.all([
+  // скрытые человеком пары и его подгруппы — как в приложении
+  const [loaded, personal] = await Promise.all([
     loadTimetable(env, groupsFor(group)),
-    userSubgroups(env.DB, query.from.id).catch(() => null),
+    personalOf(env.DB, query.from.id).catch(() => ({ mine: null, hidden: [] })),
   ])
+  const tt = personalize(loaded, personal.hidden)
+  const mine = personal.mine
   const today = todayMsk()
   const target = parseQuery(query.query, today, tt)
   const appLink = `https://t.me/${env.BOT_USERNAME}/schedule`
@@ -87,7 +92,7 @@ export async function handleInlineQuery(env: Env, query: TgInlineQuery): Promise
     type: 'article',
     id: `${target.kind}-${target.kind === 'day' ? target.day : target.monday}-${g}`,
     title: `${target.title} · ${tt.nameOf(g)}`,
-    description: summary(tt, target, g),
+    description: summary(tt, target, g, mine),
     input_message_content: {
       message_text: target.kind === 'day' ? formatDay(tt, target.day, g, mine) : formatWeek(tt, target.monday, g, mine),
       parse_mode: 'HTML',

@@ -622,6 +622,13 @@ def weeks_mask(weeks: list[int]) -> int:
 
 
 ROOM_PREFIX = re.compile(r"^([А-ЯЁ]{1,3})-")
+FLOOR_ROOM = re.compile(r"^[А-ЯЁ]{1,3}, \d{1,2} этаж$")  # «ЛК, 6 этаж» — этаж корпуса, не аудитория
+
+
+def is_lang_block(lesson: dict) -> bool:
+    """Пара языкового блока потока (кандидат): иностранный язык без преподавателя или «на этаже»."""
+    return (lesson["subject"].lower().startswith("иностранный язык")
+            and (not lesson.get("teacher") or bool(FLOOR_ROOM.match(lesson.get("room") or ""))))
 
 
 # ---------- главное ----------
@@ -861,6 +868,22 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
             entry.update({"year": info["year"], "dates": info["dates"], "season": info["season"],
                           "archive": info["published"] == 0})
 
+    # 5б. языковой блок потока: «Иностранный язык…» без преподавателя или с местом «ЛК, 6 этаж» стоит одинаково
+    #     у многих групп в нескольких окнах, а студент ходит только в одно (подгруппа по уровню). Такие пары
+    #     помечаем stream — приложение подписывает «у тебя может быть другое время» (скрыть — «Это не моя пара»)
+    lang_slots: dict[tuple, set] = defaultdict(set)
+    for gid, lessons in group_lessons.items():
+        for l in lessons:
+            if is_lang_block(l):
+                lang_slots[(l["weekday"], l["start"], l["subject"].lower())].add(gid)
+    for gid, lessons in group_lessons.items():
+        for l in lessons:
+            l.pop("stream", None)
+            if is_lang_block(l) and len(lang_slots[(l["weekday"], l["start"], l["subject"].lower())]) >= 2:
+                l["stream"] = True
+    report["lang_blocks"] = {"lessons": sum(1 for ls in group_lessons.values() for l in ls if l.get("stream")),
+                             "groups": sum(1 for ls in group_lessons.values() if any(l.get("stream") for l in ls))}
+
     # 6. файлы групп: updated_at меняется, только если пары группы поменялись
     changed_groups = []
     for e in entries:
@@ -914,7 +937,8 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
                 pair = next((i + 1 for i, slot in enumerate(slots) if slot.startswith(l["start"])), None)
                 rec["lessons"].append({**{k: v for k, v in l.items() if k != "teachers"}, "group": gid,
                                        "group_name": e["name"], "pair": pair})
-            if l.get("room"):
+            # «ЛК, 6 этаж» — не аудитория: в «Свободных аудиториях» ей не место
+            if l.get("room") and not FLOOR_ROOM.match(l["room"]):
                 rooms[l["room"]].append((l["weekday"], l["start"], l["end"], weeks_mask(l["weeks"])))
     # история по семестрам (ключ — начало семестра): кто у каких групп вёл пары. Хранятся текущий и прошлый;
     # преподаватель только прошлого семестра остаётся в списке (без пар) — о нём тоже можно оставить отзыв

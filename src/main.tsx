@@ -4,6 +4,7 @@ import { saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
 import { cachedExtras, rememberExtras, type Extras } from './edits'
+import { rememberHidden } from './hidden'
 import { INTRO_VERSION, introSeen, markIntroDone } from './intro'
 import { IntroFlow, type Current } from './onboarding/Intro'
 import { Onboarding, type Choice } from './onboarding/Onboarding'
@@ -171,9 +172,13 @@ async function boot() {
     )
     return
   }
-  // правки расписания и подгруппы: свежие от бота, а если он не ответил — последние сохранённые
-  const fresh: Extras | null = checked ? { edits: checked.edits, subgroups: checked.subgroups, tags: checked.tags } : null
+  // правки расписания, подгруппы, скрытое для всей группы: свежие от бота, а если он не ответил — последние
+  // сохранённые; свои скрытые пары — тоже (App берёт их из копии на устройстве)
+  const fresh: Extras | null = checked
+    ? { edits: checked.edits, subgroups: checked.subgroups, tags: checked.tags, hidden: checked.hidden }
+    : null
   if (fresh) rememberExtras(fresh)
+  if (checked?.myHidden) rememberHidden(checked.myHidden)
   const extras = fresh ?? cachedExtras()
 
   // Чьё расписание показывать. Порядок: настройки на устройстве / в облаке Telegram → выбор, который

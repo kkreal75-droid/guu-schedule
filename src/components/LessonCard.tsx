@@ -1,5 +1,6 @@
+import { useRef } from 'react'
 import { formatDuration } from '../format'
-import { ClockIcon, NoteIcon, PersonIcon, PinIcon } from '../icons'
+import { ClockIcon, DotsIcon, NoteIcon, PersonIcon, PinIcon } from '../icons'
 import { shortWhen } from '../../shared/edits-core'
 import type { DayLesson } from '../edits'
 import { toMinutes } from '../schedule'
@@ -23,9 +24,50 @@ type Props = {
   onEditNote?: () => void // нет — чужое расписание, без заметок
   onTeacher?: (name: string) => void // нажатие на преподавателя — его карточка
   onRoom?: (room: string) => void // нажатие на аудиторию — корпус
+  // «⋯» и долгое нажатие — действия с парой (заметка, «Это не моя пара»); hide — сразу «Это не моя пара»
+  onMenu?: (start: 'menu' | 'hide') => void
 }
 
-export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote, onTeacher, onRoom }: Props) {
+const LONG_PRESS_MS = 500
+
+// Долгое нажатие на карточку (палец не сдвинулся) и правый клик / системное долгое нажатие (contextmenu)
+function useLongPress(onLong: (() => void) | undefined) {
+  const timer = useRef(0)
+  const origin = useRef<{ x: number; y: number } | null>(null)
+  const fired = useRef(0)
+  const fire = () => {
+    if (!onLong || Date.now() - fired.current < 1000) return
+    fired.current = Date.now()
+    onLong()
+  }
+  const cancel = () => {
+    window.clearTimeout(timer.current)
+    origin.current = null
+  }
+  if (!onLong) return {}
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
+      origin.current = { x: e.clientX, y: e.clientY }
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(fire, LONG_PRESS_MS)
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (origin.current && Math.hypot(e.clientX - origin.current.x, e.clientY - origin.current.y) > 10) cancel()
+    },
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault()
+      cancel()
+      fire()
+    },
+  }
+}
+
+export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote, onTeacher, onRoom, onMenu }: Props) {
+  const press = useLongPress(onMenu && (() => onMenu('menu')))
   const start = toMinutes(lesson.start)
   const end = toMinutes(lesson.end)
   const cancelled = Boolean(lesson.cancel || lesson.movedTo)
@@ -38,6 +80,7 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
     <article
       className={`lesson ${kindClass}${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
       data-readonly={onEditNote ? undefined : true}
+      {...press}
     >
       <div className="lesson-head">
         <span className="lesson-start">{short(lesson.start)}</span>
@@ -52,6 +95,16 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
             onClick={onEditNote}
           >
             <NoteIcon />
+          </button>
+        )}
+        {onMenu && (
+          <button
+            type="button"
+            className="lesson-note-btn lesson-more-btn"
+            aria-label="Действия с парой"
+            onClick={() => onMenu('menu')}
+          >
+            <DotsIcon />
           </button>
         )}
       </div>
@@ -90,6 +143,15 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
             ))}
         </div>
       )}
+
+      {lesson.stream &&
+        (onMenu ? (
+          <button type="button" className="lesson-hint" onClick={() => onMenu('hide')}>
+            Языковая пара потока — у тебя может быть другое время
+          </button>
+        ) : (
+          <div className="lesson-hint">Языковая пара потока — у тебя может быть другое время</div>
+        ))}
 
       {live && (
         <div className="lesson-live">

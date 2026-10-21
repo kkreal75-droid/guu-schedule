@@ -101,9 +101,9 @@ export const loadPlacesFile = () => loadFile().then((f) => f.places)
 const squash = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim()
 
 // ---------- аудитория → корпус ----------
-// «ЛК-405» → место с префиксом «ЛК»; «Актовый зал», «Спортивный комплекс» — по названию целиком
+// «ЛК-405», «ЛК, 6 этаж» → место с префиксом «ЛК»; «Актовый зал», «Спортивный комплекс» — по названию целиком
 export function roomPrefix(room: string): string {
-  return room.trim().split(/[-–\s]/)[0]
+  return room.trim().split(/[-–,\s]/)[0]
 }
 
 export function placeForRoom(places: Place[], room: string): Place | null {

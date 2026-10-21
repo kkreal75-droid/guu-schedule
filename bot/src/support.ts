@@ -1,5 +1,6 @@
 // «Другое → Написать в поддержку» (этап 7.5): POST /support {initData, text} → владельцу в бот с кнопкой
 // «Ответить» (sp:reply:<№>). Нажал — бот просит ответ (force_reply); ответ на это сообщение уходит автору.
+// Ответ можно и поставить в очередь (support_messages.reply_text, migrations/0021) — cron отправит его так же.
 import { json, readApi } from './api'
 import { isOwner } from './auth'
 import { cleanText } from './text-filter'
@@ -10,6 +11,7 @@ import { escapeHtml } from './util'
 const DAY_MS = 86_400_000
 const PER_DAY = 5
 const PROMPT = '✍️ Ответ на обращение №'
+const answerText = (text: string) => `💬 <b>Ответ на твоё обращение</b>\n\n${escapeHtml(text)}`
 
 export async function handleSupport(env: Env, request: Request): Promise<Response> {
   const req = await readApi<{ text?: unknown }>(env, request, { write: true })
@@ -59,7 +61,7 @@ export async function handleSupportReply(env: Env, message: TgMessage & { reply_
     return true
   }
   try {
-    await sendMessage(env, row.user_id, `💬 <b>Ответ на твоё обращение</b>\n\n${escapeHtml(text)}`)
+    await sendMessage(env, row.user_id, answerText(text))
     await env.DB.prepare('UPDATE support_messages SET answered_at = ? WHERE id = ?').bind(Date.now(), id).run()
     await sendMessage(env, message.chat.id, `✅ Ответ на обращение №${id} отправлен.`)
   } catch (err) {
@@ -67,4 +69,37 @@ export async function handleSupportReply(env: Env, message: TgMessage & { reply_
     await sendMessage(env, message.chat.id, `❌ Не доставлено: человек не запускал бота или заблокировал его. Обращение №${id}.`)
   }
   return true
+}
+
+// cron: ответы из очереди (reply_text) — автору, владельцу — отметка, что ушло. Возвращает число подзапросов
+export async function sendQueuedReplies(env: Env): Promise<number> {
+  const { results } = await env.DB.prepare(
+    'SELECT id, user_id, reply_text FROM support_messages WHERE reply_text IS NOT NULL AND answered_at IS NULL ORDER BY id LIMIT 3',
+  ).all<{ id: number; user_id: number; reply_text: string }>()
+  let used = 1
+  for (const row of results) {
+    const text = row.reply_text.trim()
+    let delivered = true
+    try {
+      if (text) await sendMessage(env, row.user_id, answerText(text))
+    } catch (err) {
+      if (!isUnreachable(err)) throw err
+      delivered = false
+    }
+    const sent = delivered && Boolean(text)
+    // недоставленное не повторяем: снимаем из очереди, владельцу — почему
+    await (sent
+      ? env.DB.prepare('UPDATE support_messages SET answered_at = ? WHERE id = ?').bind(Date.now(), row.id)
+      : env.DB.prepare('UPDATE support_messages SET reply_text = NULL WHERE id = ?').bind(row.id)
+    ).run()
+    await sendMessage(
+      env,
+      Number(env.OWNER_ID),
+      sent
+        ? `✅ Ответ на обращение №${row.id} отправлен (из очереди).`
+        : `❌ Ответ на обращение №${row.id} не доставлен: ${text ? 'человек не запускал бота или заблокировал его' : 'пустой текст'}.`,
+    )
+    used += 3
+  }
+  return used
 }
