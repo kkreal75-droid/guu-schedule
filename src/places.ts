@@ -3,7 +3,8 @@
 import { cachedList } from './data'
 import { readLocal, writeLocal } from './storage'
 import { BOT_URL, inTelegram, tg } from './telegram'
-import { t } from './i18n'
+import { translit } from '../shared/i18n-core'
+import { getLang, t } from './i18n'
 
 export type PlaceGroup = 'buildings' | 'sport' | 'food' | 'other'
 export const PLACE_GROUPS: PlaceGroup[] = ['buildings', 'sport', 'food', 'other']
@@ -26,7 +27,18 @@ export type Place = {
   todo: string | null // что не проверено — видит только владелец в админке
   custom?: boolean // добавлено в админке
   edited?: boolean // файл поправлен в админке
+  // английская версия (этап 11): нет — показываем русское
+  name_en?: string | null
+  address_en?: string | null
+  howto_en?: string | null
+  note_en?: string | null
 }
+
+// Место на языке интерфейса: по-английски — английские поля, где они есть (код корпуса «ЛК» — как есть)
+export const localPlace = (p: Place): Place =>
+  getLang() === 'en'
+    ? { ...p, name: p.name_en || p.name, address: p.address_en || p.address, howto: p.howto_en || p.howto, note: p.note_en || p.note }
+    : p
 
 export type PlaceEdit = { id: string; data: Partial<Place> & { hidden?: boolean }; updated_at: number }
 type PlacesFile = { updated_at: string; places: Place[] }
@@ -105,12 +117,15 @@ export function roomPrefix(room: string): string {
   return room.trim().split(/[-–,\s]/)[0]
 }
 
+// латиница и кириллица сравниваются одинаково: «LK-405» найдёт «ЛК»
+const roomKey = (text: string) => translit(text.trim()).toLowerCase()
+
 export function placeForRoom(places: Place[], room: string): Place | null {
-  const text = room.trim().toLowerCase()
-  const prefix = roomPrefix(room).toLowerCase()
+  const text = roomKey(room)
+  const prefix = roomKey(roomPrefix(room))
   return (
-    places.find((p) => p.rooms.some((r) => r.toLowerCase() === text)) ??
-    places.find((p) => p.rooms.some((r) => r.toLowerCase() === prefix)) ??
+    places.find((p) => p.rooms.some((r) => roomKey(r) === text)) ??
+    places.find((p) => p.rooms.some((r) => roomKey(r) === prefix)) ??
     null
   )
 }
@@ -126,7 +141,9 @@ export function searchPlaces(places: Place[], query: string): Place[] {
   // «у-432», «лк 405» — сначала корпус аудитории
   const byRoom = /\d/.test(query) ? placeForRoom(places, query) : null
   const hits = places.filter((p) => {
-    const hay = squash([p.name, p.short ?? '', p.address, ...p.aliases, ...p.rooms].join(' '))
+    const words = [p.name, p.short ?? '', p.address, ...p.aliases, ...p.rooms].join(' ')
+    // и по-английски, и латиницей: «canteen», «LK»
+    const hay = squash(`${words} ${translit(words)} ${p.name_en ?? ''} ${p.address_en ?? ''}`)
     return q.split(' ').every((w) => hay.includes(w))
   })
   return byRoom ? [byRoom, ...hits.filter((p) => p !== byRoom)] : hits

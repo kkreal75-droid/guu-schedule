@@ -10,6 +10,7 @@ import { EN } from './i18n/en'
 export type { Lang } from '../shared/i18n-core'
 
 let current: Lang = 'ru'
+let revision = 0 // меняется при смене языка и когда загрузились переводы данных ГУУ — подписчики перерисуются
 const listeners = new Set<() => void>()
 
 export const getLang = () => current
@@ -18,6 +19,12 @@ export function setLang(lang: Lang) {
   if (lang === current) return
   current = lang
   document.documentElement.lang = lang
+  refresh()
+}
+
+// перерисовать всё (загрузились переводы названий предметов, программ, мест)
+export function refresh() {
+  revision++
   for (const listener of listeners) listener()
 }
 
@@ -26,7 +33,11 @@ const subscribe = (listener: () => void) => {
   return () => void listeners.delete(listener)
 }
 
-export const useLang = (): Lang => useSyncExternalStore(subscribe, getLang, getLang)
+const getRevision = () => revision
+export const useLang = (): Lang => {
+  useSyncExternalStore(subscribe, getRevision, getRevision)
+  return current
+}
 
 type Params = Record<string, string | number>
 const fill = (text: string, params?: Params) =>

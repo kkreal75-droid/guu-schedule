@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, PinIcon, SearchIcon } from '../icons'
 import {
-  PLACE_GROUPS, placeGroupTitle, howtoLines, loadCampus, loadPlaces, mapApps, placeForRoom, placeTitle, searchPlaces,
+  PLACE_GROUPS, placeGroupTitle, howtoLines, localPlace, loadCampus, loadPlaces, mapApps, placeForRoom, placeTitle, searchPlaces,
   type CampusMap as MapData, type Place, type PlaceGroup,
 } from '../places'
 import { haptic, openLink } from '../telegram'
 import { CampusMap, onCampusMap } from './CampusMap'
-import { t } from '../i18n'
+import { t, useLang } from '../i18n'
 
 // «Другое → Корпуса ГУУ» (этап 7.7): поиск, схема кампуса (корпуса нажимаются), места по группам
 // «Корпуса / Спорт / Еда / Другое». Карточка раскрывается: схема с меткой у входа, «Как пройти», адрес,
@@ -17,7 +17,10 @@ export type PlacesTarget = { place?: string; room?: string }
 const GROUP_COLOR: Record<PlaceGroup, string> = { buildings: 'green', sport: 'orange', food: 'amber', other: 'blue' }
 
 export function PlacesPage({ target }: { target?: PlacesTarget }) {
-  const [places, setPlaces] = useState<Place[] | null>(null)
+  const lang = useLang()
+  const [rawPlaces, setPlaces] = useState<Place[] | null>(null)
+  // на языке интерфейса: по-английски — английские названия, адреса и «Как пройти»
+  const places = useMemo(() => rawPlaces?.map(localPlace) ?? null, [rawPlaces, lang])
   const [map, setMap] = useState<MapData | null>(null)
   const [failed, setFailed] = useState(false)
   const [query, setQuery] = useState('')
@@ -79,7 +82,7 @@ export function PlacesPage({ target }: { target?: PlacesTarget }) {
         <p className="places-room">
           {roomPlace ? (
             <>
-              <b>{room}</b> — {placeTitle(roomPlace)}
+              <b lang="ru">{room}</b> — {placeTitle(roomPlace)}
             </>
           ) : (
             <>
@@ -147,7 +150,15 @@ function PlaceCard({ place: p, map, places, open, room, onToggle, cardRef }: Car
           {p.icon}
         </span>
         <span className="other-text">
-          <span className="other-title">{placeTitle(p)}</span>
+          <span className="other-title">
+            {p.name}
+            {p.short && (
+              <>
+                {' ('}
+                <span lang="ru">{p.short}</span>)
+              </>
+            )}
+          </span>
           {!open && p.address && <span className="other-sub">{p.address}</span>}
         </span>
         <ChevronRight className="other-chevron place-chevron" />

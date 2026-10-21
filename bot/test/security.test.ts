@@ -16,7 +16,7 @@ const ADMIN_ACTIONS = [
   'dashboard', 'users', 'user', 'ban', 'unban', 'review-ban', 'reset-intro', 'places', 'academic',
   'academic-save', 'academic-reset', 'place-save', 'place-reset', 'access', 'starosta', 'export', 'broadcast-info',
   'broadcast-count', 'broadcast', 'reviews', 'review-moderate', 'schedule', 'update-now',
-  'edit-add', 'edit-delete', 'settings', 'settings-save', 'greeting-preview', 'hidden', 'hidden-group-add',
+  'edit-add', 'edit-delete', 'settings', 'settings-save', 'greeting-preview', 'hidden', 'hidden-group-add', 'translations', 'translation-save',
   'hidden-group-delete', 'nonexistent',
 ]
 const PAYLOADS = [
@@ -268,5 +268,19 @@ describe('язык (этап 11)', () => {
     const seen = (await (await postAs(u, '/seen', { v: 2 })).json()) as { me: { lang: string | null } }
     expect(seen.me.lang).toBe('en')
     expect((await sql('SELECT lang FROM users WHERE id = ?', u).first<{ lang: string }>())!.lang).toBe('en')
+  })
+})
+
+describe('переводы (этап 11)', () => {
+  it('владелец правит перевод, GET /translations отдаёт его всем; русские буквы и чужой вид — 400', async () => {
+    const save = (body: Record<string, unknown>) => postAs(OWNER, '/admin/translation-save', body)
+    expect((await save({ kind: 'subject', ru: 'История России', en: 'История' })).status).toBe(400)
+    expect((await save({ kind: 'teacher', ru: 'Иванов И.И.', en: 'Ivanov I.I.' })).status).toBe(400)
+    expect((await save({ kind: 'subject', ru: 'История России', en: 'Russian History' })).status).toBe(200)
+    const pub = (await (await call('/translations')).json()) as { edits: { kind: string; ru: string; en: string }[] }
+    expect(pub.edits).toContainEqual(expect.objectContaining({ kind: 'subject', ru: 'История России', en: 'Russian History' }))
+    // пустой перевод — правка убрана
+    await save({ kind: 'subject', ru: 'История России', en: '' })
+    expect((await sql(`SELECT COUNT(*) AS n FROM translations WHERE ru = 'История России'`).first<{ n: number }>())!.n).toBe(0)
   })
 })

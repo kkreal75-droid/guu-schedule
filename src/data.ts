@@ -9,7 +9,7 @@ import { readLocal, writeLocal } from './storage'
 
 export class NotFoundError extends Error {}
 
-async function fetchData<T>(path: string): Promise<T> {
+export async function fetchData<T>(path: string): Promise<T> {
   const res = await fetch(dataUrl(path), { cache: 'no-store' })
   // GitHub Pages на неизвестный путь отдаёт 404 HTML-страницей
   if (res.status === 404 || res.headers.get('content-type')?.includes('text/html')) throw new NotFoundError(path)

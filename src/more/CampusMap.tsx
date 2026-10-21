@@ -131,6 +131,7 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
               strokeWidth={emoji ? 0 : fs * 0.22}
               className={focus?.id === place.id ? 'cm-label cm-label-focus' : 'cm-label'}
               onClick={onPick ? () => (haptic(), onPick(place)) : undefined}
+              lang={kpp ? undefined : 'ru'}
             >
               {text}
             </text>

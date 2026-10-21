@@ -67,3 +67,21 @@ export const monthName = (month: number, lang: Lang) => capitalize(format(lang, 
 const MONDAY = 4 // 1970-01-05 — понедельник
 export const weekdayName = (weekday: number, lang: Lang, style: 'long' | 'short' = 'long') =>
   capitalize(format(lang, { weekday: style }).format(dateOfDay(MONDAY + weekday))).replace(/\.$/, '')
+
+// ---------- ФИО латиницей ----------
+// ICAO Doc 9303 (как в загранпаспортах РФ с 2014 г.): Крюкова Е.В. → Kriukova E.V., Щукин → Shchukin
+const ICAO: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i', к: 'k', л: 'l', м: 'm',
+  н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch',
+  ъ: 'ie', ы: 'y', ь: '', э: 'e', ю: 'iu', я: 'ia',
+}
+export function translit(text: string): string {
+  let out = ''
+  for (const char of text) {
+    const lower = char.toLowerCase()
+    const latin = ICAO[lower]
+    if (latin === undefined) out += char
+    else out += char !== lower && latin ? latin[0].toUpperCase() + latin.slice(1) : latin
+  }
+  return out
+}

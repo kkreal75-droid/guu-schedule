@@ -11,6 +11,7 @@ import { openLink } from '../telegram'
 import { AcademicCalendar } from './AcademicCalendar'
 import { t, tKnown } from '../i18n'
 import { levelTitle } from '../onboarding/Onboarding'
+import { trProgram } from '../guu'
 
 // «Другое → Календарный учебный график»: учебный год визуально (AcademicCalendar — учёба, сессии, каникулы,
 // практика, праздники; данные — src/academic.ts), недели семестра по расписанию ГУУ и официальные графики
@@ -86,7 +87,15 @@ export function KugPage({ group }: { group: string }) {
         <AcademicCalendar
           periods={calendar.periods}
           typical={calendar.typical}
-          title={calendar.info ? `${calendar.info.name} · ${t('{n} курс', { n: calendar.info.course })}` : t('типовой график')}
+          title={
+            calendar.info ? (
+              <>
+                <span lang="ru">{calendar.info.name}</span> · {t('{n} курс', { n: calendar.info.course })}
+              </>
+            ) : (
+              t('типовой график')
+            )
+          }
         />
       ) : (
         <p className="lead">{t('Загружаю график…')}</p>
@@ -139,7 +148,7 @@ export function KugPage({ group }: { group: string }) {
           <Section title={t('Твоя программа')} footer={t('Официальный документ с сайта ГУУ: даты сессий, практик и каникул.')}>
             <button type="button" className="row row-btn kug-row" onClick={() => openLink(best.url)}>
               <span className="kug-row-text">
-                <span className="kug-title">{best.title}</span>
+                <span className="kug-title" lang={trProgram(best.title) === best.title ? 'ru' : undefined}>{trProgram(best.title)}</span>
                 <span className="kug-sub">
                   {[best.code, best.level ? levelTitle(best.level) : null, best.form && (tKnown(best.form) ?? best.form)].filter(Boolean).join(' · ')}
                 </span>
@@ -158,7 +167,7 @@ export function KugPage({ group }: { group: string }) {
           {shown.slice(0, 80).map((k) => (
             <button key={k.url + k.title} type="button" className="row row-btn kug-row" onClick={() => openLink(k.url)}>
               <span className="kug-row-text">
-                <span className="kug-title">{k.title}</span>
+                <span className="kug-title" lang={trProgram(k.title) === k.title ? 'ru' : undefined}>{trProgram(k.title)}</span>
                 <span className="kug-sub">{[k.code, k.level ? levelTitle(k.level) : null, k.form && (tKnown(k.form) ?? k.form)].filter(Boolean).join(' · ')}</span>
               </span>
               <ChevronRight className="row-chevron" />

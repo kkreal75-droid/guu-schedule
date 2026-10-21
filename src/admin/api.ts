@@ -125,6 +125,10 @@ export type HiddenWindow = {
 }
 export type HiddenOverview = { windows: HiddenWindow[]; group: HiddenLesson[]; people: number; rules: number }
 
+// «Переводы» (этап 11): правки английских названий ГУУ поверх словарей data/i18n/*.en.json
+export type TranslationKind = 'subject' | 'institute' | 'direction' | 'program'
+export type TranslationEdit = { kind: TranslationKind; ru: string; en: string; updated_at: number }
+
 export const adminApi = {
   dashboard: () => callBot<Dashboard>('/admin/dashboard'),
   users: () => callBot<{ users: AdminUser[] }>('/admin/users'),
@@ -151,6 +155,9 @@ export const adminApi = {
     callBot<{ id: number | null; total: number | null }>('/admin/broadcast', { text, photo, audience }),
   schedule: () => callBot<ScheduleStatus>('/admin/schedule'),
   hidden: () => callBot<HiddenOverview>('/admin/hidden'),
+  translations: () => callBot<{ edits: TranslationEdit[] }>('/admin/translations'),
+  translationSave: (kind: TranslationKind, ru: string, en: string) =>
+    callBot<{ edits: TranslationEdit[] }>('/admin/translation-save', { kind, ru, en }),
   hideForGroup: (w: Pick<HiddenWindow, 'group' | 'weekday' | 'start' | 'subject' | 'kind' | 'scope'>) =>
     callBot<HiddenOverview>('/admin/hidden-group-add', w),
   unhideForGroup: (id: number) => callBot<HiddenOverview>('/admin/hidden-group-delete', { id }),

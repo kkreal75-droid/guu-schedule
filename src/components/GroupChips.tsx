@@ -31,7 +31,7 @@ export function GroupChips({ value, groups, home, onChange, onAdd }: Props) {
             }}
           >
             {g === home && <StarFillIcon className="group-chip-star" aria-label={t('своя группа')} />}
-            {groupName(g)}
+            <span lang="ru">{groupName(g)}</span>
           </button>
         ))}
         {onAdd && (

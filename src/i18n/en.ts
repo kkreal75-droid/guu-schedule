@@ -608,4 +608,14 @@ export const EN: Record<string, string> = {
   "Слишком длинный текст — до 300 символов": "Text too long — up to 300 characters",
   "Укажите время пары": "Enter the class time",
   "аспирантура, {n} курс": "postgraduate, year {n}",
+  // виды занятий сессии (данные ГУУ, переводит trKind)
+  "Экзамен": "Exam",
+  "Зачёт": "Pass/fail test",
+  "Зачёт с оценкой": "Graded test",
+  "Консультация": "Consultation",
+  "Курсовая работа": "Term paper",
+  "Курсовой проект": "Course project",
+  "прошлого года": "(last year)",
+  "сессия#страница guu.ru": "exams",
+  "Заочная": "Distance learning",
 }

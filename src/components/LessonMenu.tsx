@@ -5,6 +5,7 @@ import type { HideScope } from '../hidden'
 import { ChevronLeft, ChevronRight, EyeOffIcon, NoteIcon } from '../icons'
 import { haptic, supports, tg } from '../telegram'
 import { t } from '../i18n'
+import { trSubject } from '../guu'
 
 // Действия с парой: «⋯» на карточке или долгое нажатие. «Это не моя пара» → скрыть в этот день, по чётным,
 // по нечётным или всегда (только у себя: приложение, календарь, inline). У пары языкового блока потока
@@ -65,10 +66,10 @@ export function LessonMenu({ lesson, subtitle, week, start, onNote, onHide, onCl
 
   return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet lesson-menu" role="dialog" aria-modal="true" aria-label={lesson.subject} onClick={(e) => e.stopPropagation()}>
+      <div className="sheet lesson-menu" role="dialog" aria-modal="true" aria-label={trSubject(lesson.subject)} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <div className="sheet-heading">
-            <div className="sheet-title">{lesson.subject}</div>
+            <div className="sheet-title">{trSubject(lesson.subject)}</div>
             <div className="sheet-sub">{subtitle}</div>
           </div>
           <button type="button" className="sheet-done" onClick={onClose}>

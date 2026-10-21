@@ -13,6 +13,7 @@ import { useBackButton } from '../useBackButton'
 import { ScheduleViewer } from './ScheduleViewer'
 import { getLang, t, tKnown, tn } from '../i18n'
 import { LOCALE } from '../../shared/i18n-core'
+import { trSubject, trTeacher } from '../guu'
 
 // «Другое → Рейтинг преподавателей» (этапы 6 и 7.6): общий рейтинг (поиск, фильтр, сортировка), карточка
 // (средняя, три критерия полосками, % «рекомендуют», распределение 1–5, отзывы «Полезные / Новые», «Ещё N»),
@@ -176,15 +177,15 @@ export function TeachersPage({ initial, onClose, group }: { initial?: TeacherInf
           return (
             <button key={teacher.id} type="button" className="rating-card" onClick={() => (haptic(), setOpen(teacher), window.scrollTo(0, 0))}>
               {sort !== 'name' && r?.avg != null && <span className="rating-rank">{i + 1}</span>}
-              <span className="letter-avatar">{letter(teacher.name)}</span>
+              <span className="letter-avatar">{letter(trTeacher(teacher.name))}</span>
               <span className="rating-card-text">
-                <span className="rating-card-name">{teacher.name}</span>
+                <span className="rating-card-name">{trTeacher(teacher.name)}</span>
                 {r?.avg != null ? (
                   <span className="rating-card-score">
                     <Stars value={r.avg} size="s" /> <b>{formatAverage(r.avg)}</b>
                   </span>
                 ) : (
-                  <span className="rating-card-sub">{r ? t('мало отзывов') : teacher.subjects[0]}</span>
+                  <span className="rating-card-sub">{r ? t('мало отзывов') : teacher.subjects[0] && trSubject(teacher.subjects[0])}</span>
                 )}
               </span>
               <span className="rating-card-right">
@@ -233,7 +234,7 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
   const back =
     mode === 'card' && !backLabel ? null : (
       <button type="button" className="page-back admin-sub-back" onClick={mode === 'card' ? onBack : toCard}>
-        <ChevronLeft /> {mode === 'card' ? backLabel : teacher.name}
+        <ChevronLeft /> {mode === 'card' ? backLabel : trTeacher(teacher.name)}
       </button>
     )
 
@@ -246,7 +247,7 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
           actions={
             <div className="viewer-head">
               <div className="viewer-title">
-                <span className="viewer-name">{teacher.name}</span>
+                <span className="viewer-name">{trTeacher(teacher.name)}</span>
                 <span className="viewer-sub">{t('Расписание по файлам ГУУ · у пар — группы')}</span>
               </div>
             </div>
@@ -318,9 +319,9 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
       {back}
       <div className="teacher-hero">
         <div className="teacher-hero-top">
-          <span className="letter-avatar letter-avatar-l">{letter(teacher.name)}</span>
+          <span className="letter-avatar letter-avatar-l">{letter(trTeacher(teacher.name))}</span>
           <div className="teacher-hero-text">
-            <h2 className="teacher-hero-name">{teacher.name}</h2>
+            <h2 className="teacher-hero-name">{trTeacher(teacher.name)}</h2>
             {card?.average != null ? (
               <span className="rating-card-score">
                 <Stars value={card.average} /> <b className="teacher-hero-avg">{formatAverage(card.average)}</b>
@@ -351,7 +352,7 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
         )}
         {card && card.recommend != null && <p className="teacher-hero-rec">{t('{pct}% рекомендуют', { pct: card.recommend })}</p>}
         {card && card.count > 0 && <Distribution card={card} />}
-        {teacher.subjects.length > 0 && <p className="viewer-sub">{teacher.subjects.join(' · ')}</p>}
+        {teacher.subjects.length > 0 && <p className="viewer-sub">{teacher.subjects.map(trSubject).join(' · ')}</p>}
         <div className="viewer-actions">
           <button type="button" className="chip chip-accent" onClick={() => (haptic(), setMode('schedule'), window.scrollTo(0, 0))}>
             {t('Расписание преподавателя')}
@@ -480,7 +481,7 @@ function ReviewItem({ review, onReport, onVote }: { review: Review; onReport?: (
       ) : (
         <Stars value={review.rating} size="s" />
       )}
-      {review.discipline && <div className="review-discipline">{review.discipline}</div>}
+      {review.discipline && <div className="review-discipline">{trSubject(review.discipline)}</div>}
       <p className={`review-text${long && !full ? ' is-clamped' : ''}`}>{review.text}</p>
       {long && !full && (
         <button type="button" className="link-btn review-more" onClick={() => setFull(true)}>
@@ -613,7 +614,7 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
                     aria-pressed={draft.discipline === s}
                     onClick={() => set({ discipline: draft.discipline === s ? null : s })}
                   >
-                    {s}
+                    {trSubject(s)}
                   </button>
                 ))}
               </div>

@@ -3,6 +3,8 @@
 // С МБ(МП) 1-1 и 1-2 всё начиналось: раньше их хранили по имени («МБ(МП) 1-1») — такие значения
 // ещё могут прийти от старых версий приложения, из старых записей и настроек бесед; понимаем их.
 
+import { translit } from './i18n-core'
+
 export const MB_GROUPS = [
   { id: 'b1-mb-mp-1', name: 'МБ(МП) 1-1', short: '1-1' },
   { id: 'b1-mb-mp-2', name: 'МБ(МП) 1-2', short: '1-2' },
@@ -66,9 +68,11 @@ export const FORM_TITLES: Record<Form, string> = { ofo: 'Очная', ozfo: 'О�
 
 // ---------- поиск групп ----------
 // «мб 1-1», «МБ(МП)», «гму 2-3», «маркетинг 2», «международный бизнес» — по имени, программе и id.
+// Сравниваем латиницей (ICAO): так находит и «mb 1-1», «gmu 2», «marketing 2» из английской версии.
 
-const squash = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, '')
-const words = (text: string) => text.toLowerCase().replace(/ё/g, 'е').split(/[^a-zа-я0-9]+/).filter(Boolean)
+const latin = (text: string) => translit(text.toLowerCase().replace(/ё/g, 'е'))
+const squash = (text: string) => latin(text).replace(/[^a-z0-9]+/g, '')
+const words = (text: string) => latin(text).split(/[^a-z0-9]+/).filter(Boolean)
 
 export function searchGroups(groups: GroupInfo[], query: string, limit = 20): GroupInfo[] {
   const q = squash(query)

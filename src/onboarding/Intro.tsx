@@ -15,6 +15,7 @@ import { haptic, telegramLang } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { GroupCard, Onboarding, Shell, type Choice } from './Onboarding'
 import { EmojiTile, Stories, type Story } from './Stories'
+import { trTeacher } from '../guu'
 
 // ---------- истории автора (тексты — от владельца, менять только опечатки; английские — тоже от него) ----------
 
@@ -260,7 +261,7 @@ export function IntroFlow({ current, onChoice, onLang, onFinish }: Props) {
           <p className="ob-overline">{student ? t('твоя группа') : t('ваше расписание')}</p>
           <GroupCard
             emoji={student ? '🎓' : '🧑‍🏫'}
-            name={student ? (groupName ?? t('Загружаю…')) : chosen.name}
+            name={student ? (groupName ?? t('Загружаю…')) : trTeacher(chosen.name)}
             text={student ? t('Это твоя группа? Её расписание откроется при запуске.') : t('Это вы? Ваше расписание откроется при запуске.')}
           />
         </div>

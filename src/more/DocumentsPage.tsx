@@ -5,6 +5,7 @@ import { ExternalIcon } from '../icons'
 import { dataUrl } from '../schedule'
 import { openLink } from '../telegram'
 import { t, tn } from '../i18n'
+import { sessionPageText } from '../guu'
 
 // «Другое → Документы»: исходные таблицы ГУУ, из которых собрано расписание (parse_report.json, update.py)
 
@@ -30,8 +31,8 @@ const sections = (): [string, string][] => [
 ]
 
 const label = (f: FileRow) => {
-  const t = f.text || f.name.replace(/\.(xlsx|docx?)$/i, '').replace(/-/g, ' ')
-  return t.charAt(0).toUpperCase() + t.slice(1)
+  const text = f.text || f.name.replace(/\.(xlsx|docx?)$/i, '').replace(/-/g, ' ')
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 export function DocumentsPage({ group }: { group: string }) {
@@ -55,12 +56,12 @@ export function DocumentsPage({ group }: { group: string }) {
     <button key={f.url} type="button" className="row row-btn kug-row" onClick={() => openLink(f.url)}>
       <span className="kug-row-text">
         <span className="kug-title">
-          {label(f)}
+          <span lang="ru">{label(f)}</span>
           {f.name === mineFile && <span className="badge badge-mine">{t('твоя группа')}</span>}
           {f.kind === 'session' && f.archive && f.year && <span className="badge badge-archive">{t('архив {year}', { year: shortYear(f.year) })}</span>}
         </span>
         <span className="kug-sub">
-          {f.name}
+          <span lang="ru">{f.name}</span>
           {f.groups ? ` · ${tn(f.groups, '{n} группа|{n} группы|{n} групп')}` : ''}
         </span>
       </span>
@@ -99,7 +100,7 @@ export function DocumentsPage({ group }: { group: string }) {
         <button type="button" className="row row-btn row-link kug-row" onClick={() => openLink('https://guu.ru/student/session/')}>
           <span className="kug-row-text">
             <span>{t('Страница сессии на guu.ru')}</span>
-            {sessionPage && <span className="kug-sub">{t('сейчас там {what}', { what: sessionPage })}</span>}
+            {sessionPage && <span className="kug-sub">{t('сейчас там {what}', { what: sessionPageText(sessionPage) })}</span>}
           </span>
           <ExternalIcon className="row-check" />
         </button>

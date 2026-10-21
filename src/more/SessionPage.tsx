@@ -7,6 +7,7 @@ import { loadSession, loadSessionStatus, type SessionFile, type SessionItem } fr
 import { formatDate, weekdayShort } from '../format'
 import { dayFromIso, groupName, moscowNow } from '../schedule'
 import { t } from '../i18n'
+import { trKind, trSubject } from '../guu'
 
 const SESSION_PAGE = 'https://guu.ru/student/session/'
 
@@ -26,7 +27,7 @@ function Item({ item, past }: { item: SessionItem; past: boolean }) {
       </div>
       <div className="session-body">
         <div className="session-top">
-          {item.kind && <span className="badge">{item.kind}</span>}
+          {item.kind && <span className="badge">{trKind(item.kind)}</span>}
           {item.start && (
             <span className="session-time">
               {item.start}
@@ -34,7 +35,7 @@ function Item({ item, past }: { item: SessionItem; past: boolean }) {
             </span>
           )}
         </div>
-        <div className="session-subject">{item.subject}</div>
+        <div className="session-subject">{trSubject(item.subject)}</div>
         {(item.room || item.teacher) && (
           <div className="session-meta">{[item.room, item.teacher].filter(Boolean).join(' · ')}</div>
         )}

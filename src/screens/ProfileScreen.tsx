@@ -17,6 +17,7 @@ import { haptic, inTelegram, openLink, telegramUser } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { t, useLang, type Lang } from '../i18n'
 import { chooseLang } from '../language'
+import { trKind, trSubject, trTeacher } from '../guu'
 
 // «Профиль» (этап 7.8, сверено с profile-28): крупный заголовок, карточка «аватар · имя · @ник · группа»,
 // «Параметры аккаунта» (студент / преподаватель + выпадающие списки и «Сохранить»), подгруппы, избранные
@@ -51,7 +52,8 @@ function UserCard({ who }: { who: string }) {
     .map((part) => part[0])
     .slice(0, 2)
     .join('')
-  const sub = [user?.username ? `@${user.username}` : null, who].filter(Boolean).join(' · ')
+  // группа — данные ГУУ (lang="ru"), ник — как в Telegram
+  const nick = user?.username ? `@${user.username}` : null
   return (
     <div className="user-card">
       {user?.photo_url ? (
@@ -61,7 +63,11 @@ function UserCard({ who }: { who: string }) {
       )}
       <div className="user-text">
         <div className="user-name">{name}</div>
-        <div className="user-sub">{sub}</div>
+        <div className="user-sub">
+          {nick}
+          {nick && who && ' · '}
+          {who && <span lang="ru">{who}</span>}
+        </div>
         {!inTelegram && <div className="user-sub">{t('Откройте через Telegram — настройки будут синхронизироваться')}</div>}
       </div>
     </div>
@@ -97,9 +103,9 @@ function HiddenSection({ hidden, home, nameOf, onUnhide }: { hidden: HiddenLesso
       {list.map((h) => (
         <div key={h.id} className="row">
           <span className="hidden-row">
-            <span className="hidden-row-title">{h.subject}</span>
+            <span className="hidden-row-title">{trSubject(h.subject)}</span>
             <span className="hidden-row-sub">
-              {[h.group !== home ? nameOf(h.group) : null, `${weekdayShort(h.weekday)} ${h.start}`, h.kind, scopeText(h)]
+              {[h.group !== home ? nameOf(h.group) : null, `${weekdayShort(h.weekday)} ${h.start}`, trKind(h.kind), scopeText(h)]
                 .filter(Boolean)
                 .join(' · ')}
             </span>
@@ -138,7 +144,7 @@ export function ProfileScreen({
   const nameOf = useGroupNames()
   // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
   const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
-  const who = teacher ? (prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)
+  const who = teacher ? trTeacher(prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)
 
   if (sub === 'calendar') {
     return (
@@ -189,7 +195,7 @@ export function ProfileScreen({
         <Section title={t('Избранные группы')} footer={t('Видны над расписанием рядом со своей. Добавить — «+» у групп на главном экране.')}>
           {favorites.map((g) => (
             <div key={g} className="row">
-              <span>{nameOf(g)}</span>
+              <span lang="ru">{nameOf(g)}</span>
               <button
                 type="button"
                 className="icon-btn"

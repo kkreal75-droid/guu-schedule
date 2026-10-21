@@ -3,6 +3,7 @@ import { loadTeachers, searchTeachers, type TeacherInfo } from '../data'
 import { ChevronRight } from '../icons'
 import { haptic } from '../telegram'
 import { t, tn } from '../i18n'
+import { trSubject, trTeacher } from '../guu'
 
 // Поиск преподавателя по фамилии (teachers.json): онбординг и «Ещё → Расписание преподавателя»
 export function TeacherPicker({ onPick }: { onPick: (t: TeacherInfo) => void }) {
@@ -54,9 +55,9 @@ export function TeacherPicker({ onPick }: { onPick: (t: TeacherInfo) => void }) 
               }}
             >
               <span className="gsearch-text">
-                <span className="gsearch-name">{teacher.name}</span>
+                <span className="gsearch-name">{trTeacher(teacher.name)}</span>
                 <span className="gsearch-sub">
-                  {teacher.subjects.slice(0, 2).join(', ')}
+                  {teacher.subjects.slice(0, 2).map(trSubject).join(', ')}
                   {teacher.subjects.length > 2 ? ` ${tn(teacher.subjects.length - 2, 'и ещё {n}|и ещё {n}|и ещё {n}')}` : ''}
                 </span>
               </span>

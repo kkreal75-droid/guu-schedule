@@ -7,6 +7,7 @@ import type { Prefs, Role } from '../prefs'
 import { haptic } from '../telegram'
 import { STEPS, type Choice, type Option, type Selection, type Step, type StepKey, type Value } from './Onboarding'
 import { t } from '../i18n'
+import { trSubject, trTeacher } from '../guu'
 
 // «Профиль → Параметры аккаунта» (этап 7.8): «Я студент / Я преподаватель», под ним выпадающие списки
 // Форма → Уровень → Курс → Институт → Направление → Программа → Группа (те же шаги, что в онбординге:
@@ -136,6 +137,7 @@ export function AccountForm({ prefs, onSave, onSearch }: Props) {
               <label key={step.key} className="account-field">
                 <span>{label(step.key)}</span>
                 <select
+                  lang={step.key === 'group' ? 'ru' : undefined}
                   className="account-select"
                   value={value === undefined ? '' : String(value)}
                   onChange={(e) => pick(step.key, e.target.value)}
@@ -186,7 +188,7 @@ function TeacherField({ value, onChange }: { value: { id: string; name: string }
       <div className="account-field">
         <span>{t('ФИО')}</span>
         <div className="account-select account-picked">
-          <span>{value.name}</span>
+          <span>{trTeacher(value.name)}</span>
           <button type="button" className="icon-btn" aria-label={t('Выбрать другого')} onClick={() => (haptic(), onChange(null))}>
             <CloseIcon />
           </button>
@@ -207,8 +209,8 @@ function TeacherField({ value, onChange }: { value: { id: string; name: string }
         <div className="account-results">
           {found.map((teacher) => (
             <button key={teacher.id} type="button" className="account-result" onClick={() => (haptic(), onChange({ id: teacher.id, name: teacher.name }))}>
-              <span className="account-result-name">{teacher.name}</span>
-              <span className="account-result-sub">{teacher.subjects.slice(0, 2).join(', ')}</span>
+              <span className="account-result-name">{trTeacher(teacher.name)}</span>
+              <span className="account-result-sub">{teacher.subjects.slice(0, 2).map(trSubject).join(', ')}</span>
             </button>
           ))}
         </div>

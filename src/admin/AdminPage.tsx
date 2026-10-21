@@ -9,6 +9,7 @@ import { useFlash } from './common'
 import { Dashboard } from './Dashboard'
 import { ReviewsAdmin } from './ReviewsAdmin'
 import { HiddenAdmin } from './HiddenAdmin'
+import { TranslationsAdmin } from './TranslationsAdmin'
 import { AcademicAdmin } from './AcademicAdmin'
 import { PlacesAdmin } from './PlacesAdmin'
 import { ScheduleAdmin } from './ScheduleAdmin'
@@ -16,7 +17,7 @@ import { SettingsAdmin } from './SettingsAdmin'
 import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
-type SectionId = 'dashboard' | 'users' | 'broadcast' | 'reviews' | 'schedule' | 'hidden' | 'academic' | 'places' | 'settings'
+type SectionId = 'dashboard' | 'users' | 'broadcast' | 'reviews' | 'schedule' | 'hidden' | 'translations' | 'academic' | 'places' | 'settings'
 type Item = { id: SectionId; title: string; icon: ComponentType<SVGProps<SVGSVGElement>>; render: () => ReactNode }
 
 const ITEMS: Item[] = [
@@ -26,6 +27,7 @@ const ITEMS: Item[] = [
   { id: 'reviews', title: 'Отзывы', icon: StarIcon, render: () => <ReviewsAdmin /> },
   { id: 'schedule', title: 'Расписание', icon: CalendarIcon, render: () => <ScheduleAdmin /> },
   { id: 'hidden', title: 'Скрытые пары', icon: EyeOffIcon, render: () => <HiddenAdmin /> },
+  { id: 'translations', title: 'Переводы', icon: NoteIcon, render: () => <TranslationsAdmin /> },
   { id: 'academic', title: 'Учебный график', icon: PlanIcon, render: () => <AcademicAdmin /> },
   { id: 'places', title: 'Места', icon: BuildingIcon, render: () => <PlacesAdmin /> },
   { id: 'settings', title: 'Настройки', icon: NoteIcon, render: () => <SettingsAdmin /> },

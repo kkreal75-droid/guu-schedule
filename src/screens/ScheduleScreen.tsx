@@ -15,6 +15,7 @@ import { dayFromIso, getTimetable, isoFromDay, moscowNow, toMinutes } from '../s
 import type { Timetable } from '../../shared/schedule-core'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
+import { trSubject } from '../guu'
 
 export type Cursor = { week: number; weekday: number }
 
@@ -254,7 +255,7 @@ export function ScheduleScreen({
                 haptic()
                 setEditing({
                   key: noteKey,
-                  title: lesson.subject,
+                  title: trSubject(lesson.subject),
                   subtitle: `${weekdayFull(weekday)}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
                 })
               }
@@ -294,7 +295,7 @@ export function ScheduleScreen({
             setMenu(null)
             setEditing({
               key: lessonNoteKey(day, group, lesson),
-              title: lesson.subject,
+              title: trSubject(lesson.subject),
               subtitle: `${weekdayFull(weekday)}, ${formatDate(day)} · ${lesson.start}–${lesson.end}`,
             })
           }}

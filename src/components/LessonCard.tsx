@@ -5,6 +5,7 @@ import { shortWhen } from '../../shared/edits-core'
 import type { DayLesson } from '../edits'
 import { toMinutes } from '../schedule'
 import { t } from '../i18n'
+import { roomLabel, trKind, trSubject, trTeacher } from '../guu'
 
 const KIND_CLASS: Record<string, string> = {
   Лекция: 'k-lecture',
@@ -76,6 +77,17 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
   const past = nowMinutes !== null && nowMinutes >= end
   const kindClass = (lesson.kind && KIND_CLASS[lesson.kind]) || 'k-other'
   const teachers = lesson.teachers ?? (lesson.teacher ? [lesson.teacher] : [])
+  // английская версия: предмет — перевод (оригинал мелко под ним), аудитория — код и корпус по-английски
+  const subject = trSubject(lesson.subject)
+  const room = lesson.room ? roomLabel(lesson.room) : null
+  // код аудитории — данные ГУУ (lang="ru"), корпус — на языке интерфейса
+  const roomText = room && (
+    <>
+      {room.code && <span lang="ru">{room.code}</span>}
+      {room.code && room.building && ' · '}
+      {room.building}
+    </>
+  )
 
   return (
     <article
@@ -112,34 +124,40 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
 
       {(lesson.kind || lesson.added || lesson.subgroup) && (
         <div className="lesson-tags">
-          {lesson.kind && <span className="badge">{lesson.kind}</span>}
+          {lesson.kind && <span className="badge">{trKind(lesson.kind)}</span>}
           {lesson.added && <span className="badge badge-edit">{t('добавлена')}</span>}
           {lesson.subgroup && <span className="badge badge-sub">{lesson.subgroup.name}</span>}
         </div>
       )}
-      <h3 className="lesson-subject">{lesson.subject}</h3>
+      <h3 className="lesson-subject">{subject}</h3>
+      {/* по-английски — под переводом мелко оригинал, как в расписании ГУУ */}
+      {subject !== lesson.subject && (
+        <div className="lesson-subject-ru" lang="ru">
+          {lesson.subject}
+        </div>
+      )}
 
       {(teachers.length > 0 || lesson.room) && (
         <div className="lesson-meta">
           {teachers.map((name) =>
             onTeacher ? (
               <button key={name} type="button" className="lesson-link" onClick={() => onTeacher(name)}>
-                <PersonIcon /> {name}
+                <PersonIcon /> {trTeacher(name)}
               </button>
             ) : (
               <span key={name}>
-                <PersonIcon /> {name}
+                <PersonIcon /> {trTeacher(name)}
               </span>
             ),
           )}
           {lesson.room &&
             (onRoom ? (
               <button type="button" className="lesson-link" onClick={() => onRoom(lesson.room!)}>
-                <PinIcon /> {lesson.room}
+                <PinIcon /> {roomText}
               </button>
             ) : (
               <span>
-                <PinIcon /> {lesson.room}
+                <PinIcon /> {roomText}
               </span>
             ))}
         </div>

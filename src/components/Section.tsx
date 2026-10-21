@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 // Блок в стиле настроек Telegram: заголовок, белая карточка со строками, подпись снизу
-export function Section({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
+export function Section({ title, footer, children }: { title?: ReactNode; footer?: ReactNode; children: ReactNode }) {
   return (
     <section className="section">
       {title && <h3 className="section-title">{title}</h3>}

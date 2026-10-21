@@ -13,6 +13,7 @@ import { GroupSearch } from './GroupSearch'
 import { EmojiTile } from './Stories'
 import { TeacherPicker } from './TeacherPicker'
 import { t } from '../i18n'
+import { trDirection, trInstitute, trProgram } from '../guu'
 
 export type Choice = { role: 'student'; group: string } | { role: 'teacher'; teacher: string; name: string }
 
@@ -87,7 +88,7 @@ export const STEPS: Step[] = [
     value: (g) => g.institute,
     options: (pool, index) =>
       uniq(pool.map((g) => g.institute))
-        .map((v) => ({ value: v, label: index.institutes[v] ?? v, sub: index.institutes[v] ? v : undefined }))
+        .map((v) => ({ value: v, label: trInstitute(v, index.institutes[v]), sub: index.institutes[v] ? v : undefined }))
         .sort(byLabel),
     chip: (v) => String(v),
   },
@@ -97,9 +98,9 @@ export const STEPS: Step[] = [
     value: (g) => g.direction,
     options: (pool) =>
       uniq(pool.map((g) => g.direction))
-        .map((v) => ({ value: v, label: v }))
+        .map((v) => ({ value: v, label: trDirection(v) }))
         .sort(byLabel),
-    chip: (v) => String(v),
+    chip: (v) => trDirection(String(v)),
   },
   {
     key: 'program',
@@ -107,9 +108,9 @@ export const STEPS: Step[] = [
     value: (g) => g.program,
     options: (pool) =>
       uniq(pool.map((g) => g.program))
-        .map((v) => ({ value: v, label: v }))
+        .map((v) => ({ value: v, label: trProgram(v) }))
         .sort(byLabel),
-    chip: (v) => String(v),
+    chip: (v) => trProgram(String(v)),
   },
   {
     key: 'group',

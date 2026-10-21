@@ -22,6 +22,7 @@
   public/data/calendar.json              — первая и последняя пара курса (учебный график, shared/calendar-core.ts)
   public/data/parse_report.json         — что разобрано по каждому файлу и листу, где парсер не уверен
   public/data/alerts.json               — тревоги для владельца (бот присылает их в личку)
+  public/data/subjects.json             — все предметы и какие без английского перевода (data/i18n/subjects.en.json)
   public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
                                           «Сведения → Образование»; раз в сутки (в 4 ч МСК) или с --force
   schedule.json                         — как раньше: только МБ(МП) 1-1 и 1-2 (для старых версий приложения)
@@ -76,6 +77,7 @@ OUT = ROOT / "public" / "data"
 STATE_FILE = ROOT / "data" / "state.json"
 IDS_FILE = ROOT / "data" / "group_ids.json"
 HISTORY_FILE = ROOT / "data" / "teacher_history.json"
+I18N_SUBJECTS = ROOT / "data" / "i18n" / "subjects.en.json"  # английские названия предметов (этап 11)
 DOC_CACHE = ROOT / "data" / "doc-cache"
 LEGACY_FILE = ROOT / "schedule.json"
 OVERRIDES_FILE = ROOT / "overrides.json"
@@ -1018,6 +1020,17 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
     data_changed = bool(writer.changed)
     if data_changed or not (OUT / "parse_report.json").exists():
         writer.write(OUT / "parse_report.json", dump_pretty(report))
+    # 8б. английская версия (этап 11): все предметы — public/data/subjects.json (админ-панель → «Переводы»);
+    #     предметов нет в data/i18n/subjects.en.json — тревога владельцу (тот же набор — та же тревога, бот не повторит)
+    all_subjects = sorted({l["subject"] for ls in group_lessons.values() for l in ls if l["subject"].strip()}, key=str.lower)
+    dictionary = load_json(I18N_SUBJECTS, {}) or {}
+    untranslated = [x for x in all_subjects if x not in dictionary]
+    writer.write(OUT / "subjects.json", dump(stable(OUT / "subjects.json", {
+        "updated_at": now, "subjects": all_subjects, "untranslated": untranslated})))
+    if untranslated:
+        alert(f"Предметы без английского перевода ({len(untranslated)}): " + "; ".join(untranslated[:15])
+              + ("…" if len(untranslated) > 15 else "") + ". Перевести — админ-панель → «Переводы».")
+
     old_alerts = (load_json(OUT / "alerts.json", {}) or {}).get("alerts", [])
     keep = {a["id"]: a for a in old_alerts}
     alerts_now = [keep.get(a["id"], a) for a in alerts]  # та же тревога — то же время, бот не повторит

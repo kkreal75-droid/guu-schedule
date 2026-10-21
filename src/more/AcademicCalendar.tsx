@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { HOLIDAYS, YEAR, summary, type Period, type PeriodKind } from '../../shared/calendar-core'
 import { isEvenWeek } from '../../shared/format-core'
 import { dayFromIso, isoFromDay } from '../../shared/schedule-core'
@@ -47,7 +47,7 @@ function Row({ kind, label, value }: { kind: PeriodKind | 'holiday'; label: stri
   )
 }
 
-export function AcademicCalendar({ periods, typical, title }: { periods: Period[]; typical: boolean; title: string }) {
+export function AcademicCalendar({ periods, typical, title }: { periods: Period[]; typical: boolean; title: ReactNode }) {
   const today = isoFromDay(moscowNow().day)
   const [all, setAll] = useState(false)
   const s = summary(periods, today)
@@ -137,7 +137,7 @@ export function AcademicCalendar({ periods, typical, title }: { periods: Period[
       )}
 
       <p className="cal-note cd-source">
-        {typical ? `${t('Типовой график 1 курса бакалавриата.')} ` : `${title}. `}
+        {typical ? `${t('Типовой график 1 курса бакалавриата.')} ` : <>{title}. </>}
         {exact
           ? t('Даты {source}.', { source: sourceTitle('doc') })
           : t('Даты примерные — по расписанию и типовому графику ГУУ, уточняются.')}

@@ -17,7 +17,7 @@
 | Старый формат | `schedule.json` (корень) | только МБ(МП) 1-1/1-2 — для версий приложения, закэшированных в Telegram |
 | Ручные правки | `overrides.json`, `overrides/thursday.json`, `overrides/thursday-1-2.json` | накладываются поверх файлов групп (см. ниже) |
 | Автообновление | `update.py` + `.github/workflows/deploy.yml` | раз в час проверяет guu.ru |
-| Служебное | `data/state.json`, `data/group_ids.json`, `data/teacher_history.json`, `data/doc-cache/` | SHA файлов ГУУ, реестр id групп, у каких групп вёл преподаватель (текущий и прошлый семестр), .doc → .docx |
+| Служебное | `data/state.json`, `data/group_ids.json`, `data/teacher_history.json`, `data/doc-cache/`, `data/i18n/` | SHA файлов ГУУ, реестр id групп, у каких групп вёл преподаватель (текущий и прошлый семестр), .doc → .docx |
 
 **Данные (`public/data/`, Vite кладёт на сайт как есть).** `groups.json` — все группы (id, имя, уровень,
 форма, курс, институт, программа); `schedule/<id>.json` — пары группы + сетка времени по дням (номер
@@ -28,6 +28,7 @@
 раньше начала семестра; прошлогодние файлы guu.ru — архив, по совпадению имени их группам НЕ показывать);
 `session_status.json` — что на странице сессии guu.ru («весенняя сессия прошлого года»), у каких групп сессия;
 `calendar.json` — первая и последняя пара каждого курса (учебный график, см. ниже);
+`subjects.json` — все предметы и какие без английского перевода (этап 11);
 `parse_report.json` — что разобрано по файлам/листам и где парсер не уверен (и «Другое → Документы»);
 `kug.json` — календарные учебные графики программ (PDF с guu.ru/sveden/education/, раз в сутки); `places.json` —
 места кампуса для «Корпусов ГУУ» (ведётся руками, update.py не трогает; `todo` — что не проверено) и `campus.json` —
@@ -92,6 +93,7 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /reviews/<top|teacher|save|delete|report|vote>` — рейтинг преподавателей (`reviews.ts`);
 - `GET /places` — правки мест «Корпусов ГУУ» поверх `data/places.json` (`places.ts`, D1 `place_edits`), кэш 60 с;
 - `GET /academic` — правки учебного графика (`academic.ts`, D1 `calendar_edits`), кэш 60 с;
+- `GET /translations` — правки английских названий ГУУ (`translations.ts`, D1 `translations`), кэш 60 с;
 - `GET /health` — жив ли воркер и D1 (для мониторинга);
 - вход защищает `guard.ts`: лимит тела (64 КБ, вебхук 1 МБ, админка 12 МБ), CORS только для origin `WEBAPP_URL`,
   лимиты Workers Rate Limiting (`RL_*` в wrangler.jsonc: по IP щедро, по пользователю, строже на запись) — 429 до D1;
@@ -110,7 +112,7 @@ LibreOffice ставится, только если изменился .doc (н�
   30 дней, каждую минуту — ответы поддержки из очереди, остаток лимита — досылка рассылок (≤30 сообщений за запуск,
   пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0022`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0023`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram), 0023 — `translations` (правки переводов)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_*` (бывший чат: не используются, сообщения стираются через 30 дней),
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`, `tg_updates` (повторы обновлений Telegram), `admin_log` (действия владельца,
 в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии), `hidden_lessons` (скрытые пары: свои и `user_id = 0` — для всей группы). Группа (`users.grp` и т. п.) — id.
@@ -224,6 +226,12 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   `shared/i18n-core.ts` и `src/format.ts`; новый текст интерфейса — только через t() и сразу с английским
   (иначе падает `npm run i18n`); данные ГУУ, нарочно русское — комментарий `i18n-ignore`. Язык: выбранный (ключ
   `lang` на устройстве/в облаке, D1 `users.lang`) → язык Telegram (ru/uk/be/kk → русский). Админ-панель — по-русски.
+  Данные ГУУ (`src/guu.ts`, грузятся только для английского): предметы — `data/i18n/subjects.en.json`, институты /
+  направления / программы — `data/i18n/guu.en.json` (оба в git, на сайте как есть), правки владельца — D1 `translations`
+  («Админ-панель → Переводы»), виды пар — словарь интерфейса, ФИО — латиницей (ICAO, `shared/i18n-core.ts → translit`),
+  места — `places.json` `name_en/address_en/howto_en/note_en`. Новый предмет без перевода — update.py присылает
+  владельцу тревогу; перевести — в «Переводах» или в `data/i18n/subjects.en.json`. Данные, что остаются русскими
+  (коды групп и аудиторий), — `lang="ru"` в разметке; проверка экранов — `?scan` в dev (`src/dev/i18n-scan.ts`).
 - Коммиты — по-русски, по смыслу этапа.
 
 ## Состояние (21.10.2026)

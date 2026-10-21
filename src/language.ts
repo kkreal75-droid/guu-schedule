@@ -2,6 +2,7 @@
 // (D1 users.lang — на нём бот пишет человеку). Не выбирал — язык Telegram (ru / uk / be / kk → русский).
 import { isLang, type Lang } from '../shared/i18n-core'
 import { saveLang } from './api'
+import { loadEnglishNames } from './guu'
 import { setLang } from './i18n'
 import { readLocal, save, writeLocal } from './storage'
 import { telegramLang } from './telegram'
@@ -24,6 +25,7 @@ export function bootLang(cloud: string | null, bot: Lang | null | undefined): La
 
 // Выбор в знакомстве или «Профиль → Язык»: интерфейс меняется сразу, без перезагрузки
 export function chooseLang(lang: Lang) {
+  if (lang === 'en') void loadEnglishNames() // названия предметов, программ, мест — перерисует, когда загрузятся
   setLang(lang)
   save(KEY, lang)
   saveLang(lang).catch((err) => console.warn('Не удалось сохранить язык в боте', err))

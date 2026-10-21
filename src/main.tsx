@@ -12,11 +12,14 @@ import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from '
 import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
 import { readCloud, readLocal } from './storage'
 import { checkIn, initTelegram, type CheckIn } from './telegram'
-import { setLang, t, useLang } from './i18n'
+import { getLang, setLang, t, useLang } from './i18n'
+import { loadEnglishNames } from './guu'
 import { bootLang, chooseLang, savedLang } from './language'
 import { useTheme } from './theme'
 
 if (import.meta.env.DEV) installTelegramMock()
+// ?scan — проверка английской версии на отрисованных экранах (src/dev/i18n-scan.ts)
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('scan')) void import('./dev/i18n-scan').then((m) => m.runI18nScan())
 initTelegram()
 // язык — сразу (скелетон и ошибки запуска уже на нём), уточняем после облака и бота
 setLang(bootLang(null, null))
@@ -161,6 +164,8 @@ let AppLazy: typeof import('./App').default
 async function boot() {
   const [checked, cloud, cloudIntroSeen, cloudLangValue] = await Promise.all([status, cloudPrefs, cloudIntro, cloudLang])
   setLang(bootLang(cloudLangValue, checked?.me?.lang))
+  // английский: названия ГУУ — до первого показа (не дольше 1,5 с; не успели — перерисуем, когда загрузятся)
+  if (getLang() === 'en') await Promise.race([loadEnglishNames(), new Promise((r) => setTimeout(r, 1500))])
   if (checked?.banned) {
     root.render(
       <div className="boot">

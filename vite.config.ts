@@ -7,7 +7,11 @@ import { defineConfig, type Plugin } from 'vite'
 // чтобы показывать то же расписание; schedule.json (только МБ(МП) 1-1/1-2) — для старых версий
 // приложения, которые Telegram ещё держит в кэше. Данные всего ГУУ (public/data/: группы, пары,
 // преподаватели, аудитории) Vite кладёт на сайт сам — как всё из public/.
-const DATA_FILES = ['schedule.json', 'overrides.json', 'overrides/thursday.json', 'overrides/thursday-1-2.json'].map((name) => ({
+// + английские названия ГУУ (этап 11): data/i18n/*.en.json — на сайте по тому же пути
+const DATA_FILES = [
+  'schedule.json', 'overrides.json', 'overrides/thursday.json', 'overrides/thursday-1-2.json',
+  'data/i18n/subjects.en.json', 'data/i18n/guu.en.json',
+].map((name) => ({
   name,
   path: resolve(import.meta.dirname, name),
 }))

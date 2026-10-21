@@ -52,6 +52,9 @@ export async function placeSave(env: Env, body: Record<string, unknown>): Promis
     name, short: clip(raw.short, 12) || null, icon: clip(raw.icon, 8) || '📍', group, address: clip(raw.address, 160),
     lat, lon, howto: howto(raw.howto), note: clip(raw.note, 300) || null, todo: clip(raw.todo, 300) || null,
     rooms: list(raw.rooms, 12, 30), aliases: list(raw.aliases, 20, 40), ...(hidden ? { hidden: true } : {}),
+    // английская версия (этап 11): название, адрес, «Как пройти», заметка — пусто: как в файле
+    name_en: clip(raw.name_en, 80) || null, address_en: clip(raw.address_en, 160) || null,
+    howto_en: howto(raw.howto_en) || null, note_en: clip(raw.note_en, 300) || null,
   }
   await env.DB.prepare(
     `INSERT INTO place_edits (id, data, updated_at) VALUES (?1, ?2, ?3)

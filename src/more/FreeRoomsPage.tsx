@@ -4,6 +4,7 @@ import { dataUrl, getTimetable, moscowNow, toMinutes } from '../schedule'
 import { dateOf, weekdayShort } from '../format'
 import { haptic } from '../telegram'
 import { t, tn } from '../i18n'
+import { roomLabel } from '../guu'
 
 // rooms.json (update.py): аудитория → когда занята; weeks — битовая маска (бит N = N-я неделя)
 type RoomsFile = { rooms: Record<string, { building: string; busy: [number, string, string, number][] }> }
@@ -126,10 +127,18 @@ export function FreeRoomsPage() {
             })}
           </p>
           {result.free.map(([building, rooms]) => (
-            <Section key={building} title={`${building}-… · ${rooms.length}`}>
+            <Section
+              key={building}
+              title={
+                <>
+                  <span lang="ru">{building}-…</span>
+                  {roomLabel(building).building && ` · ${roomLabel(building).building}`} · {rooms.length}
+                </>
+              }
+            >
               <div className="rooms-list">
                 {rooms.map((room) => (
-                  <span key={room} className="room-chip">
+                  <span key={room} className="room-chip" lang="ru">
                     {room}
                   </span>
                 ))}

@@ -8,6 +8,7 @@ import { WEEK_INDEXES, weekdayShort } from '../format'
 import { buildTimetable, dayFromIso, fetchGroup, groupName, isoFromDay, moscowNow } from '../schedule'
 import { confirmAction, haptic } from '../telegram'
 import { t } from '../i18n'
+import { trSubject } from '../guu'
 
 // «Ещё → Правки группы» — только старосте (назначает владелец) и только своей группы.
 // Правки видят все: приложение, /today, inline, беседы, календарь. Владелец видит автора и может откатить.
@@ -163,7 +164,7 @@ export function StarostaPage({ group, onExtras }: { group: string; onExtras: (gr
               {dayPairs.length === 0 && <span className="section-footer">{t('В этот день пар нет')}</span>}
               {dayPairs.map((l) => (
                 <button key={`${l.start}|${l.subject}`} type="button" className="chip" aria-pressed={start === l.start} onClick={() => setStart(l.start)}>
-                  {l.start} · {l.subject.slice(0, 28)}
+                  {l.start} · {trSubject(l.subject).slice(0, 28)}
                 </button>
               ))}
             </div>
@@ -288,7 +289,7 @@ export function StarostaPage({ group, onExtras }: { group: string; onExtras: (gr
           {info.tags.map((tag) => (
             <div key={tag.id} className="row">
               <span className="tag-text">
-                {weekdayShort(tag.weekday)} {tag.start} · {tag.subject}
+                {weekdayShort(tag.weekday)} {tag.start} · {trSubject(tag.subject)}
                 {tag.teacher ? ` · ${tag.teacher}` : ''} → <b>{info.subgroups.find((s) => s.id === tag.subgroup)?.name ?? '?'}</b>
               </span>
               <button type="button" className="button-inline danger" disabled={busy} onClick={() => run('/starosta/tag-delete', { id: tag.id }, t('Убрано'))}>
@@ -309,7 +310,7 @@ export function StarostaPage({ group, onExtras }: { group: string; onExtras: (gr
               {weekPairs.map((p) => (
                 <div key={`${p.start}|${p.subject}|${p.teacher}`} className="tag-pick">
                   <span>
-                    {p.start} · {p.subject}
+                    {p.start} · {trSubject(p.subject)}
                     {p.teacher ? ` · ${p.teacher}` : ''}
                   </span>
                   <div className="row-chips">

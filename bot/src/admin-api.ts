@@ -8,6 +8,7 @@ import { FOREVER, moderateReview, reviewStats, setReviewBan, type ReviewAction }
 import { academicReset, academicSave, loadCalendarEdits } from './academic'
 import { loadPlaceEdits, placeReset, placeSave } from './places'
 import { hiddenOverview, hideForGroup, unhideForGroup } from './hidden'
+import { loadTranslationEdits, translationSave } from './translations'
 import { MB_IDS, normalizeGroup } from '../../shared/groups'
 import { getUser } from './db'
 import { ADMIN_LIMIT } from './guard'
@@ -460,7 +461,7 @@ async function greetingPreview({ env, req }: Call): Promise<Response> {
 // только чтение — в журнал не пишем
 const READ_ONLY = new Set([
   'dashboard', 'users', 'user', 'reviews', 'schedule', 'broadcast-info', 'broadcast-count', 'places',
-  'academic', 'hidden',
+  'academic', 'hidden', 'translations',
 ])
 
 // «Скрытые пары»: что люди скрывают у себя (подсказка — ≥ 60% группы) и что скрыто для всей группы
@@ -496,6 +497,8 @@ const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   'settings-save': settingsSave,
   'greeting-preview': greetingPreview,
   hidden,
+  translations: async ({ env }) => json({ ok: true, edits: await loadTranslationEdits(env) }),
+  'translation-save': ({ env, req }) => translationSave(env, req.body),
   'hidden-group-add': async (call) => {
     const problem = await hideForGroup(call.env, call.req.body)
     return problem ? fail(400, problem) : hidden(call)

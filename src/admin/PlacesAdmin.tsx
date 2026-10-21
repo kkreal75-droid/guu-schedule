@@ -119,6 +119,11 @@ const toForm = (p: Partial<Place> & { hidden?: boolean }) => ({
   rooms: (p.rooms ?? []).join(', '),
   aliases: (p.aliases ?? []).join(', '),
   hidden: Boolean(p.hidden),
+  // английская версия (этап 11)
+  name_en: p.name_en ?? '',
+  address_en: p.address_en ?? '',
+  howto_en: p.howto_en ?? '',
+  note_en: p.note_en ?? '',
 })
 
 // «55.7140, 37.8115» или ссылка с ll=/query= — широта и долгота
@@ -149,6 +154,7 @@ function PlaceEditor({ base, edit, map, onBack, onSaved, onReset }: EditorProps)
         name: form.name, short: form.short, icon: form.icon, group: form.group, address: form.address,
         lat: coords?.[0] ?? null, lon: coords?.[1] ?? null, howto: form.howto, note: form.note, todo: form.todo,
         rooms: splitList(form.rooms), aliases: splitList(form.aliases), hidden: form.hidden,
+        name_en: form.name_en, address_en: form.address_en, howto_en: form.howto_en, note_en: form.note_en,
       })
       haptic('light')
       flash('Сохранено')
@@ -224,6 +230,23 @@ function PlaceEditor({ base, edit, map, onBack, onSaved, onReset }: EditorProps)
           <label className="field">
             <span>Заметка (часы работы и т. п.)</span>
             <input className="input" value={form.note} maxLength={300} onChange={(e) => set({ note: e.target.value })} />
+          </label>
+          <h4 className="admin-form-title">По-английски (для английской версии; пусто — покажется русское)</h4>
+          <label className="field">
+            <span>Название (English)</span>
+            <input className="input" value={form.name_en} maxLength={80} onChange={(e) => set({ name_en: e.target.value })} placeholder="Laboratory building" />
+          </label>
+          <label className="field">
+            <span>Адрес (English)</span>
+            <input className="input" value={form.address_en} maxLength={160} onChange={(e) => set({ address_en: e.target.value })} placeholder="99 Ryazansky Prospekt, structure 4" />
+          </label>
+          <label className="field">
+            <span>How to get there (каждая строка — пункт)</span>
+            <textarea className="input textarea" rows={4} value={form.howto_en} maxLength={1500} onChange={(e) => set({ howto_en: e.target.value })} />
+          </label>
+          <label className="field">
+            <span>Заметка (English)</span>
+            <input className="input" value={form.note_en} maxLength={300} onChange={(e) => set({ note_en: e.target.value })} />
           </label>
           <label className="field">
             <span>Префиксы аудиторий через запятую (У-432 → «У»; «Актовый зал» — целиком)</span>
