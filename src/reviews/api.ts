@@ -1,7 +1,7 @@
 // Запросы рейтинга преподавателей к боту (bot/src/reviews.ts). Авторы отзывов анонимны — их видит только
 // владелец (author, grp, reports приходят только ему).
 import { botError, callBot } from '../api'
-import { tn } from '../i18n'
+import { getLang, tn } from '../i18n'
 
 export type Criteria = { clarity: number; competence: number; communication: number }
 export type Helpful = { up: number; down: number; mine: number } // mine: 1 / -1 / 0
@@ -57,6 +57,7 @@ export const reviewsApi = {
 // Текст ошибки для человека: бот присылает готовую фразу (или код) — на языке интерфейса
 export const reviewError = (err: unknown): string => botError(err)
 
-export const formatAverage = (avg: number) => avg.toFixed(1).replace('.', ',')
+// «4,3» / «4.3» — десятичный разделитель по языку интерфейса
+export const formatAverage = (avg: number) => (getLang() === 'en' ? avg.toFixed(1) : avg.toFixed(1).replace('.', ','))
 
 export const reviewsWord = (n: number): string => tn(n, 'отзыв|отзыва|отзывов')

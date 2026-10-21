@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { searchGroups, type GroupInfo } from '../../shared/groups'
-import { groupSubtitle } from '../guu'
+import { GroupSubtitle } from '../components/GroupSubtitle'
 import { ChevronRight } from '../icons'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
@@ -47,8 +47,10 @@ export function GroupSearch({
               }}
             >
               <span className="gsearch-text">
-                <span className="gsearch-name">{g.name}</span>
-                <span className="gsearch-sub">{groupSubtitle(g)}</span>
+                <span className="gsearch-name" lang="ru">
+                  {g.name}
+                </span>
+                <GroupSubtitle group={g} className="gsearch-sub" />
               </span>
               <ChevronRight className="row-chevron" />
             </button>

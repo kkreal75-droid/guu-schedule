@@ -94,9 +94,15 @@ export function roomLabel(room: string): { code: string | null; building: string
   return { code: floor ? `${floor[1]}, floor ${floor[2]}` : room, building }
 }
 
-// «Международный бизнес · ИУПСиБК · 1 курс» / «International Business · ИУПСиБК · Year 1»
-export const groupSubtitle = (g: GroupInfo) =>
-  [trProgram(g.program), g.institute, g.level === 'postgrad' ? t('аспирантура, {n} курс', { n: g.course }) : t('{n} курс', { n: g.course })].join(' · ')
+// «Международный бизнес · ИУПСиБК · 1 курс» / «International Business · ИУПСиБК · Year 1». Аббревиатура института —
+// как в файлах ГУУ; не аббревиатура («Аспирантура») — по-английски
+const instituteShort = (abbr: string) => (en() && abbr.length > 8 ? trInstitute(abbr) : abbr)
+// [программа, институт, курс] — институт в разметке помечают lang="ru", если он остался по-русски
+export const groupSubtitleParts = (g: GroupInfo): [string, string, string] => [
+  trProgram(g.program),
+  instituteShort(g.institute),
+  g.level === 'postgrad' ? t('аспирантура, {n} курс', { n: g.course }) : t('{n} курс', { n: g.course }),
+]
 
 // что на странице сессии guu.ru (session_status.json): «зимняя сессия 2026/27», «весенняя сессия прошлого года»
 // i18n-ignore — разбираем русскую подпись update.py

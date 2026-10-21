@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { isMbGroup, type GroupInfo } from '../../shared/groups'
-import { groupSubtitle } from '../guu'
+import { GroupSubtitle } from '../components/GroupSubtitle'
 import { loadGroups } from '../data'
 import { GroupSearch } from '../onboarding/GroupSearch'
 import { MAX_FAVORITES, type Prefs } from '../prefs'
@@ -44,8 +44,10 @@ export function GroupSchedulePage({
       actions={
         <div className="viewer-head">
           <div className="viewer-title">
-            <span className="viewer-name">{picked.name}</span>
-            <span className="viewer-sub">{groupSubtitle(picked)}</span>
+            <span className="viewer-name" lang="ru">
+              {picked.name}
+            </span>
+            <GroupSubtitle group={picked} className="viewer-sub" />
           </div>
           <div className="viewer-actions">
             {own ? (
