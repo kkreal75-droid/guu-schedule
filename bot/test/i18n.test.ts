@@ -8,7 +8,7 @@ import { splitLangs } from '../src/broadcast'
 import type { Translations } from '../src/translations'
 import mb11 from '../../public/data/schedule/b1-mb-mp-1.json'
 import subjectsEn from '../../data/i18n/subjects.en.json'
-import type { Lesson } from '../../shared/schedule-core'
+import type { GroupFile, Lesson } from '../../shared/schedule-core'
 import { OWNER, call, eventually, mockOutbound, newUser, postAs, sendUpdate, sql, telegramCalls } from './helpers'
 
 beforeAll(() => mockOutbound())
@@ -31,7 +31,7 @@ describe('приветствие', () => {
   it('Telegram по-английски — английское приветствие и кнопка «📅 Open schedule»', async () => {
     const id = newUser()
     await privateMessage(id, '/start', 'en')
-    const [msg] = await eventually(async () => sentTo(id).length && sentTo(id))
+    const [msg] = await eventually(async () => (sentTo(id).length ? sentTo(id) : null))
     expect(msg.body.text).toMatch(/what's up, bro|Hey Alex|Yo Alex/)
     expect(msg.body.reply_markup?.inline_keyboard[0][0].text).toBe('📅 Open schedule')
   })
@@ -40,7 +40,7 @@ describe('приветствие', () => {
     for (const code of ['ru', 'uk', 'kk', undefined]) {
       const id = newUser()
       await privateMessage(id, '/start', code)
-      const [msg] = await eventually(async () => sentTo(id).length && sentTo(id))
+      const [msg] = await eventually(async () => (sentTo(id).length ? sentTo(id) : null))
       expect(msg.body.reply_markup?.inline_keyboard[0][0].text).toBe('📅 Открыть расписание')
     }
   })
@@ -50,7 +50,7 @@ describe('приветствие', () => {
     await postAs(id, '/profile', { role: 'student', group: 'b1-mb-mp-1' })
     expect((await postAs(id, '/lang', { lang: 'en' })).status).toBe(200)
     await privateMessage(id, '/start', 'ru')
-    const [msg] = await eventually(async () => sentTo(id).length && sentTo(id))
+    const [msg] = await eventually(async () => (sentTo(id).length ? sentTo(id) : null))
     expect(msg.body.reply_markup?.inline_keyboard[0][0].text).toBe('📅 Open schedule')
     expect((await sql('SELECT lang, lang_code FROM users WHERE id = ?', id).first())).toEqual({ lang: 'en', lang_code: 'ru' })
   })
@@ -61,7 +61,7 @@ describe('/today и inline', () => {
     const id = newUser()
     await postAs(id, '/profile', { role: 'student', group: 'b1-mb-mp-1' })
     await privateMessage(id, '/today', 'en')
-    const [msg] = await eventually(async () => sentTo(id).length && sentTo(id))
+    const [msg] = await eventually(async () => (sentTo(id).length ? sentTo(id) : null))
     expect(msg.body.text).toMatch(/^📅 <b>(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{1,2} [A-Z][a-z]+<\/b>/)
     expect(msg.body.text).not.toMatch(/Пар нет|Вне учебного|выходной|неделя/)
   })
@@ -81,7 +81,7 @@ describe('/today и inline', () => {
 })
 
 describe('пары по-английски', () => {
-  const lessons = (mb11 as { lessons: Lesson[] }).lessons
+  const lessons: Lesson[] = (mb11 as GroupFile).lessons.map((l) => ({ ...l, group: 'b1-mb-mp-1' }))
 
   it('предмет из словаря, вид пары, ФИО латиницей, код аудитории — как есть', () => {
     const lesson = lessons.find((l) => (subjectsEn as Record<string, string>)[l.subject] && l.kind && l.teacher && l.room)!
@@ -114,7 +114,7 @@ describe('календарь', () => {
     // строки длиннее 75 байт .ics переносит — склеиваем обратно
     const read = async () => (await (await call(new URL(url).pathname)).text()).replace(/\r\n /g, '')
     const ics = await read()
-    const lesson = (mb11 as { lessons: Lesson[] }).lessons.find((l) => (subjectsEn as Record<string, string>)[l.subject])!
+    const lesson = (mb11 as GroupFile).lessons.find((l) => (subjectsEn as Record<string, string>)[l.subject])!
     const en = (subjectsEn as Record<string, string>)[lesson.subject]
     expect(ics).toContain(`SUMMARY:${en.replace(/,/g, '\\,')}`)
     expect(ics).toMatch(/X-WR-CALNAME:Schedule /)
