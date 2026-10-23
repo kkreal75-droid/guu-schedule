@@ -130,8 +130,22 @@ export type HiddenOverview = { windows: HiddenWindow[]; group: HiddenLesson[]; p
 export type TranslationKind = 'subject' | 'institute' | 'direction' | 'program'
 export type TranslationEdit = { kind: TranslationKind; ru: string; en: string; updated_at: number }
 
+// вебхук бота в Telegram (bot/src/setup.ts → webhookCheck)
+export type BotStatus = {
+  expected: string
+  url: string
+  url_ok: boolean
+  updates_ok: boolean
+  pending: number
+  last_error_at: number | null
+  last_error: string | null
+  fresh_error: boolean
+}
+
 export const adminApi = {
   dashboard: () => callBot<Dashboard>('/admin/dashboard'),
+  botStatus: () => callBot<BotStatus>('/admin/bot-status'),
+  botSetup: () => callBot<BotStatus>('/admin/bot-setup'),
   users: () => callBot<{ users: AdminUser[] }>('/admin/users'),
   user: (id: number) => callBot<UserCard>('/admin/user', { id }),
   ban: (id: number, reason: string) => callBot<UserCard>('/admin/ban', { id, reason }),

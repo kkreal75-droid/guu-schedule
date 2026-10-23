@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
     "check": "wrangler types && tsc --noEmit",
     "migrate": "wrangler d1 migrations apply guu-bot --remote",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:raw": "wrangler deploy"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.6",

@@ -20,6 +20,7 @@ import { loadGroupFile, loadTeachersIndex, loadTimetable } from './schedule'
 import { htmlProblem, loadSettings, renderGreeting, saveSettings, type Settings } from './settings'
 import { TelegramError, sendMessage } from './telegram'
 import { escapeHtml } from './util'
+import { setupBot, webhookCheck } from './setup'
 
 const DAY_MS = 86_400_000
 const MSK_OFFSET_MS = 3 * 3_600_000
@@ -473,7 +474,7 @@ async function greetingPreview({ env, req }: Call): Promise<Response> {
 // только чтение — в журнал не пишем
 const READ_ONLY = new Set([
   'dashboard', 'users', 'user', 'reviews', 'schedule', 'broadcast-info', 'broadcast-count', 'places',
-  'academic', 'hidden', 'translations',
+  'academic', 'hidden', 'translations', 'bot-status',
 ])
 
 // «Скрытые пары»: что люди скрывают у себя (подсказка — ≥ 60% группы) и что скрыто для всей группы
@@ -481,6 +482,12 @@ const hidden = async ({ env }: Call) => json({ ok: true, ...(await hiddenOvervie
 
 const HANDLERS: Record<string, (call: Call) => Promise<Response>> = {
   dashboard,
+  // бот в Telegram: состояние вебхука и «Переустановить» (адрес — только из конфигурации, setup.ts)
+  'bot-status': async ({ env }) => json({ ok: true, ...(await webhookCheck(env)) }),
+  'bot-setup': async ({ env }) => {
+    await setupBot(env, true)
+    return json({ ok: true, ...(await webhookCheck(env)) })
+  },
   users,
   user,
   ban,

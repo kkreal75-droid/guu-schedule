@@ -1,7 +1,10 @@
-// Настройка бота в Telegram: вебхук на этот воркер и меню команд.
-// Запускается через GET / (?force — принудительно, например после деплоя).
+// Настройка бота в Telegram: вебхук на этот воркер и меню команд, присмотр за вебхуком.
+// Адрес вебхука — только из конфигурации (vars.WEBHOOK_URL в wrangler.jsonc: https, путь /webhook), никогда из
+// входящего запроса. Публичного адреса настройки нет: настраивают владелец (админ-панель, /webhook fix) и cron —
+// раз в 10 минут и после каждого деплоя он сверяет getWebhookInfo, чинит сброшенный вебхук и пишет владельцу.
 import { webhookSecret } from './auth'
-import { tg } from './telegram'
+import { sendMessage, tg } from './telegram'
+import { escapeHtml } from './util'
 
 type WebhookInfo = {
   url?: string
@@ -12,6 +15,114 @@ type WebhookInfo = {
 }
 
 const ALLOWED_UPDATES = ['message', 'callback_query', 'inline_query', 'my_chat_member']
+
+// WEBHOOK_URL из конфигурации; не https://…/webhook — ошибка (автотесты и npm run deploy ловят её до прода)
+export function webhookUrl(env: Env): string {
+  const raw = String((env as { WEBHOOK_URL?: unknown }).WEBHOOK_URL ?? '')
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('WEBHOOK_URL не задан в wrangler.jsonc')
+  }
+  if (url.protocol !== 'https:' || url.pathname !== '/webhook' || url.search || url.hash || url.username) {
+    throw new Error(`WEBHOOK_URL должен быть https://…/webhook, сейчас: ${raw}`)
+  }
+  return url.toString()
+}
+
+const FRESH_ERROR_MS = 15 * 60_000 // ошибка доставки за последние 15 минут — «свежая»
+const MAX_PENDING = 20
+
+export type WebhookCheck = {
+  expected: string
+  url: string // что стоит в Telegram ('' — вебхук сброшен)
+  url_ok: boolean
+  updates_ok: boolean
+  pending: number
+  last_error_at: number | null
+  last_error: string | null
+  fresh_error: boolean
+}
+
+export async function webhookCheck(env: Env, now = Date.now()): Promise<WebhookCheck> {
+  const expected = webhookUrl(env)
+  const info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
+  const at = info.last_error_date ? info.last_error_date * 1000 : null
+  return {
+    expected,
+    url: info.url ?? '',
+    url_ok: info.url === expected,
+    updates_ok: ALLOWED_UPDATES.every((u) => info.allowed_updates?.includes(u)),
+    pending: info.pending_update_count ?? 0,
+    last_error_at: at,
+    last_error: info.last_error_message ?? null,
+    fresh_error: at !== null && now - at < FRESH_ERROR_MS,
+  }
+}
+
+// Только вебхук (меню команд и описание не трогаем): drop_pending_updates нет — накопившееся Telegram дошлёт
+const setWebhook = async (env: Env) =>
+  tg(env, 'setWebhook', { url: webhookUrl(env), secret_token: await webhookSecret(env), allowed_updates: ALLOWED_UPDATES })
+
+const ALERT_KEY = 'webhook-alert' // KV: тревога о вебхуке — не чаще раза в 30 минут
+const ALERT_TTL = 30 * 60
+const VERSION_KEY = 'worker-version' // KV: какую версию воркера уже проверили после деплоя
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
+
+// Присмотр за вебхуком (cron раз в 10 минут и после деплоя): сброшен или стоит не туда — ставим свой и пишем
+// владельцу; свежая ошибка доставки или очередь > 20 — тревога. Тревоги — не чаще раза в 30 минут (deploy — всегда).
+export async function watchWebhook(env: Env, now = Date.now(), note: string | null = null): Promise<number> {
+  const check = await webhookCheck(env, now)
+  const problems: string[] = []
+  if (!check.url_ok || !check.updates_ok) {
+    await setWebhook(env)
+    const fixed = await webhookCheck(env, now)
+    const status = fixed.url_ok ? 'поставил свой заново' : `поставить свой не вышло (сейчас: ${fixed.url || 'пусто'})`
+    if (!check.url) problems.push(`Вебхук был сброшен (пустой адрес) — ${status}.`)
+    else if (hostOf(check.url) !== hostOf(check.expected)) {
+      problems.push(`Вебхук указывал на ЧУЖОЙ адрес ${hostOf(check.url)} — ${status}. Токен бота мог утечь: перевыпусти его в BotFather.`)
+    } else if (!check.url_ok) problems.push(`Вебхук стоял на ${check.url} — ${status}.`)
+    else problems.push(`У вебхука не те типы обновлений — ${status}.`)
+  }
+  if (check.fresh_error) {
+    const time = new Date(check.last_error_at!).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
+    problems.push(`Telegram не смог доставить обновление в ${time}: «${check.last_error}».`)
+  }
+  if (check.pending > MAX_PENDING) problems.push(`В очереди Telegram ${check.pending} обновлений (бот не успевает или не получает их).`)
+  if (!problems.length && !note) return 1
+  if (!note && (await env.KV.get(ALERT_KEY))) return 2
+  if (problems.length) await env.KV.put(ALERT_KEY, '1', { expirationTtl: ALERT_TTL })
+  const lines = [note, ...problems].filter((l): l is string => Boolean(l)).map(escapeHtml)
+  const head = problems.length ? '🚨 <b>Бот в Telegram</b>' : '✅ <b>Бот в Telegram</b>'
+  await sendMessage(env, Number(env.OWNER_ID), `${head}\n${lines.join('\n')}`)
+  return 4
+}
+
+// После деплоя или отката (новая версия воркера) — сразу проверка вебхука. Откат (версия старше прошлой проверенной) —
+// сообщение владельцу всегда; обычный деплой — только если с вебхуком что-то не так.
+let checkedVersion: string | null = null
+export async function afterDeploy(env: Env, now = Date.now()): Promise<number> {
+  const meta = (env as { CF_VERSION_METADATA?: { id?: string; timestamp?: string } }).CF_VERSION_METADATA
+  if (!meta?.id || checkedVersion === meta.id) return 0
+  const saved = await env.KV.get<{ id: string; timestamp: string }>(VERSION_KEY, 'json')
+  checkedVersion = meta.id
+  if (saved?.id === meta.id) return 1
+  await env.KV.put(VERSION_KEY, JSON.stringify({ id: meta.id, timestamp: meta.timestamp ?? '' }))
+  const rollback = Boolean(saved?.timestamp && meta.timestamp && meta.timestamp < saved.timestamp)
+  const when = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+  const note = rollback
+    ? `↩️ Воркер откатился на версию ${meta.id.slice(0, 8)} от ${when(meta.timestamp)} (была ${saved!.id.slice(0, 8)} от ${when(saved!.timestamp)}). Вебхук проверен.`
+    : null
+  return 2 + (await watchWebhook(env, now, note))
+}
 
 // Строка о данных в описании бота (экран «Что умеет этот бот?») — дописываем, если её нет
 const PRIVACY_LINE = 'Бот считает визиты для статистики, данные никому не передаются.'
@@ -98,15 +209,17 @@ const ADMIN_COMMANDS = [
   { command: 'bans', description: 'Список банов' },
   { command: 'usage', description: 'Расход лимитов Cloudflare' },
   { command: 'backup', description: 'Бэкап базы сейчас' },
+  { command: 'webhook', description: 'Вебхук: состояние, /webhook fix — заново' },
 ]
 
-export async function setupBot(env: Env, origin: string, force: boolean) {
-  const url = `${origin}/webhook`
+// Полная настройка (вебхук, меню команд, описание) — только владелец: админ-панель или «/webhook fix»
+export async function setupBot(env: Env, force: boolean) {
+  const url = webhookUrl(env)
   let info = await tg<WebhookInfo>(env, 'getWebhookInfo', {})
   let changed = false
   const sameUpdates = ALLOWED_UPDATES.every((u) => info.allowed_updates?.includes(u))
   if (force || info.url !== url || !sameUpdates) {
-    await tg(env, 'setWebhook', { url, secret_token: await webhookSecret(env), allowed_updates: ALLOWED_UPDATES })
+    await setWebhook(env)
     await tg(env, 'setMyCommands', { commands: PUBLIC_COMMANDS, scope: { type: 'default' } })
     await tg(env, 'setMyCommands', { commands: GROUP_COMMANDS, scope: { type: 'all_group_chats' } })
     await tg(env, 'setMyCommands', { commands: ADMIN_COMMANDS, scope: { type: 'chat', chat_id: Number(env.OWNER_ID) } })

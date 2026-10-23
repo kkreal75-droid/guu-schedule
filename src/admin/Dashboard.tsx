@@ -1,6 +1,67 @@
+import { useState } from 'react'
 import { Section } from '../components/Section'
-import { adminApi, adminError } from './api'
+import { formatStamp } from '../format'
+import { haptic } from '../telegram'
+import { adminApi, adminError, type BotStatus } from './api'
 import { BarChart, Loading, Stat, useLoad } from './common'
+
+// Бот в Telegram: стоит ли вебхук на наш адрес, очередь, последняя ошибка доставки; «Переустановить вебхук»
+// (адрес — только из конфигурации воркера). Cron проверяет то же раз в 10 минут и пишет в бот.
+function BotWebhook() {
+  const { data, setData, error } = useLoad(adminApi.botStatus)
+  const [busy, setBusy] = useState(false)
+  const [fail, setFail] = useState<string | null>(null)
+  if (!data) {
+    return (
+      <Section title="Бот в Telegram">
+        <p className="section-footer">{error ? adminError(error) : 'Проверяю вебхук…'}</p>
+      </Section>
+    )
+  }
+  const ok = data.url_ok && data.updates_ok
+  const fix = async () => {
+    haptic()
+    setBusy(true)
+    setFail(null)
+    try {
+      setData((await adminApi.botSetup()) as BotStatus)
+    } catch (err) {
+      setFail(adminError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <Section
+        title="Бот в Telegram"
+        footer="Адрес вебхука — только из настроек воркера. Раз в 10 минут и после деплоя бот проверяет его сам и пишет в личку, если что-то не так."
+      >
+        <div className="row">
+          <span>Вебхук</span>
+          <span className="row-value">{ok ? '✅ на месте' : data.url ? '❌ не наш адрес' : '❌ сброшен'}</span>
+        </div>
+        <div className="row">
+          <span>В очереди Telegram</span>
+          <span className="row-value">{data.pending}</span>
+        </div>
+        <div className="row">
+          <span>Ошибка доставки</span>
+          <span className="row-value">{data.last_error ? `${data.fresh_error ? '⚠️ ' : ''}${formatStamp(data.last_error_at!)}` : 'нет'}</span>
+        </div>
+        {data.last_error && (
+          <div className="row">
+            <span className="row-value">{data.last_error}</span>
+          </div>
+        )}
+      </Section>
+      <button type="button" className="button-primary" disabled={busy} onClick={fix}>
+        {busy ? 'Ставлю вебхук…' : 'Переустановить вебхук'}
+      </button>
+      {fail && <p className="section-footer">{fail}</p>}
+    </>
+  )
+}
 
 export function Dashboard() {
   const { data, error } = useLoad(adminApi.dashboard)
@@ -10,6 +71,8 @@ export function Dashboard() {
 
   return (
     <div className="page-body">
+      <BotWebhook />
+
       <Section title="Пользователи">
         <div className="stats">
           <Stat label="всего" value={users.total} />

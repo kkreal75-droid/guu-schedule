@@ -17,11 +17,13 @@
 //   POST /hidden/add|delete — «Это не моя пара»: свои скрытые пары (hidden.ts).
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
-//   GET  /        — настраивает вебхук и меню команд, показывает getWebhookInfo; ?force — заново (≤ 3 раз в минуту).
-//   GET  /health  — жив ли воркер и D1 (для мониторинга, без внутренних данных).
+//   GET  /health  — жив ли воркер, D1 и вебхук в Telegram (для мониторинга и проверки после деплоя, без внутренних данных).
+//   Публичного адреса настройки бота нет (GET / — 404): вебхук ставят владелец (админ-панель, /webhook fix) и cron
+//   (setup.ts: раз в 10 минут и после каждого деплоя сверяет getWebhookInfo, чинит и пишет владельцу).
 // Вход защищает guard.ts: лимит тела, CORS только для приложения, лимиты запросов по IP и пользователю.
 //   cron (раз в минуту) — сводки в беседы и изменения расписания (digest.ts), досылка рассылок, ответы из очереди поддержки,
-//   раз в 10 минут — тревоги автообновления (alerts.ts) и рассылка о новой сессии (session.ts), раз в час — чистка журнала.
+//   раз в 10 минут — тревоги автообновления (alerts.ts), рассылка о новой сессии (session.ts) и присмотр за вебхуком
+//   (setup.ts), раз в час — чистка журнала.
 //
 // Секреты (npx wrangler secret put …): BOT_TOKEN, OWNER_ID, GITHUB_TOKEN.
 // Данные — D1 (DB), настройки — KV.
@@ -56,7 +58,7 @@ import { handleFavorites, handleIntro, handleLang, handleProfile } from './profi
 import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { cleanupHidden, handleHiddenApi, userHidden } from './hidden'
 import { loadSettings } from './settings'
-import { setupBot } from './setup'
+import { afterDeploy, watchWebhook, webhookCheck } from './setup'
 import { answerCallback, type TgUpdate } from './telegram'
 
 // Кто прислал обновление и стоит ли его считать в лимит: личка, кнопки, inline и команды в беседах.
@@ -202,8 +204,9 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
   }
 }
 
-// GET /health — для мониторинга: жив ли воркер и отвечает ли D1 (проверка — не чаще раза в 30 с)
-let health: { at: number; ok: boolean } | null = null
+// GET /health — для мониторинга и проверки после деплоя: жив ли воркер, отвечает ли D1, стоит ли вебхук в Telegram
+// на наш адрес (webhook: null — Telegram не ответил) и нет ли свежих ошибок доставки (delivery). Не чаще раза в 30 с.
+let health: { at: number; ok: boolean; webhook: boolean | null; delivery: boolean | null } | null = null
 async function handleHealth(env: Env): Promise<Response> {
   if (!health || Date.now() - health.at > 30_000) {
     let ok = true
@@ -212,9 +215,23 @@ async function handleHealth(env: Env): Promise<Response> {
     } catch {
       ok = false
     }
-    health = { at: Date.now(), ok }
+    let webhook: boolean | null = null
+    let delivery: boolean | null = null
+    try {
+      const check = await webhookCheck(env)
+      webhook = check.url_ok && check.updates_ok
+      delivery = !check.fresh_error
+    } catch (err) {
+      // нет WEBHOOK_URL в конфигурации — «плохо»; Telegram не ответил — «неизвестно»
+      webhook = err instanceof Error && err.message.startsWith('WEBHOOK_URL') ? false : null
+    }
+    health = { at: Date.now(), ok, webhook, delivery }
   }
-  return Response.json({ ok: health.ok }, { status: health.ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } })
+  const good = health.ok && health.webhook !== false
+  return Response.json(
+    { ok: good, db: health.ok, webhook: health.webhook, delivery: health.delivery },
+    { status: good ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
+  )
 }
 
 // Обновление от Telegram: только POST, секрет в заголовке (сравнение в постоянное время), тело до 1 МБ.
@@ -266,7 +283,7 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   // публичное (без initData) — свой лимит по IP: из кэша, но запрос всё равно стоит денег
   const publicGet =
-    request.method === 'GET' && (['/', '/health', '/places', '/academic', '/translations'].includes(url.pathname) || url.pathname.startsWith('/event/'))
+    request.method === 'GET' && (['/health', '/places', '/academic', '/translations'].includes(url.pathname) || url.pathname.startsWith('/event/'))
   if (publicGet && !(await allow(env, 'RL_PUBLIC', clientIp(request)))) return tooMany()
   if (url.pathname === '/health' && request.method === 'GET') return handleHealth(env)
 
@@ -315,17 +332,7 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
     return guarded(env, `Отзывы: ${action}`, () => handleReviewsApi(env, request, action))
   }
 
-  if (url.pathname === '/' && request.method === 'GET') {
-    // настройка вебхука ходит в Telegram 4–8 раз — не чаще 3 раз в минуту на всех
-    if (!(await allow(env, 'RL_SETUP', 'setup'))) return tooMany()
-    try {
-      return Response.json(await setupBot(env, url.origin, url.searchParams.has('force')))
-    } catch (err) {
-      await reportError(env, 'Настройка вебхука', err)
-      return Response.json({ ok: false, error: 'telegram' }, { status: 502 })
-    }
-  }
-
+  // GET / — 404: публичной настройки бота нет (setup.ts)
   return new Response('not found', { status: 404 })
 }
 
@@ -333,6 +340,11 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
   const now = controller.scheduledTime
   const run = async () => {
     let used = 0
+    // новая версия воркера (деплой или откат) — сразу проверка вебхука; раз в 10 минут — присмотр (setup.ts)
+    used += await afterDeploy(env, now).catch((err) => (reportError(env, 'Проверка после деплоя', err), 0))
+    if (new Date(now).getUTCMinutes() % 10 === 1) {
+      used += await watchWebhook(env, now).catch((err) => (reportError(env, 'Присмотр за вебхуком', err), 0))
+    }
     used += await runDigests(env, now).catch((err) => (reportError(env, 'Сводки в беседы', err), 0))
     if (new Date(now).getUTCMinutes() % 10 === 5) {
       used += await detectChanges(env, now).catch((err) => (reportError(env, 'Изменения расписания', err), 0))

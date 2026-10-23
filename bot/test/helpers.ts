@@ -51,6 +51,16 @@ const SITE: Record<string, unknown> = {
 // что воркер отправил в Telegram — для проверок
 export const telegramCalls: { method: string; body: unknown }[] = []
 
+// вебхук в поддельном Telegram: по умолчанию — наш адрес из конфигурации; setWebhook не по https отклоняется
+// и оставляет вебхук пустым
+const ALL_UPDATES = ['message', 'callback_query', 'inline_query', 'my_chat_member']
+const WEBHOOK = (env as unknown as { WEBHOOK_URL: string }).WEBHOOK_URL
+export const telegramState: { webhook: Record<string, unknown> } = { webhook: {} }
+export function resetWebhook(patch: Record<string, unknown> = {}) {
+  telegramState.webhook = { url: WEBHOOK, has_custom_certificate: false, pending_update_count: 0, allowed_updates: ALL_UPDATES, ...patch }
+}
+resetWebhook()
+
 export function mockOutbound() {
   const real = globalThis.fetch
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -66,6 +76,16 @@ export function mockOutbound() {
         // multipart (sendDocument) — оставляем текстом
       }
       telegramCalls.push({ method, body })
+      if (method === 'getWebhookInfo') return Response.json({ ok: true, result: telegramState.webhook })
+      if (method === 'setWebhook') {
+        const { url: hook, allowed_updates } = body as { url: string; allowed_updates?: string[] }
+        if (!/^https:\/\//.test(hook)) {
+          telegramState.webhook = { ...telegramState.webhook, url: '' }
+          return Response.json({ ok: false, error_code: 400, description: 'Bad Request: bad webhook: An HTTPS URL must be provided for webhook' }, { status: 400 })
+        }
+        telegramState.webhook = { ...telegramState.webhook, url: hook, allowed_updates: allowed_updates ?? ALL_UPDATES, last_error_date: undefined, last_error_message: undefined }
+        return Response.json({ ok: true, result: true })
+      }
       const result =
         method === 'getChatMember' ? { status: 'member' } : method === 'getMe' ? { username: 'GUU_Scheduule_bot' } : { message_id: 1 }
       return Response.json({ ok: true, result })

@@ -14,6 +14,7 @@ import { escapeHtml } from './util'
 import { handleSupportReply } from './support'
 import { backupToOwner } from './backup'
 import { deleteMeCommand } from './privacy'
+import { setupBot, webhookCheck, type WebhookCheck } from './setup'
 
 export const BANNED_REPLY = 'Доступ к боту ограничен.'
 
@@ -76,6 +77,25 @@ const ADMIN: Record<string, Handler> = {
   '/bans': ({ env, message }) => listBans(env, message.chat.id),
   '/usage': async ({ env, message }) => void (await sendMessage(env, message.chat.id, usageText(await usageToday(env)))),
   '/backup': async ({ env }) => void (await backupToOwner(env)),
+  // состояние вебхука; «/webhook fix» — поставить заново (адрес — из конфигурации, setup.ts)
+  '/webhook': async ({ env, message, args }) => {
+    if (args.trim() === 'fix') await setupBot(env, true)
+    await sendMessage(env, message.chat.id, webhookText(await webhookCheck(env)))
+  },
+}
+
+function webhookText(c: WebhookCheck): string {
+  const at = (ms: number | null) =>
+    ms ? new Date(ms).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+  return [
+    `🔗 <b>Вебхук</b> ${c.url_ok && c.updates_ok ? '✅ на месте' : '❌ не на месте'}`,
+    `Адрес: ${escapeHtml(c.url || 'пусто')}`,
+    `В очереди: ${c.pending}`,
+    `Последняя ошибка доставки: ${c.last_error ? `${at(c.last_error_at)} — ${escapeHtml(c.last_error)}` : 'нет'}`,
+    c.url_ok && c.updates_ok ? '' : 'Поставить заново: /webhook fix',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, message: TgMessage): Promise<void> {

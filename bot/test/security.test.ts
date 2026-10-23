@@ -251,7 +251,7 @@ describe('публичное и служебное', () => {
   it('/health — 200 без внутренних данных', async () => {
     const res = await call('/health')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true })
+    expect(await res.json()).toEqual({ ok: true, db: true, webhook: true, delivery: true })
   })
   it('ETag: повтор — 304', async () => {
     const first = await call('/places')

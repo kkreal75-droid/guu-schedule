@@ -103,7 +103,7 @@ LibreOffice ставится, только если изменился .doc (н�
 - `GET /academic` — правки учебного графика (`academic.ts`, D1 `calendar_edits`), кэш 60 с;
 - `GET /translations` — правки английских названий ГУУ (`translations.ts`, D1 `translations`), кэш 60 с;
 - `GET /event/<id>.ics` — мероприятие make.events в календарь (`events.ts`, данные — `data/events.json` с сайта);
-- `GET /health` — жив ли воркер и D1 (для мониторинга);
+- `GET /health` — жив ли воркер, D1 и вебхук в Telegram: `{ok, db, webhook, delivery}` (мониторинг, проверка после деплоя);
 - вход защищает `guard.ts`: лимит тела (64 КБ, вебхук 1 МБ, админка 12 МБ), CORS только для origin `WEBAPP_URL`,
   лимиты Workers Rate Limiting (`RL_*` в wrangler.jsonc: по IP щедро, по пользователю, строже на запись) — 429 до D1;
   публичное (`/places`, `/academic`, `.ics`) — из памяти изолята с ETag;
@@ -111,9 +111,15 @@ LibreOffice ставится, только если изменился .doc (н�
   владельца (reply на «✍️ Ответ на обращение №N») бот пересылает автору (`support.ts`, ≤5 в сутки); ответ можно поставить в очередь — `UPDATE support_messages SET reply_text = '…' WHERE id = N`,
   cron отправит его автору тем же сообщением «💬 Ответ на твоё обращение» и отметит владельцу;
 - `POST /admin/<…>` — админ-панель (`admin-api.ts`), только OWNER_ID, остальным 403 на любой адрес;
-- `GET /` — setWebhook + меню команд (`?force` — заново) + строка о данных в описании бота;
+- `GET /` — 404. Публичной настройки бота нет. Адрес вебхука —
+  только `vars.WEBHOOK_URL` (https, `/webhook`); настройка (`setup.ts → setupBot`: вебхук, меню команд, описание) —
+  «Админ-панель → Дашборд → Переустановить вебхук» (`POST /admin/bot-setup`, состояние — `/admin/bot-status`) или
+  `/webhook fix` у владельца;
 - cron `* * * * *`: сводки в беседы, раз в 10 мин (минута %10 = 5) сверка изменений на 7 дней
   (снимки — D1 `group_snapshots`, только группы с беседами, по 15 за запуск) и тревоги автообновления,
+  в :x1 — присмотр за вебхуком (`setup.ts → watchWebhook`: сброшен или чужой адрес — ставит свой и пишет владельцу,
+  свежая ошибка доставки или очередь > 20 — тревога; тревоги не чаще раза в 30 мин, KV `webhook-alert`), новая версия
+  воркера (деплой или откат, `CF_VERSION_METADATA`, KV `worker-version`) — та же проверка сразу, об откате — владельцу,
   в :x3 — сверка расхода лимитов (`usage.ts`: на 80% — тревога владельцу и режим экономии: визиты не пишутся,
   .ics из кэша), в 00:20 UTC — бэкап D1 владельцу в личку (`backup.ts`, `docs/backup.md`),
   в :x7 — рассылка «📚 Опубликовано расписание сессии» группам, у которых она появилась (`session.ts`, KV
@@ -127,11 +133,12 @@ LibreOffice ставится, только если изменился .doc (н�
 в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии), `hidden_lessons` (скрытые пары: свои и `user_id = 0` — для всей группы). Группа (`users.grp` и т. п.) — id.
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
-`alerts-sent` (присланные тревоги). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
+`alerts-sent` (присланные тревоги), `webhook-alert`, `worker-version`, `err:<хэш>` (одинаковая ошибка владельцу — не чаще
+раза в час, `errors.ts`). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
 
 **Команды бота.** Личка: `/start` (одно из 3 приветствий), `/today`, `/tomorrow`.
 Личка, всем: `/deleteme` — удалить свои данные (с подтверждением; отзывы обезличиваются, бан остаётся).
-Владелец (у остальных молчат): `/stats`, `/usage` (расход лимитов), `/backup` (бэкап D1 сейчас), `/broadcast`, `/broadcasts`, `/export`, `/ban`, `/unban`, `/bans`.
+Владелец (у остальных молчат): `/stats`, `/usage` (расход лимитов), `/backup` (бэкап D1 сейчас), `/webhook` (вебхук; `fix` — заново), `/broadcast`, `/broadcasts`, `/export`, `/ban`, `/unban`, `/bans`.
 Беседы: `/setup` (админы: кнопки 1-1/1-2 или `/setup название`
 — поиск по всем группам; потом время 7:00/7:30/8:00/выкл),
 `/today`, `/tomorrow`, `/here` (рассылка в эту тему форума), `/off`. Inline: `@GUU_Scheduule_bot сегодня|завтра|пн…сб|неделя`.
@@ -142,7 +149,7 @@ LibreOffice ставится, только если изменился .doc (н�
 npm run dev                      # фронт; ?tg&uid=7&name=… — эмулятор Telegram (src/dev/telegram-mock.ts)
 npm run build                    # tsc -b && vite build → dist/
 cd bot && npm run check          # wrangler types + tsc
-cd bot && npm run deploy         # деплой воркера, затем: curl https://guu-schedule-bot.guu-schedule-bot.workers.dev/?force
+cd bot && npm run deploy         # scripts/deploy.mjs: WEBHOOK_URL → wrangler deploy → /health, вебхук, 403/404 → откат, если плохо
 cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и проверить: … migrations list guu-bot --remote
 ```
 Сайт деплоится только через push в main (GitHub Actions). Локально: `bot/.dev.vars` (тестовый токен
