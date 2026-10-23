@@ -51,6 +51,9 @@ function forgetOpened() {
   window.history.replaceState(window.history.state, '', url)
 }
 
+// добавили в избранное через «+» — после перезагрузки расписания сразу показать добавленное
+let viewAfterReload: string | null = null
+
 export default function App({ status, extras: initialExtras, startTab, onReload, onChangeProfile, onSaveChoice, onShowIntro }: Props) {
   const [prefs, updatePrefs] = usePrefs()
   // правки и подгруппы; староста меняет их — обновляем сразу, без перезапуска
@@ -139,7 +142,11 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
   }, [])
   const [tab, setTab] = useState<Tab>(() => startTab ?? (openedFrom() ? 'more' : 'schedule'))
   // группа, выбранная переключателем на экране расписания; null — своя
-  const [viewGroup, setViewGroup] = useState<string | null>(null)
+  const [viewGroup, setViewGroup] = useState<string | null>(() => {
+    const id = viewAfterReload
+    viewAfterReload = null
+    return id
+  })
   const shownGroup = viewGroup && schedule.groups.includes(viewGroup) ? viewGroup : home
   const [cursor, setCursor] = useState<Cursor>(initialCursor)
 
@@ -226,7 +233,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     setAdding(false)
     if (favorites.has(id)) return
     setFavorites([...prefs.favorites, id])
-    setViewGroup(id)
+    viewAfterReload = id
     void onReload('schedule')
   }
 
