@@ -25,6 +25,8 @@
   public/data/subjects.json             — все предметы и какие без английского перевода (data/i18n/subjects.en.json)
   public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
                                           «Сведения → Образование»; раз в сутки (в 4 ч МСК) или с --force
+  public/data/events.json               — мероприятия проектного обучения с make.events (каждый час; прошедшие —
+                                          7 дней); data/events_state.json — с какого времени make.events не отвечает
   schedule.json                         — как раньше: только МБ(МП) 1-1 и 1-2 (для старых версий приложения)
   data/state.json, data/group_ids.json  — SHA файлов, число групп; реестр id групп (id не меняются)
   data/teacher_history.json             — у каких групп вёл пары преподаватель: текущий и прошлый семестр
@@ -352,6 +354,228 @@ def update_kug(force: bool) -> bool:
     Writer().write(path, dump(body))
     print(f"Календарные учебные графики: {len(programs)}")
     return True
+
+
+# ---------- мероприятия проектного обучения (Make.Events, этап 13) ----------
+# Публичный API сообщества ГУУ на make.events — тот же, что у страницы сообщества (без входа). Каждый час:
+# предстоящие + сегодняшние; прошедшие держим у себя 7 дней. Данные чужие — чистим: HTML → текст, лимиты длины,
+# ссылку собираем сами из id. Не ответил — остаётся прошлая копия; 6 часов подряд без ответа — тревога владельцу.
+
+EVENTS_API = "https://make.events/api/v1/events/search"
+EVENTS_COMMUNITY = "cPsmzW"
+EVENTS_PAGE = f"https://make.events/community/{EVENTS_COMMUNITY}/public/events"
+EVENTS_FILE = OUT / "events.json"
+EVENTS_STATE = ROOT / "data" / "events_state.json"  # с какого времени источник не отвечает (пишется только при смене)
+EVENTS_ARCHIVE_DAYS = 7
+EVENTS_STALE_HOURS = 6
+EVENTS_MAX_BYTES = 8 * 1024 * 1024
+EVENTS_MAX_PAGES = 10  # по 100 — до 1000 предстоящих; больше — что-то не то
+EVENT_ID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+EVENT_SUBDOMAIN = re.compile(r"^[a-z0-9-]{1,40}$")
+# управляющие символы и «невидимые» (направление текста, нулевой ширины) — из чужого текста убираем
+UNSAFE_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f​-‏‪-‮⁠-⁩﻿]")
+
+
+def post_json(url: str, body: dict, attempts: int = 2):
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    if parts.scheme != "https" or parts.hostname != "make.events":
+        raise UpdateError(f"неожиданный адрес {url}")
+    data = json.dumps(body).encode()
+    for attempt in range(1, attempts + 1):
+        try:
+            req = Request(url, data=data, method="POST", headers={
+                "User-Agent": USER_AGENT, "Content-Type": "application/json", "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate"})
+            with urlopen(req, timeout=30, context=SSL_CONTEXT) as resp:
+                declared = int(resp.headers.get("Content-Length") or 0)
+                if declared > EVENTS_MAX_BYTES:
+                    raise UpdateError(f"ответ {declared // 1048576} МБ — больше лимита")
+                raw = resp.read(EVENTS_MAX_BYTES + 1)
+                if len(raw) > EVENTS_MAX_BYTES:
+                    raise UpdateError("ответ больше лимита")
+                return json.loads(decompress(raw, resp.headers.get("Content-Encoding")))
+        except HTTPError as e:
+            if e.code < 500 or attempt == attempts:
+                raise SiteUnavailable(f"make.events: HTTP {e.code}") from e
+        except (URLError, TimeoutError, ConnectionError) as e:
+            if attempt == attempts:
+                raise SiteUnavailable(f"make.events: {e}") from e
+        except ValueError as e:  # не JSON
+            raise UpdateError(f"make.events: ответ не JSON ({e})") from e
+        time.sleep(5 * attempt)
+    raise AssertionError("unreachable")
+
+
+class HtmlText(HTMLParser):
+    """Описание мероприятия (HTML редактора make.events) → обычный текст с абзацами."""
+    BLOCK = {"p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "table", "ul", "ol", "figure", "blockquote"}
+    SKIP = {"script", "style", "button", "noscript", "template", "svg"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self._skip += 1
+        elif tag == "li":
+            self.parts.append("\n• ")
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+        elif tag == "td":
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self._skip = max(0, self._skip - 1)
+        elif tag in self.BLOCK or tag == "li":
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.parts.append(re.sub(r"\s+", " ", data))  # как браузер: переводы строк в исходнике — пробелы
+
+
+def clip(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > limit * 0.8 else cut).rstrip(" ,.;:—-\n") + "…"
+
+
+def plain_line(value, limit: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r"\s+", " ", UNSAFE_CHARS.sub("", value)).strip()
+    return clip(text, limit) if text else None
+
+
+def html_to_text(value, limit: int) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    parser = HtmlText()
+    try:
+        parser.feed(value[:200_000])
+        parser.close()
+    except Exception:  # битый HTML — хотя бы без тегов
+        parser.parts = [re.sub(r"<[^>]*>", " ", value)]
+    text = UNSAFE_CHARS.sub("", "".join(parser.parts).replace("\xa0", " "))
+    # абзац — строка (приложение показывает их с отступом), пустые строки-распорки редактора не нужны
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
+    return clip("\n".join(line for line in lines if line), limit)
+
+
+def event_from_api(e: dict) -> dict | None:
+    """Одно мероприятие из ответа API → наш формат; что-то не так — None (такое не показываем)."""
+    from zoneinfo import ZoneInfo
+    if not isinstance(e, dict) or not EVENT_ID.match(str(e.get("eventId") or "")):
+        return None
+    title = plain_line(e.get("title"), 300)
+    try:
+        start = datetime.fromisoformat(e["dateStart"])
+        end = datetime.fromisoformat(e["dateEnd"]) if e.get("dateEnd") else None
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not title or start.tzinfo is None:
+        return None
+    # время показываем в поясе мероприятия, как сама make.events: организаторы вводят «10:40» и ставят пояс наугад
+    # (Сантьяго, Каир…), московское время такого мероприятия — не то, что они имели в виду
+    try:
+        tz = ZoneInfo(str(e.get("timezone") or "Europe/Moscow"))
+    except Exception:
+        tz = ZoneInfo("Europe/Moscow")
+    start = start.astimezone(tz)
+    end = end.astimezone(tz) if end and end.tzinfo else None
+    # конец «23:59» — make.events ставит его, когда организатор конец не указал; многодневные — без конца
+    if end and (end.date() != start.date() or end <= start or end.strftime("%H:%M") >= "23:58"):
+        end = None
+    sub = str((e.get("company") or {}).get("subdomain") or "guu")
+    if not EVENT_SUBDOMAIN.match(sub):
+        sub = "guu"
+    place = plain_line(e.get("place"), 200)
+    return {
+        "id": e["eventId"],
+        "title": title,
+        "start": start.strftime("%Y-%m-%dT%H:%M"),
+        "end": end.strftime("%Y-%m-%dT%H:%M") if end else None,
+        "place": place or ("Онлайн" if e.get("isOnline") is True else None),
+        "description": html_to_text(e.get("description"), 4000) or (plain_line(e.get("shortDescription"), 400) or ""),
+        "url": f"https://{sub}.make.events/eventsNew/{e['eventId']}",
+    }
+
+
+def fetch_events() -> list[dict]:
+    found: dict[str, dict] = {}
+    for kind in ("actual", "today"):
+        offset = 0
+        for _ in range(EVENTS_MAX_PAGES):
+            page = post_json(f"{EVENTS_API}?t={kind}", {
+                "filters": {"&communityId": {"eq": EVENTS_COMMUNITY}}, "limit": 100, "offset": offset})
+            items = page.get("items") if isinstance(page, dict) else None
+            if not isinstance(items, list):
+                raise UpdateError("make.events: в ответе нет списка мероприятий — формат изменился?")
+            for raw in items:
+                event = event_from_api(raw)
+                if event:
+                    found[event["id"]] = event
+            total = page.get(f"{kind}Count")
+            offset += len(items)
+            if not items or len(items) < 100 or (isinstance(total, int) and offset >= total):
+                break
+    return list(found.values())
+
+
+def write_alerts(prefix: str, alerts: list[dict]) -> None:
+    """Тревоги одного источника (id с prefix) в alerts.json; чужие не трогаем, та же тревога — то же время."""
+    path = OUT / "alerts.json"
+    old = (load_json(path, {}) or {}).get("alerts", [])
+    keep = {a["id"]: a for a in old}
+    rest = [a for a in old if not a["id"].startswith(prefix)]
+    Writer().write(path, dump({"alerts": rest + [keep.get(a["id"], a) for a in alerts]}))
+
+
+def update_events(now: datetime | None = None) -> bool:
+    """Обновляет public/data/events.json. Возвращает, поменялось ли что-то для сайта."""
+    now = now or datetime.now(MSK)
+    state = load_json(EVENTS_STATE, {}) or {}
+    old = load_json(EVENTS_FILE, {}) or {}
+    old_events = old.get("events", [])
+    today = now.date().isoformat()
+    keep_from = (now.date() - timedelta(days=EVENTS_ARCHIVE_DAYS)).isoformat()
+    try:
+        fetched = fetch_events()
+        upcoming_before = sum(1 for e in old_events if e["start"][:10] >= today)
+        if not fetched and upcoming_before >= 5:
+            raise UpdateError(f"make.events вернул 0 мероприятий (было {upcoming_before} предстоящих)")
+    except UpdateError as e:
+        since = state.get("failing_since") or now.isoformat(timespec="seconds")
+        if state.get("failing_since") != since:
+            Writer().write(EVENTS_STATE, dump_pretty({"failing_since": since}))
+        warn(f"мероприятия Make.Events: {e}")
+        hours = (now - datetime.fromisoformat(since)).total_seconds() / 3600
+        if hours >= EVENTS_STALE_HOURS:
+            copy = old.get("updated_at", "—")[:16].replace("T", " ")
+            aid = "events-stale-" + hashlib.sha1(since.encode()).hexdigest()[:8]
+            write_alerts("events-", [{"id": aid, "at": now.isoformat(timespec="seconds"), "text":
+                f"Мероприятия Make.Events не обновляются {int(hours)} ч ({e}). В приложении — копия от {copy}."}])
+        return False
+    if state.get("failing_since"):
+        Writer().write(EVENTS_STATE, dump_pretty({"failing_since": None}))
+    write_alerts("events-", [])
+    ids = {e["id"] for e in fetched}
+    # прошедшие за 7 дней — из прошлой копии (API отдаёт архив только целиком, с 2024 года);
+    # предстоящее, которого больше нет в API, — отменено или скрыто: не показываем
+    archive = [e for e in old_events if e["id"] not in ids and keep_from <= e["start"][:10] < today]
+    events = sorted([e for e in fetched if e["start"][:10] >= keep_from] + archive, key=lambda e: (e["start"], e["id"]))
+    body = stable(EVENTS_FILE, {"source": EVENTS_PAGE, "updated_at": now.isoformat(timespec="seconds"), "events": events})
+    writer = Writer()
+    writer.write(EVENTS_FILE, dump(body))
+    if writer.changed:
+        print(f"Мероприятия Make.Events: {len(events)} (предстоящих {sum(1 for e in events if e['start'][:10] >= today)})")
+    return bool(writer.changed)
 
 
 @dataclass
@@ -1056,6 +1280,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
     old_alerts = (load_json(OUT / "alerts.json", {}) or {}).get("alerts", [])
     keep = {a["id"]: a for a in old_alerts}
     alerts_now = [keep.get(a["id"], a) for a in alerts]  # та же тревога — то же время, бот не повторит
+    alerts_now += [a for a in old_alerts if a["id"].startswith("events-")]  # тревоги Make.Events — свои (update_events)
     writer.write(OUT / "alerts.json", dump({"alerts": alerts_now}))
 
     # 9. schedule.json для старых версий приложения: МБ(МП) 1-1 и 1-2 в прежнем формате
@@ -1148,8 +1373,10 @@ def check_overrides(lessons: list[dict]) -> None:
 
 
 def update(force: bool, local: Path | None) -> tuple[bool, str, bool]:
+    events_changed = False
     if not local:
         update_kug(force)
+        events_changed = update_events()
     state = load_json(STATE_FILE, {"files": {}})
     sources = local_sources(local) if local else find_sources()
     contents: dict[str, bytes] = {}
@@ -1163,7 +1390,7 @@ def update(force: bool, local: Path | None) -> tuple[bool, str, bool]:
     old = {k: v.get("sha256") for k, v in state.get("files", {}).items()}
     if not force and shas == {k: old.get(k) for k in shas} and set(old) == set(shas) and (OUT / "groups.json").exists():
         print("Ни один файл не изменился — расписание то же.")
-        return False, "", False
+        return events_changed, "Мероприятия проектного обучения обновились" if events_changed else "", False
     for key, sha in shas.items():
         if old.get(key) != sha:
             print(f"  изменился: {key}")

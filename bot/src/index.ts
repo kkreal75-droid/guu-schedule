@@ -13,6 +13,7 @@
 //   GET  /places  — правки мест «Корпусов ГУУ» поверх data/places.json (places.ts), правит владелец в админке.
 //   GET  /translations — правки английских названий ГУУ (translations.ts), правит владелец в админке.
 //   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
+//   GET  /event/<id>.ics — мероприятие make.events в календарь (events.ts, этап 13).
 //   POST /hidden/add|delete — «Это не моя пара»: свои скрытые пары (hidden.ts).
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
@@ -38,6 +39,7 @@ import { notifySessions } from './session'
 import { handleReviewsApi, isReviewAction, onReviewButton } from './reviews'
 import { handleAcademicGet } from './academic'
 import { handlePlacesGet } from './places'
+import { handleEventIcs } from './events'
 import { handleTranslationsGet } from './translations'
 import { handleSupport, onSupportButton, sendQueuedReplies } from './support'
 import { BATCH, drainBroadcasts, onBroadcastButton } from './broadcast'
@@ -263,7 +265,8 @@ export default {
 async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   // публичное (без initData) — свой лимит по IP: из кэша, но запрос всё равно стоит денег
-  const publicGet = request.method === 'GET' && ['/', '/health', '/places', '/academic', '/translations'].includes(url.pathname)
+  const publicGet =
+    request.method === 'GET' && (['/', '/health', '/places', '/academic', '/translations'].includes(url.pathname) || url.pathname.startsWith('/event/'))
   if (publicGet && !(await allow(env, 'RL_PUBLIC', clientIp(request)))) return tooMany()
   if (url.pathname === '/health' && request.method === 'GET') return handleHealth(env)
 
@@ -273,6 +276,8 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env, request))
   if (url.pathname === '/translations' && request.method === 'GET') return guarded(env, 'Переводы', () => handleTranslationsGet(env, request))
   if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env, request))
+  const event = url.pathname.match(/^\/event\/([A-Za-z0-9_-]{1,40})\.ics$/)
+  if (event && request.method === 'GET') return guarded(env, 'Мероприятие .ics', () => handleEventIcs(env, event[1]))
   if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
   if (url.pathname === '/lang' && request.method === 'POST') return guarded(env, 'Язык', () => handleLang(env, request))
   if (url.pathname === '/favorites' && request.method === 'POST') return guarded(env, 'Избранное', () => handleFavorites(env, request))

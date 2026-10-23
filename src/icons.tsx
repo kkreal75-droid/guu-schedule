@@ -274,3 +274,24 @@ export const MegaphoneIcon = (p: P) => (
     <path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1ZM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11" />
   </svg>
 )
+
+// открытая книга: «Проектное обучение» (этап 13)
+export const BookIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M12 6.5c-1.8-1.3-4.3-2-7.5-2v13c3.2 0 5.7.7 7.5 2 1.8-1.3 4.3-2 7.5-2v-13c-3.2 0-5.7.7-7.5 2Z" />
+    <path d="M12 6.5v13" />
+  </svg>
+)
+
+// молния: мероприятие make.events
+export const BoltIcon = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12l1-8Z" />
+  </svg>
+)
+
+export const ChevronDown = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+)

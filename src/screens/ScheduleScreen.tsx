@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { DayStrip } from '../components/DayStrip'
 import { LessonCard } from '../components/LessonCard'
+import { ProjectDay } from '../components/Events'
 import { LessonMenu } from '../components/LessonMenu'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
 import { WeekCard } from '../components/WeekCard'
@@ -16,6 +17,7 @@ import { courseKey, courseOccurrences, occurrenceIndex, progressOf } from '../..
 import type { GroupInfo } from '../../shared/groups'
 import { loadGroups } from '../data'
 import { mergeStreams, type ShownLesson } from '../lessons'
+import { isProjectLesson } from '../../shared/events-core'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
 import { groupSubtitleParts, trSubject } from '../guu'
@@ -106,6 +108,10 @@ export function ScheduleScreen({
   const teacherView = isTeacherKey(group)
   const view = useMemo(() => dayLessons(T, group, day, extras, mine), [T, group, day, extras, mine])
   const lessons: ShownLesson[] = useMemo(() => (teacherView ? mergeStreams(view.lessons) : view.lessons), [view, teacherView])
+  // день «Проектного обучения» (этап 13): все пары — оно → шапка и мероприятия make.events вместо шести карточек;
+  // у группы в этот день свои пары (четверг МБ) — они, а под ними свёрнутая карточка мероприятий
+  const project = teacherView ? [] : lessons.filter(isProjectLesson)
+  const shown = project.length ? lessons.filter((l) => !isProjectLesson(l)) : lessons
 
   // ход предметов за семестр (этап 12): «занятие N из M», «последнее занятие»
   const courses = useMemo(() => courseOccurrences(T, group, extras, mine), [T, group, extras, mine])
@@ -178,7 +184,7 @@ export function ScheduleScreen({
 
   const nowMinutes = isToday ? now.minutes : null
   const nextIndex =
-    nowMinutes === null ? -1 : lessons.findIndex((l) => !l.cancel && !l.movedTo && toMinutes(l.start) > nowMinutes)
+    nowMinutes === null ? -1 : shown.findIndex((l) => !l.cancel && !l.movedTo && toMinutes(l.start) > nowMinutes)
 
   const dayKey = dayNoteKey(day)
   const dayNote = notes[dayKey]
@@ -187,7 +193,12 @@ export function ScheduleScreen({
     setEditing({ key: dayKey, title: t('Заметка к дню'), subtitle: `${weekdayFull(weekday)}, ${formatDate(day)}` })
   }
 
-  const summary = lessons.length ? `${pluralPairs(lessons.length)} · ${lessons[0].start}–${lessons[lessons.length - 1].end}` : null
+  const summary =
+    project.length && !shown.length
+      ? t('Проектное обучение')
+      : lessons.length
+        ? `${pluralPairs(lessons.length)} · ${lessons[0].start}–${lessons[lessons.length - 1].end}`
+        : null
   const dayLabel = `${weekdayFull(weekday)}, ${formatDate(day)}`
 
   return (
@@ -277,9 +288,11 @@ export function ScheduleScreen({
               <div className="empty-title">{weekday === 6 ? t('Выходной') : t('Пар нет')}</div>
               <div className="empty-text">{inSemester(week) ? t('В этот день занятий нет') : t('Этот день вне семестра')}</div>
             </div>
+          ) : project.length && !shown.length ? (
+            <ProjectDay iso={isoFromDay(day)} />
           ) : (
-            lessons.map((lesson, i) => {
-              const gap = i > 0 ? toMinutes(lesson.start) - toMinutes(lessons[i - 1].end) : 0
+            shown.map((lesson, i) => {
+              const gap = i > 0 ? toMinutes(lesson.start) - toMinutes(shown[i - 1].end) : 0
               const noteKey = lessonNoteKey(day, group, lesson)
               const editNote = () => {
                 haptic()
@@ -315,6 +328,9 @@ export function ScheduleScreen({
                 </div>
               )
             })
+          )}
+          {project.length > 0 && shown.length > 0 && (
+            <ProjectDay key={day} iso={isoFromDay(day)} folded from={project[0].start} to={project[project.length - 1].end} />
           )}
         </div>
       </main>

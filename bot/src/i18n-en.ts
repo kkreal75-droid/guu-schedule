@@ -21,6 +21,9 @@ export const EN: Record<string, string> = {
   Добавлена: 'Added',
   '{n} пара': 'Class {n}',
   '🎉 Каникулы! Пар нет до {date}': '🎉 Holidays! No classes until {date}',
+  'Сегодня проектное обучение — {n} {events}': 'Project learning today — {n} {events}',
+  'мероприятие|мероприятия|мероприятий': 'event|events',
+  'Сегодня проектное обучение — мероприятий пока нет': 'Project learning today — no events yet',
   // виды пар и места без номера аудитории (как в файлах ГУУ)
   Лекция: 'Lecture',
   Практика: 'Seminar',

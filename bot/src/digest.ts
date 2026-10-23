@@ -1,6 +1,7 @@
 // Автосообщения в беседы (cron раз в минуту):
 //   • в учебные дни (Пн–Сб) в выбранное время — пары на сегодня или «Сегодня пар нет 🎉»; в первый день
-//     каникул по учебному графику — «🎉 Каникулы! Пар нет до ДД.ММ» (academic.ts);
+//     каникул по учебному графику — «🎉 Каникулы! Пар нет до ДД.ММ» (academic.ts); в день «Проектного обучения» —
+//     строка «Сегодня проектное обучение — N мероприятий» (events.ts, make.events);
 //   • в субботу в 19:00 — неделя вперёд;
 //   • раз в 10 минут — сверка пар на 7 дней вперёд; изменились — «⚠️ Изменение в расписании».
 // Расписание и настройки читаем только в те минуты, когда есть что делать, и только для групп,
@@ -10,6 +11,8 @@ import { dayLessons, type DayLesson } from '../../shared/edits-core'
 import { isoFromDay, moscowNow, toMinutes } from '../../shared/schedule-core'
 import { DIGEST_TIMES, chatLabel, forgetIfGone, inThread, isThreadError, loadChats, type ChatSettings } from './chats'
 import { holidayEnds } from './academic'
+import { loadEvents, projectLine } from './events'
+import { isProjectLesson } from '../../shared/events-core'
 import { reportError } from './errors'
 import { RU, localeFor, tr, type Locale } from './i18n'
 import { dayTitle, formatDay, formatLesson, formatWeek, loadTimetable, localizeLessonLine, type BotTimetable } from './schedule'
@@ -98,6 +101,9 @@ export async function runDigests(env: Env, now: number): Promise<number> {
   const holidays = daily
     ? await holidayEnds(env, groups, day).catch((err) => (reportError(env, 'Учебный график в сводке', err), new Map<string, string>()))
     : new Map<string, string>()
+  // у группы сегодня «Проектное обучение» — в сводке строка «Сегодня проектное обучение — N мероприятий» (make.events)
+  const project = daily && groups.some((g) => tt.schedule.groups.includes(g) && dayLessons(tt, g, day, tt.extras).lessons.some(isProjectLesson))
+  const events = project ? await loadEvents(env).catch((err) => (reportError(env, 'Мероприятия в сводке', err), null)) : null
   let sends = 0
   for (const { slot, key, sent, todo } of plan) {
     for (const [chatId, settings] of todo) {
@@ -106,8 +112,10 @@ export async function runDigests(env: Env, now: number): Promise<number> {
       const loc = settings.lang === 'en' ? en : RU
       const holidayEnd = slot.id.startsWith('daily-') ? holidays.get(settings.group!) : undefined
       const holiday = holidayEnd ? tr(loc.lang, '🎉 Каникулы! Пар нет до {date}', { date: holidayEnd }) : null
-      const text = holiday ?? (tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!, loc) : null)
+      let text = holiday ?? (tt.schedule.groups.includes(settings.group!) ? slot.text(tt, settings.group!, loc) : null)
       if (!text) continue
+      const extra = !holiday && slot.id.startsWith('daily-') ? projectLine(tt, settings.group!, day, events, loc) : null
+      if (extra) text += `\n\n${extra}`
       sends++
       await deliver(env, chatId, settings, text, 'Сводка')
     }

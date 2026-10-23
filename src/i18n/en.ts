@@ -656,4 +656,25 @@ export const EN: Record<string, string> = {
   "последнее занятие": "last class",
   "своё расписание": "your schedule",
   "Убрать из избранного": "Remove from favourites",
+
+  // ---------- этап 13: мероприятия make.events ----------
+  "мероприятие|мероприятия|мероприятий": "event|events",
+  "Начало: {time}": "Starts at {time}",
+  "Записаться": "Sign up",
+  "В календарь": "Add to calendar",
+  "Загружаю мероприятия…": "Loading events…",
+  "Не удалось загрузить мероприятия. Проверьте интернет.": "Couldn't load events. Check your connection.",
+  "Мероприятий на этот день пока нет": "No events for this day yet",
+  "Все мероприятия": "All events",
+  "Мероприятия проектного обучения": "Project learning events",
+  "Проектное обучение": "Project learning",
+  "Проектное обучение: клубы, лекции, мастер-классы. Данные — с make.events, обновляются каждый час.":
+    "Project learning: clubs, talks, workshops. Data from make.events, updated every hour.",
+  "Название, место, тема…": "Title, place, topic…",
+  "Поиск мероприятий": "Search events",
+  "Ничего не нашлось": "Nothing found",
+  "Предстоящих мероприятий пока нет": "No upcoming events yet",
+  "Все мероприятия на make.events": "All events on make.events",
+  "Мероприятия ГУУ": "GUU events",
+  "Проектное обучение, Make.Events": "Project learning, Make.Events",
 }

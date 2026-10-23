@@ -20,11 +20,11 @@ const uidPrefix = (group: string) => shortName(group, group)
 const encoder = new TextEncoder()
 
 // RFC 5545: экранируем \ ; , и переводы строк
-const escapeText = (text: string) =>
+export const escapeText = (text: string) =>
   text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n')
 
 // Строки длиннее 75 октетов переносим (CRLF + пробел), не разрывая символы UTF-8
-function fold(line: string): string {
+export function fold(line: string): string {
   if (encoder.encode(line).length <= 75) return line
   const parts: string[] = []
   let current = ''
@@ -45,7 +45,7 @@ function fold(line: string): string {
 
 const localStamp = (iso: string, hhmm: string) => `${iso.replace(/-/g, '')}T${hhmm.replace(':', '')}00`
 
-function utcStamp(at: string | undefined): string {
+export function utcStamp(at: string | undefined): string {
   const date = at ? new Date(at) : new Date(Date.UTC(2026, 7, 31))
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')
 }
@@ -60,7 +60,7 @@ function hash(text: string): string {
   return (h >>> 0).toString(36)
 }
 
-const MOSCOW_TZ = [
+export const MOSCOW_TZ = [
   'BEGIN:VTIMEZONE',
   'TZID:Europe/Moscow',
   'BEGIN:STANDARD',

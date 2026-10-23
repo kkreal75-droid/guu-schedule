@@ -3,7 +3,7 @@ import { AdminPage } from '../admin/AdminPage'
 import type { TeacherInfo } from '../data'
 import type { Extras } from '../edits'
 import {
-  BuildingIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GlobeIcon, GroupChatIcon,
+  BoltIcon, BuildingIcon, ChevronLeft, ChevronRight, DoorIcon, DownloadIcon, EditIcon, ExamIcon, GlobeIcon, GroupChatIcon,
   MegaphoneIcon, MessageIcon, PeopleIcon, PhoneCalendarIcon, PlanIcon, QuestionIcon, ShieldIcon, StarIcon, TableIcon,
   TeacherIcon,
 } from '../icons'
@@ -15,6 +15,7 @@ import { GroupBotPage } from '../more/GroupBotPage'
 import { GroupSchedulePage } from '../more/GroupSchedulePage'
 import { InstallPage } from '../more/InstallPage'
 import { InternationalPage } from '../more/InternationalPage'
+import { EventsPage } from '../more/EventsPage'
 import { KugPage } from '../more/KugPage'
 import { PlacesPage, type PlacesTarget } from '../more/PlacesPage'
 import { SessionPage } from '../more/SessionPage'
@@ -135,6 +136,7 @@ export function MoreScreen({
             />
           ),
         },
+        { id: 'events', title: t('Мероприятия ГУУ'), sub: t('Проектное обучение, Make.Events'), icon: BoltIcon, color: 'pink', render: () => <EventsPage /> },
         { id: 'groupbot', title: t('Бот в беседе группы'), sub: t('Расписание в чат каждое утро'), icon: GroupChatIcon, color: 'indigo', render: () => <GroupBotPage /> },
       ],
     },

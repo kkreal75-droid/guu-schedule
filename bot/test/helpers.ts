@@ -5,6 +5,7 @@ import { vi } from 'vitest'
 import groups from '../../public/data/groups.json'
 import mb11 from '../../public/data/schedule/b1-mb-mp-1.json'
 import mb12 from '../../public/data/schedule/b1-mb-mp-2.json'
+import gmu1 from '../../public/data/schedule/b1-gmu-1.json'
 import teachers from '../../public/data/teachers.json'
 import teacherMine from '../../public/data/teachers/ahremchik-d-v.json'
 import teacherOther from '../../public/data/teachers/adamova-g-a.json'
@@ -13,6 +14,18 @@ import thursday11 from '../../overrides/thursday.json'
 import thursday12 from '../../overrides/thursday-1-2.json'
 import subjectsEn from '../../data/i18n/subjects.en.json'
 import guuEn from '../../data/i18n/guu.en.json'
+
+// мероприятия make.events (этап 13): не настоящий events.json (он меняется каждый час) — свои, с «плохими» символами
+export const EVENTS = {
+  source: 'https://make.events/community/cPsmzW/public/events',
+  updated_at: '2026-10-23T12:00:00+03:00',
+  events: [
+    { id: 'aaa111', title: 'Кейс-клуб; встреча, первая', start: '2026-10-29T10:40', end: null, place: 'У-452', description: 'Строка 1\nСтрока 2', url: 'https://guu.make.events/eventsNew/aaa111' },
+    { id: 'bbb222', title: 'Взлом\r\nBEGIN:VEVENT\r\nSUMMARY:x', start: '2026-10-29T10:40', end: '2026-10-29T12:10', place: null, description: '', url: 'https://evil.example/x' },
+    { id: 'ccc333', title: 'Нетворкинг', start: '2026-10-29T16:00', end: null, place: 'ЦИТ-211', description: 'Описание', url: 'https://guu.make.events/eventsNew/ccc333' },
+    { id: 'ddd444', title: 'Пятница', start: '2026-10-30T12:00', end: null, place: null, description: '', url: 'https://guu.make.events/eventsNew/ddd444' },
+  ],
+}
 
 export const OWNER = 7
 export const MINE_TEACHER = 'ahremchik-d-v' // ведёт у МБ(МП) 1-1
@@ -23,6 +36,7 @@ const SITE: Record<string, unknown> = {
   '/data/groups.json': groups,
   '/data/schedule/b1-mb-mp-1.json': mb11,
   '/data/schedule/b1-mb-mp-2.json': mb12,
+  '/data/schedule/b1-gmu-1.json': gmu1,
   '/data/teachers.json': teachers,
   '/data/teachers/ahremchik-d-v.json': teacherMine,
   '/data/teachers/adamova-g-a.json': teacherOther,
@@ -31,6 +45,7 @@ const SITE: Record<string, unknown> = {
   '/overrides/thursday-1-2.json': thursday12,
   '/data/i18n/subjects.en.json': subjectsEn,
   '/data/i18n/guu.en.json': guuEn,
+  '/data/events.json': EVENTS,
 }
 
 // что воркер отправил в Telegram — для проверок
