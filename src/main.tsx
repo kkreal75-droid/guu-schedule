@@ -8,8 +8,8 @@ import { rememberHidden } from './hidden'
 import { INTRO_VERSION, introSeen, markIntroDone } from './intro'
 import { IntroFlow, type Current } from './onboarding/Intro'
 import { Onboarding, type Choice } from './onboarding/Onboarding'
-import { cleanFavorites, defaultPrefs, mergeBootPrefs, parsePrefs, readPrefs, savePrefs, type Prefs } from './prefs'
-import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
+import { cleanFavorites, defaultPrefs, mergeBootPrefs, migrateFavorites, parsePrefs, readPrefs, savePrefs, type Prefs } from './prefs'
+import { GroupMissingError, groupsToLoad, homeOf, loadSchedule } from './schedule'
 import { readCloud, readLocal } from './storage'
 import { checkIn, initTelegram, type CheckIn } from './telegram'
 import { getLang, setLang, t, useLang } from './i18n'
@@ -62,10 +62,16 @@ const hasLocalTraces = () =>
   ['notes_cache', 'schedule_cache', 'edits_cache', 'group_cache_b1-mb-mp-1'].some((key) => readLocal(key))
 
 // Выбор из онбординга → настройки (тема и избранное — как были)
+// Выбор группы / роли. Настроек ещё не было (новый) — избранное с нуля: у МБ вторая группа появится чипом уже
+// для выбранной группы (migrateFavorites); своё расписание в избранном не дублируем
 function applyChoice(prefs: Prefs, choice: Choice): Prefs {
-  return choice.role === 'teacher'
-    ? { ...prefs, role: 'teacher', teacher: choice.teacher, teacherName: choice.name, at: Date.now() }
-    : { ...prefs, role: 'student', group: choice.group, teacher: null, teacherName: null, at: Date.now() }
+  const base = readLocal('prefs') ? prefs : { ...prefs, favorites: [], favVersion: 1 }
+  const next: Prefs =
+    choice.role === 'teacher'
+      ? { ...base, role: 'teacher', teacher: choice.teacher, teacherName: choice.name, at: Date.now() }
+      : { ...base, role: 'student', group: choice.group, teacher: null, teacherName: null, at: Date.now() }
+  const home = homeOf(next)
+  return migrateFavorites({ ...next, favorites: next.favorites.filter((id) => id !== home) })
 }
 
 type Tab = import('./components/TabBar').Tab
