@@ -1,13 +1,14 @@
 import { useRef } from 'react'
-import { formatDuration } from '../format'
-import { ClockIcon, DotsIcon, NoteIcon, PersonIcon, PinIcon } from '../icons'
+import { formatDuration, weeksText } from '../format'
+import { ClockIcon, DotsIcon, NoteIcon, PeopleIcon, PersonIcon, PinIcon } from '../icons'
 import { shortWhen } from '../../shared/edits-core'
-import type { DayLesson } from '../edits'
+import type { ShownLesson } from '../lessons'
 import { toMinutes } from '../schedule'
+import { haptic } from '../telegram'
 import { t } from '../i18n'
 import { roomLabel, trKind, trSubject, trTeacher } from '../guu'
 
-const KIND_CLASS: Record<string, string> = {
+export const KIND_CLASS: Record<string, string> = {
   Лекция: 'k-lecture',
   Практика: 'k-practice',
   Лабораторная: 'k-lab',
@@ -17,13 +18,18 @@ const KIND_CLASS: Record<string, string> = {
 const short = (time: string) => time.replace(/^0(\d)/, '$1')
 
 type Props = {
-  lesson: DayLesson // пара с правками: отменена, перенесена, добавлена, подгруппа, пометки
+  lesson: ShownLesson // пара с правками: отменена, перенесена, добавлена, подгруппа, пометки; у преподавателя — группы
   // минуты от полуночи, если карточка показывается за сегодня; иначе null
   nowMinutes: number | null
   isNext: boolean
   pair: number | null // номер пары по сетке группы; у добавленной правкой — нет
   note: string | undefined
+  last?: boolean // последнее занятие предмета в семестре (этап 12)
+  showWeeks?: boolean // показать недели пары (расписание преподавателя)
   onEditNote?: () => void // нет — чужое расписание, без заметок
+  onOpen?: () => void // нажатие на карточку — шторка с деталями (ход предмета)
+  onGroup?: (group: string) => void // нажатие на группу у пары преподавателя — её расписание
+  groupTitle?: (id: string, name: string) => string // полное название группы — подсказкой
   onTeacher?: (name: string) => void // нажатие на преподавателя — его карточка
   onRoom?: (room: string) => void // нажатие на аудиторию — корпус
   // «⋯» и долгое нажатие — действия с парой (заметка, «Это не моя пара»); hide — сразу «Это не моя пара»
@@ -68,7 +74,9 @@ function useLongPress(onLong: (() => void) | undefined) {
   }
 }
 
-export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote, onTeacher, onRoom, onMenu }: Props) {
+export function LessonCard({
+  lesson, nowMinutes, isNext, pair, note, last, showWeeks, onEditNote, onOpen, onGroup, groupTitle, onTeacher, onRoom, onMenu,
+}: Props) {
   const press = useLongPress(onMenu && (() => onMenu('menu')))
   const start = toMinutes(lesson.start)
   const end = toMinutes(lesson.end)
@@ -76,7 +84,9 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
   const live = !cancelled && nowMinutes !== null && nowMinutes >= start && nowMinutes < end
   const past = nowMinutes !== null && nowMinutes >= end
   const kindClass = (lesson.kind && KIND_CLASS[lesson.kind]) || 'k-other'
-  const teachers = lesson.teachers ?? (lesson.teacher ? [lesson.teacher] : [])
+  // у преподавателя вместо преподавателя — группы (чипами)
+  const audience = lesson.audience
+  const teachers = audience ? [] : (lesson.teachers ?? (lesson.teacher ? [lesson.teacher] : []))
   // английская версия: предмет — перевод (оригинал мелко под ним), аудитория — код и корпус по-английски
   const subject = trSubject(lesson.subject)
   const room = lesson.room ? roomLabel(lesson.room) : null
@@ -93,7 +103,13 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
     <article
       className={`lesson ${kindClass}${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
       data-readonly={onEditNote ? undefined : true}
+      data-clickable={onOpen ? true : undefined}
       {...press}
+      onClick={(e) => {
+        // кнопки и ссылки внутри карточки — свои действия
+        if (!onOpen || (e.target as HTMLElement).closest('button, a')) return
+        onOpen()
+      }}
     >
       <div className="lesson-head">
         <span className="lesson-start">{short(lesson.start)}</span>
@@ -122,11 +138,13 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
         )}
       </div>
 
-      {(lesson.kind || lesson.added || lesson.subgroup) && (
+      {(lesson.kind || lesson.added || lesson.subgroup || last || lesson.overlap) && (
         <div className="lesson-tags">
           {lesson.kind && <span className="badge">{trKind(lesson.kind)}</span>}
           {lesson.added && <span className="badge badge-edit">{t('добавлена')}</span>}
           {lesson.subgroup && <span className="badge badge-sub">{lesson.subgroup.name}</span>}
+          {last && !lesson.cancel && !lesson.movedTo && <span className="badge badge-last">{t('последнее занятие')}</span>}
+          {lesson.overlap && <span className="badge badge-warn">{t('накладка в расписании')}</span>}
         </div>
       )}
       <h3 className="lesson-subject">{subject}</h3>
@@ -160,6 +178,27 @@ export function LessonCard({ lesson, nowMinutes, isNext, pair, note, onEditNote,
                 <PinIcon /> {roomText}
               </span>
             ))}
+        </div>
+      )}
+
+      {showWeeks && lesson.weeks.length > 0 && (
+        <div className="lesson-weeks">{t('Недели: {weeks}', { weeks: weeksText(lesson.weeks) })}</div>
+      )}
+
+      {audience && audience.length > 0 && (
+        <div className="lesson-groups">
+          {audience.map((g) => {
+            const title = groupTitle?.(g.id, g.name) ?? g.name
+            return onGroup ? (
+              <button key={g.id} type="button" className="group-pill" title={title} aria-label={title} onClick={() => (haptic(), onGroup(g.id))}>
+                <PeopleIcon /> <span lang="ru">{g.name}</span>
+              </button>
+            ) : (
+              <span key={g.id} className="group-pill" title={title}>
+                <PeopleIcon /> <span lang="ru">{g.name}</span>
+              </span>
+            )
+          })}
         </div>
       )}
 

@@ -75,6 +75,9 @@ export const trDirection = (ru: string) => (en() ? (dict.direction[ru] ?? ru) : 
 export const trInstitute = (abbr: string, full?: string) => (en() ? (dict.institute[abbr] ?? full ?? abbr) : (full ?? abbr))
 // «Лекция / Практика / Лабораторная» → Lecture / Seminar / Lab (словарь интерфейса)
 export const trKind = (kind: string | null) => (kind && en() ? (tKnown(kind) ?? kind) : kind)
+// коротко для строк нагрузки: «Лек» / «ПЗ» / «Лаб» — Lecture / Seminar / Lab
+export const kindShort = (kind: string) =>
+  kind === 'Лекция' ? t('Лек') : kind === 'Практика' ? t('ПЗ') : kind === 'Лабораторная' ? t('Лаб') : (trKind(kind) ?? kind) // i18n-ignore
 // «Крюкова Е.В.» → «Kriukova E.V.»
 export const trTeacher = (name: string) => (en() ? translit(name) : name)
 

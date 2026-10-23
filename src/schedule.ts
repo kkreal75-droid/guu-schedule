@@ -1,7 +1,7 @@
 import rawOverrides from '../overrides.json'
 import thursday from '../overrides/thursday.json'
 import thursday12 from '../overrides/thursday-1-2.json'
-import { MB_IDS, isMbGroup } from '../shared/groups'
+import { isMbGroup } from '../shared/groups'
 import {
   makeTimetable,
   scheduleFromGroups,
@@ -71,12 +71,13 @@ async function loadGroup(id: string): Promise<GroupFile> {
   }
 }
 
-// Какие расписания нужны: преподавателю — его; студенту МБ(МП) 1-1/1-2 — обе (переключатель
-// «1-1 / 1-2», как раньше), остальным — своя группа; плюс избранные группы
+// Своё расписание: преподавателю — его пары («t-<id>»), студенту — его группа
+export const homeOf = (prefs: Prefs) => (prefs.role === 'teacher' && prefs.teacher ? teacherKey(prefs.teacher) : prefs.group)
+
+// Какие расписания нужны: своё и избранное (этап 12: группы и преподаватели вперемешку; у МБ(МП) 1-1/1-2
+// вторая группа — обычный чип избранного, см. migrateFavorites)
 export function groupsToLoad(prefs: Prefs): string[] {
-  if (prefs.role === 'teacher' && prefs.teacher) return [teacherKey(prefs.teacher)]
-  const own = isMbGroup(prefs.group) ? MB_IDS : [prefs.group]
-  return [...new Set([...own, ...prefs.favorites])]
+  return [...new Set([homeOf(prefs), ...prefs.favorites])]
 }
 
 // Первая группа — главная: её нет — GroupMissingError; избранные, которых больше нет, пропускаем

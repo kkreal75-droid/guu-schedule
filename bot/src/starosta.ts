@@ -165,7 +165,7 @@ export async function handleExtras(env: Env, request: Request): Promise<Response
   const req = await readApi<{ groups?: unknown }>(env, request)
   if (req instanceof Response) return req
   const groups = Array.isArray(req.body.groups)
-    ? req.body.groups.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, 8)
+    ? req.body.groups.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, 60) // у преподавателя групп много
     : []
   return json({ ok: true, ...extrasFor(await loadExtras(env), groups) })
 }

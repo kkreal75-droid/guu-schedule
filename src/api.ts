@@ -37,6 +37,12 @@ export async function saveLang(lang: 'ru' | 'en'): Promise<void> {
   await callBot('/lang', { lang })
 }
 
+// Избранное над расписанием (этап 12) — копия у бота для других устройств; at — когда менялось
+export async function saveFavorites(list: string[], at: number): Promise<void> {
+  if (!botAvailable()) return
+  await callBot('/favorites', { list, at })
+}
+
 export async function saveProfile(choice: ProfileChoice): Promise<void> {
   if (!botAvailable()) return
   await callBot('/profile', choice)

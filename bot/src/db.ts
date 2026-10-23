@@ -31,6 +31,8 @@ export type UserRow = {
   intro_version: number // какую версию знакомства (истории, тур) уже видел
   lang: string | null // выбранный язык (ru / en); NULL — не выбирал
   lang_code: string | null // language_code из Telegram
+  favorites: string | null // JSON: избранное над расписанием (группы и «t-<id>»), этап 12
+  favorites_at: number | null
 }
 
 export type Access = 'free_forever' | 'standard'
@@ -45,9 +47,21 @@ export type Me = {
   starosta: string | null // староста этой группы — в «Ещё» есть «Правки группы»
   intro: number // какую версию знакомства уже видел (приложение покажет новую один раз)
   lang: Lang | null // выбранный язык; null — не выбирал (приложение берёт язык Telegram)
+  favorites: string[] | null // избранное над расписанием; null — не сохранялось
+  favorites_at: number // когда менялось (0 — никогда)
 }
 
-type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'intro_version' | 'lang'
+type MeFields = 'role' | 'grp' | 'teacher_id' | 'access' | 'legacy' | 'starosta_of' | 'intro_version' | 'lang' | 'favorites' | 'favorites_at'
+
+function parseFavorites(raw: string | null | undefined): string[] | null {
+  if (!raw) return null
+  try {
+    const list = JSON.parse(raw) as unknown
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : null
+  } catch {
+    return null
+  }
+}
 
 export function meOf(row: Pick<UserRow, MeFields> | null): Me {
   const group = normalizeGroup(row?.grp)
@@ -60,6 +74,8 @@ export function meOf(row: Pick<UserRow, MeFields> | null): Me {
     starosta: normalizeGroup(row?.starosta_of),
     intro: row?.intro_version ?? 0,
     lang: isLang(row?.lang) ? row.lang : null,
+    favorites: parseFavorites(row?.favorites),
+    favorites_at: row?.favorites_at ?? 0,
   }
 }
 
@@ -113,7 +129,7 @@ export async function touchUser(
             OR (excluded.grp IS NOT NULL AND users.grp IS NOT excluded.grp)
             OR (?4 IN (?10, ?11) AND users.access IS NOT 'free_forever')
             OR (?13 IS NOT NULL AND users.lang_code IS NOT ?13)
-         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang`,
+         RETURNING banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang, favorites, favorites_at`,
       )
       .bind(profile.id, profile.username, profile.name, grp, now, isOpen, isStart, wrote, VISIT_GAP_MS, MB_IDS[0], MB_IDS[1], throttle, profile.lang ?? null),
     // журнал визитов для графиков: /start — всегда, открытие — только если засчитано
@@ -124,7 +140,9 @@ export async function touchUser(
       )
       .bind(profile.id, now, kind),
     // строку не переписали (частое открытие) — берём как есть
-    db.prepare('SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang FROM users WHERE id = ?').bind(profile.id),
+    db.prepare(
+      'SELECT banned, grp, role, teacher_id, access, legacy, starosta_of, intro_version, lang, favorites, favorites_at FROM users WHERE id = ?',
+    ).bind(profile.id),
   ])
   const row = ((upsert.results[0] ?? current.results[0]) as Pick<UserRow, 'banned' | MeFields> | undefined)
   return { banned: Boolean(row?.banned), grp: normalizeGroup(row?.grp), me: meOf(row ?? null) }

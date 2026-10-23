@@ -6,7 +6,7 @@
 // подгруппой, студент видит, только если выбрал её (или не выбрал ни одной).
 // «Это не моя пара» — скрытые пары (D1 hidden_lessons): свои — только у себя (приложение, календарь, inline,
 // /today в личке), для всей группы (владелец, админ-панель) — у всех, и в беседе группы тоже.
-import { dayFromIso, isoFromDay, type Lesson, type Timetable } from './schedule-core'
+import { dayFromIso, isTeacherKey, isoFromDay, type Audience, type Lesson, type Timetable } from './schedule-core'
 
 export type EditKind = 'cancel' | 'note' | 'add' | 'move'
 
@@ -18,6 +18,7 @@ export type AddData = {
   teacher?: string | null
   room?: string | null
   subgroup?: number | null
+  audience?: Audience[] // только у правок, перенесённых в расписание преподавателя (teacherEdits)
 }
 export type MoveData = { to_date: string; to_start: string; to_end: string; room?: string | null }
 
@@ -97,6 +98,60 @@ export type DayView = { lessons: DayLesson[]; notes: string[] /* ко всему
 const isMove = (e: ScheduleEdit): e is ScheduleEdit & { data: MoveData } => e.kind === 'move' && Boolean(e.data && 'to_date' in e.data)
 const isAdd = (e: ScheduleEdit): e is ScheduleEdit & { data: AddData } => e.kind === 'add' && Boolean(e.data && 'subject' in e.data)
 
+// ---------- правки групп в расписании преподавателя (этап 12) ----------
+// У пары преподавателя — группы (audience); их правки относятся и к нему: отмена — если отменили все группы пары
+// (у потока одна группа может просто не прийти), перенос — если пара у одной группы, пометка — с именем группы,
+// добавленная старостой пара с этим преподавателем — тоже его. Считаем один раз на расписание и набор правок.
+
+// i18n-ignore — сравнение ФИО без регистра, пробелов, точек и «ё»
+const personKey = (name: string | null | undefined) => (name ?? '').toLowerCase().replace(/ё/g, 'е').replace(/[\s.]/g, '')
+
+const teacherCache = new WeakMap<Timetable, WeakMap<Extras, Map<string, ScheduleEdit[]>>>()
+
+export function teacherEdits(tt: Timetable, group: string, extras: Extras): ScheduleEdit[] {
+  let byExtras = teacherCache.get(tt)
+  if (!byExtras) teacherCache.set(tt, (byExtras = new WeakMap()))
+  let byGroup = byExtras.get(extras)
+  if (!byGroup) byExtras.set(extras, (byGroup = new Map()))
+  const hit = byGroup.get(group)
+  if (hit) return hit
+
+  const own = tt.schedule.lessons.filter((l) => l.group === group)
+  const names = new Map(own.flatMap((l) => l.audience ?? []).map((a) => [a.id, a.name]))
+  const me = personKey(tt.nameOf(group))
+  const out: ScheduleEdit[] = extras.edits.filter((e) => e.group === group)
+  // пара преподавателя в этот день и время, у которой есть эта группа
+  const lessonAt = (iso: string, start: string | null, of: string) => {
+    if (!start) return null
+    const day = dayFromIso(iso)
+    return tt.lessonsOn(group, tt.weekOf(day), tt.weekdayOf(day)).find((l) => l.start === start && l.audience?.some((a) => a.id === of)) ?? null
+  }
+  const cancels = new Map<string, Set<string>>() // «дата|время» → какие группы отменили
+  for (const e of extras.edits) {
+    if (!names.has(e.group)) continue
+    if (e.kind === 'add' && isAdd(e)) {
+      if (personKey(e.data.teacher) === me) out.push({ ...e, group, data: { ...e.data, audience: [{ id: e.group, name: names.get(e.group)! }] } })
+      continue
+    }
+    const lesson = lessonAt(e.date, e.start, e.group)
+    if (!lesson) continue
+    const single = (lesson.audience?.length ?? 0) <= 1
+    if (e.kind === 'cancel') {
+      const key = `${e.date}|${e.start}`
+      const set = cancels.get(key) ?? new Set<string>()
+      set.add(e.group)
+      cancels.set(key, set)
+      if (lesson.audience!.every((a) => set.has(a.id))) out.push({ ...e, group })
+    } else if (e.kind === 'note') {
+      out.push({ ...e, group, text: single ? e.text : `${names.get(e.group)}: ${e.text}` })
+    } else if (e.kind === 'move' && single) {
+      out.push({ ...e, group })
+    }
+  }
+  byGroup.set(group, out)
+  return out
+}
+
 // Подгруппа пары из файла — по меткам старосты
 export function subgroupOf(lesson: Lesson, extras: Extras): Subgroup | null {
   const tag = extras.tags.find(
@@ -117,7 +172,7 @@ export function dayLessons(tt: Timetable, group: string, day: number, extras: Ex
   const iso = isoFromDay(day)
   const week = tt.weekOf(day)
   const weekday = tt.weekdayOf(day)
-  const edits = extras.edits.filter((e) => e.group === group)
+  const edits = isTeacherKey(group) ? teacherEdits(tt, group, extras) : extras.edits.filter((e) => e.group === group)
   const today = edits.filter((e) => e.date === iso)
   const hidden = extras.hidden?.filter((h) => h.group === group)
   const lessons = tt.inSemester(week) ? tt.lessonsOn(group, week, weekday) : []
@@ -168,8 +223,9 @@ export function dayLessons(tt: Timetable, group: string, day: number, extras: Ex
       end: e.data.end,
       subject: e.data.subject,
       kind: e.data.kind ?? null,
-      teacher: e.data.teacher ?? null,
+      teacher: e.data.audience ? e.data.audience.map((a) => a.name).join(', ') : (e.data.teacher ?? null),
       room: e.data.room ?? null,
+      ...(e.data.audience ? { audience: e.data.audience } : {}),
       weeks: [week],
       pair: null,
       cancel: null,

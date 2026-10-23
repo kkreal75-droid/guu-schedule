@@ -55,7 +55,11 @@
 фамилии, главный экран — его пары (`t-<id>`, у пары вместо преподавателя — группы). Профиль → «Параметры
 аккаунта» (`src/onboarding/AccountForm.tsx`): «Я студент / Я преподаватель», выпадающие списки по тем же шагам
 (`STEPS` из Onboarding.tsx) или ФИО с поиском → «Сохранить»; «Знаю свою группу» — онбординг сразу с поиска.
-Версия в профиле — `__BUILD__` (vite.config.ts: package.json + дата + коммит). Над расписанием: у МБ — «1-1 / 1-2», у остальных — своя группа + избранные (до 5). `access`
+Версия в профиле — `__BUILD__` (vite.config.ts: package.json + дата + коммит). Над расписанием — лента избранного
+(этап 12, `FavoritesBar.tsx`): ★ своё (группа или своё ФИО у преподавателя) + группы и преподаватели («t-<id>»)
+вперемешку, без ограничения (до 50), порядок перетаскиванием, удаление долгим нажатием, «+» — поиск по группам и
+преподавателям; у МБ «1-1 / 1-2» — обычные чипы (`migrateFavorites`). Хранится в prefs (устройство + облако) и в D1
+(`users.favorites`, `POST /favorites`, новее побеждает); страницы берут его из `FavoritesContext` (`src/favorites.tsx`). `access`
 (free_forever — МБ и все, кто был до онбординга; standard — остальные) и `PAYWALL_ENABLED=false` — только
 структура, ни на что не влияют; владелец меняет access в карточке пользователя. Рассылка — всем / 1-1 / 1-2 /
 фильтр (уровень, форма, курс, институт или группа). «Ещё → Сессия» — `data/session/<id>.json` или заглушка.
@@ -88,6 +92,7 @@ LibreOffice ставится, только если изменился .doc (н�
 - `POST /hidden/add {group, date, start, subject, kind, scope}` | `/hidden/delete {id}` — «Это не моя пара» (`hidden.ts`);
 - `POST /profile` — выбор из онбординга `{role, group | teacher}` (группа/преподаватель должны быть на сайте);
   `POST /intro {version}` — знакомство просмотрено; `POST /lang {lang}` — язык интерфейса (ru / en, этап 11);
+  `POST /favorites {list, at}` — избранное над расписанием (этап 12);
 - `POST /starosta/<info|edit-add|edit-delete|subgroup-add|subgroup-delete|tag-add|tag-delete>` — староста своей группы;
   `POST /my-subgroups` — свои подгруппы; `POST /extras {groups}` — правки и подгруппы групп (просмотр чужой);
 - `POST /cal/status|connect|disconnect`, `GET /cal/<токен>.ics`, `GET /cal/<токен>/apple` (страница webcal для iPhone);
@@ -113,7 +118,7 @@ LibreOffice ставится, только если изменился .doc (н�
   30 дней, каждую минуту — ответы поддержки из очереди, остаток лимита — досылка рассылок (≤30 сообщений за запуск,
   пауза 50 мс).
 
-**D1 `guu-bot`** (миграции `bot/migrations/0001…0024`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram), 0023 — `translations` (правки переводов), 0024 — `broadcasts.text_en` (английский текст рассылки)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
+**D1 `guu-bot`** (миграции `bot/migrations/0001…0025`; 0006 — `users.role/teacher_id/access/legacy/onboarded_at`, 0007 — старосты, подгруппы, 0008/0009 — чат вместо досок (чат удалён в этапе 9, таблицы `board_*` остались), 0010 — отзывы, 0011 — `users.intro_version`, 0012 — `sport_sections`, `sport_sessions` (с 8.1 не используются), 0013 — `support_messages`, 0014 — критерии отзывов и `review_votes`, 0015 — `place_edits`, 0016 — `broadcasts.button`, 0017 — `calendar_edits`, 0018 — `tg_updates`, `admin_log`, `usage_daily`, 0019 — индекс псевдонимов чата, 0020 — `hidden_lessons`, 0021 — `support_messages.reply_text`, 0022 — `users.lang` (выбранный язык), `users.lang_code` (язык Telegram), 0023 — `translations` (правки переводов), 0024 — `broadcasts.text_en` (английский текст рассылки), 0025 — `users.favorites`, `favorites_at` (избранное)): `users`, `visits`, `broadcasts`, `broadcast_queue`,
 `calendar_tokens`, `board_*` (бывший чат: не используются, сообщения стираются через 30 дней),
 `schedule_edits`, `group_snapshots`, `subgroups`, `lesson_tags`, `teacher_reviews`, `review_reports`, `place_edits`, `calendar_edits`, `tg_updates` (повторы обновлений Telegram), `admin_log` (действия владельца,
 в интерфейсе не показывается), `usage_daily` (расход лимитов, режим экономии), `hidden_lessons` (скрытые пары: свои и `user_id = 0` — для всей группы). Группа (`users.grp` и т. п.) — id.
@@ -241,6 +246,11 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
   текст` + строка `/en` + английский; в админке — поле), получателю с английским — он, нет — русский. Объявление и
   техработы — `settings.notice.text_en`, `maintenance.text_en`. Английские приветствия — `GREETINGS_EN` (settings.ts),
   описание и меню команд с language_code=en — `bot/src/setup.ts` (`GET /?force`).
+- Преподаватели (этап 12): у пары преподавателя — `audience` (группы; `teacherAsGroup`), карточка — чипы групп и
+  недели, пара потока — одна карточка, накладки помечены (`src/lessons.ts`); правки групп относятся и к нему
+  (`edits-core → teacherEdits`). Ход предмета — `shared/progress-core.ts` (`courseOccurrences`, `progressOf`): связка
+  «предмет + вид + преподаватель / группы», с правками, пара = 2 ак. ч, без явных недель — без хода; шторка пары
+  («Занятие N из M»), бейдж «последнее занятие», «Нагрузка в семестре» (`TeacherLoad.tsx`).
 - Коммиты — по-русски, по смыслу этапа.
 
 ## Состояние (21.10.2026)

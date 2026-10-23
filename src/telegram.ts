@@ -61,6 +61,7 @@ export const BOT_URL: string | null =
 
 // Что бот знает о человеке: выбор из онбординга (на случай, если на этом устройстве его нет)
 // и нужен ли онбординг (новый пользователь)
+// favorites / favorites_at — избранное над расписанием у бота (этап 12)
 export type Me = {
   role: 'student' | 'teacher' | null
   group: string | null
@@ -70,6 +71,8 @@ export type Me = {
   starosta: string | null // староста этой группы — «Ещё → Правки группы»
   intro: number // какую версию знакомства уже видел (этап 7.1)
   lang?: Lang | null // выбранный язык (этап 11); null — не выбирал
+  favorites?: string[] | null
+  favorites_at?: number
 }
 
 // edits — ручные правки расписания; hidden — пары, скрытые владельцем для всей группы; myHidden — свои

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react'
 import { DayStrip } from '../components/DayStrip'
-import { GroupChips } from '../components/GroupChips'
 import { LessonCard } from '../components/LessonCard'
 import { LessonMenu } from '../components/LessonMenu'
 import { NoteEditor, type NoteTarget } from '../components/NoteEditor'
@@ -12,10 +11,14 @@ import type { DayLesson, Extras } from '../edits'
 import type { HideScope } from '../hidden'
 import { dayHasNotes, dayNoteKey, lessonNoteKey, type Notes } from '../notes'
 import { dayFromIso, getTimetable, isoFromDay, moscowNow, toMinutes } from '../schedule'
-import type { Timetable } from '../../shared/schedule-core'
+import { isTeacherKey, type Timetable } from '../../shared/schedule-core'
+import { courseKey, courseOccurrences, occurrenceIndex, progressOf } from '../../shared/progress-core'
+import type { GroupInfo } from '../../shared/groups'
+import { loadGroups } from '../data'
+import { mergeStreams, type ShownLesson } from '../lessons'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
-import { trSubject } from '../guu'
+import { groupSubtitleParts, trSubject } from '../guu'
 
 export type Cursor = { week: number; weekday: number }
 
@@ -47,10 +50,8 @@ type Props = {
   extras: Extras // правки (владелец, старосты), подгруппы
   mine?: number[] | null // выбранные подгруппы: чужие пары подгрупп не показываем
   group: string
-  groups: string[] // своя группа и избранные — чипы над расписанием
-  home?: string // своя группа (★)
-  onGroupChange: (group: string) => void
-  onAddGroup?: () => void // «+» у чипов — добавить группу в избранное
+  bar?: ReactNode // лента избранного над расписанием (своё ★ и избранное)
+  onGroup?: (group: string) => void // нажатие на группу у пары преподавателя — её расписание
   cursor: Cursor
   onCursorChange: (cursor: Cursor) => void
   notes: Notes
@@ -74,7 +75,7 @@ const hiddenToast = (scope: HideScope) =>
   })[scope]
 
 export function ScheduleScreen({
-  extras, mine = null, group, groups, home, onGroupChange, onAddGroup, cursor, onCursorChange, notes, onSaveNote,
+  extras, mine = null, group, bar, onGroup, cursor, onCursorChange, notes, onSaveNote,
   onTeacher, onRoom, tt, readOnly, onHide, onUnhide,
 }: Props) {
   const T = tt ?? getTimetable()
@@ -83,7 +84,7 @@ export function ScheduleScreen({
   const now = useNow()
   const [direction, setDirection] = useState<'fwd' | 'back' | null>(null)
   const [editing, setEditing] = useState<NoteTarget | null>(null)
-  const [menu, setMenu] = useState<{ lesson: DayLesson; start: 'menu' | 'hide' } | null>(null)
+  const [menu, setMenu] = useState<{ lesson: ShownLesson; start: 'menu' | 'hide' } | null>(null)
   // «Пара скрыта · Вернуть» — 5 секунд после скрытия
   const [toast, setToast] = useState<{ text: string; id: number | null } | null>(null)
   useEffect(() => {
@@ -100,9 +101,38 @@ export function ScheduleScreen({
   const todayWeek = weekOf(now.day)
   const isToday = day === now.day
 
-  // пары дня со всеми правками и подгруппами (shared/edits-core.ts)
+  // пары дня со всеми правками и подгруппами (shared/edits-core.ts); у преподавателя пара потока у нескольких
+  // групп — одной карточкой, накладки помечены (src/lessons.ts)
+  const teacherView = isTeacherKey(group)
   const view = useMemo(() => dayLessons(T, group, day, extras, mine), [T, group, day, extras, mine])
-  const lessons = view.lessons
+  const lessons: ShownLesson[] = useMemo(() => (teacherView ? mergeStreams(view.lessons) : view.lessons), [view, teacherView])
+
+  // ход предметов за семестр (этап 12): «занятие N из M», «последнее занятие»
+  const courses = useMemo(() => courseOccurrences(T, group, extras, mine), [T, group, extras, mine])
+  const lastHere = useMemo(() => {
+    const keys = new Set<string>()
+    for (const l of view.lessons) {
+      const last = courses.get(courseKey(l))?.at(-1)
+      if (last && last.day === day && last.start === l.start) keys.add(`${l.start}|${l.subject}`)
+    }
+    return keys
+  }, [view, courses, day])
+  const progressFor = (lesson: ShownLesson) => {
+    const list = courses.get(courseKey(lesson))
+    const progress = list && progressOf(list, now)
+    return progress ? { ...progress, index: occurrenceIndex(list, day, lesson.start) } : null
+  }
+
+  // у пар преподавателя — группы: полное название (программа, институт, курс) — подсказкой
+  const [groupsInfo, setGroupsInfo] = useState<Map<string, GroupInfo> | null>(null)
+  useEffect(() => {
+    if (!teacherView || groupsInfo) return
+    loadGroups().then((index) => setGroupsInfo(new Map(index.groups.map((g) => [g.id, g]))), () => {})
+  }, [teacherView, groupsInfo])
+  const groupTitle = (id: string, name: string) => {
+    const info = groupsInfo?.get(id)
+    return info ? `${name} — ${groupSubtitleParts(info).join(' · ')}` : name
+  }
   const busyDays = useMemo(
     () => WEEK_INDEXES.map((_, i) => dayLessons(T, group, monday + i, extras, mine).lessons.length > 0),
     [T, group, monday, extras, mine],
@@ -192,7 +222,7 @@ export function ScheduleScreen({
               />
             </div>
           </header>
-          <GroupChips value={group} groups={groups} home={home} onChange={onGroupChange} onAdd={onAddGroup} />
+          {bar}
         </>
       )}
 
@@ -272,9 +302,14 @@ export function ScheduleScreen({
                     isNext={i === nextIndex}
                     pair={lesson.pair ?? (lesson.added || lesson.movedFrom ? null : T.pairNumber(lesson))}
                     note={readOnly ? undefined : notes[noteKey]}
+                    last={lastHere.has(`${lesson.start}|${lesson.subject}`)}
+                    showWeeks={teacherView}
                     onTeacher={onTeacher}
                     onRoom={onRoom}
+                    onGroup={onGroup}
+                    groupTitle={groupTitle}
                     onEditNote={readOnly ? undefined : editNote}
+                    onOpen={() => (haptic(), setMenu({ lesson, start: 'menu' }))}
                     onMenu={readOnly ? undefined : (start) => (haptic(), setMenu({ lesson, start }))}
                   />
                 </div>
@@ -290,6 +325,8 @@ export function ScheduleScreen({
           subtitle={`${weekdayFull(weekday)}, ${formatDate(day)} · ${menu.lesson.start}–${menu.lesson.end}`}
           week={week}
           start={menu.start}
+          progress={progressFor(menu.lesson)}
+          actions={!readOnly}
           onNote={() => {
             const lesson = menu.lesson
             setMenu(null)

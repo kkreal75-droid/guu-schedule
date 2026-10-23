@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Section } from '../components/Section'
 import { Segmented } from '../components/Segmented'
 import { useGroupNames } from '../data'
+import { useFavorites } from '../favorites'
 import type { Extras } from '../edits'
 import { botAvailable, callBot } from '../api'
 import { CheckIcon, ChevronLeft, ChevronRight, CloseIcon, ExternalIcon } from '../icons'
@@ -140,8 +141,10 @@ export function ProfileScreen({
     if (botAvailable()) callBot('/my-subgroups', { group: prefs.group, ids: next }).catch(() => {})
   }
   const teacher = prefs.role === 'teacher' && prefs.teacher
-  const favorites = prefs.favorites
+  const favorites = useFavorites()
   const nameOf = useGroupNames()
+  // избранное: группы и преподаватели (имена преподавателей — из загруженного расписания)
+  const favoriteName = (id: string) => (id.startsWith('t-') ? trTeacher(groupName(id)) : nameOf(id))
   // «1-курс-бакалавриат-ОФО-141.xlsx» → «141»
   const sourceVersion = schedule.source_file?.match(/-(\d+)\.xlsx$/)?.[1]
   const who = teacher ? trTeacher(prefs.teacherName ?? groupName(`t-${prefs.teacher}`)) : groupName(prefs.group)
@@ -191,18 +194,21 @@ export function ProfileScreen({
         </Section>
       )}
 
-      {favorites.length > 0 && (
-        <Section title={t('Избранные группы')} footer={t('Видны над расписанием рядом со своей. Добавить — «+» у групп на главном экране.')}>
-          {favorites.map((g) => (
-            <div key={g} className="row">
-              <span lang="ru">{nameOf(g)}</span>
+      {favorites && favorites.list.length > 0 && (
+        <Section
+          title={t('Избранное')}
+          footer={t('Лента над расписанием: подержи чип, чтобы переставить или убрать. Добавить — «+» в ленте.')}
+        >
+          {favorites.list.map((id) => (
+            <div key={id} className="row">
+              <span lang={id.startsWith('t-') ? undefined : 'ru'}>{favoriteName(id)}</span>
               <button
                 type="button"
                 className="icon-btn"
-                aria-label={t('Убрать {name} из избранного', { name: nameOf(g) })}
+                aria-label={t('Убрать из избранного')}
                 onClick={() => {
                   haptic()
-                  onChange({ favorites: prefs.favorites.filter((f) => f !== g) })
+                  favorites.remove(id)
                 }}
               >
                 <CloseIcon />

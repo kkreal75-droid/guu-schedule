@@ -14,6 +14,8 @@ import { ScheduleViewer } from './ScheduleViewer'
 import { getLang, t, tKnown, tn } from '../i18n'
 import { LOCALE } from '../../shared/i18n-core'
 import { trSubject, trTeacher } from '../guu'
+import { FavoriteToggle } from '../components/FavoriteToggle'
+import { TeacherLoad } from './TeacherLoad'
 
 // «Другое → Рейтинг преподавателей» (этапы 6 и 7.6): общий рейтинг (поиск, фильтр, сортировка), карточка
 // (средняя, три критерия полосками, % «рекомендуют», распределение 1–5, отзывы «Полезные / Новые», «Ещё N»),
@@ -357,8 +359,11 @@ function TeacherView({ teacher, onBack, backLabel }: { teacher: TeacherInfo; onB
           <button type="button" className="chip chip-accent" onClick={() => (haptic(), setMode('schedule'), window.scrollTo(0, 0))}>
             {t('Расписание преподавателя')}
           </button>
+          <FavoriteToggle id={teacherKey(teacher.id)} />
         </div>
       </div>
+
+      <TeacherLoad id={teacher.id} />
 
       {notice && <p className="notice-toast">{notice}</p>}
       {!botAvailable() && <p className="lead">{t('Отзывы работают в Telegram — откройте расписание там.')}</p>}

@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { normalizeGroup, shortName, type GroupInfo, type GroupsIndex } from '../shared/groups'
 import type { TeacherFile } from '../shared/schedule-core'
+import { translit } from '../shared/i18n-core'
 import { dataUrl } from './schedule'
 import { readLocal, writeLocal } from './storage'
 
@@ -96,12 +97,15 @@ export async function loadSession(id: string): Promise<SessionFile | null> {
 // i18n-ignore — поиск без «ё»
 const norm = (text: string) => text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
 
-// «денисова», «Денисова И», «ден» — по началу фамилии; потом — по вхождению
+// «денисова», «Денисова И», «ден» — по началу фамилии; потом — по вхождению. Латиницей тоже: «denisova», «koroleva»
 export function searchTeachers(list: TeacherInfo[], query: string, limit = 30): TeacherInfo[] {
   const q = norm(query).replace(/\./g, '')
   if (q.length < 2) return []
-  const name = (t: TeacherInfo) => norm(t.name).replace(/\./g, '')
-  const starts = list.filter((t) => name(t).startsWith(q))
-  const contains = list.filter((t) => !name(t).startsWith(q) && name(t).includes(q))
+  const names = (t: TeacherInfo) => {
+    const ru = norm(t.name).replace(/\./g, '')
+    return [ru, translit(ru)]
+  }
+  const starts = list.filter((t) => names(t).some((n) => n.startsWith(q)))
+  const contains = list.filter((t) => !starts.includes(t) && names(t).some((n) => n.includes(q)))
   return [...starts, ...contains].slice(0, limit)
 }

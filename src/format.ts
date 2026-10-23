@@ -37,3 +37,35 @@ export function formatDuration(minutes: number) {
 
 // «19 окт — 25 окт» / «19 Oct — 25 Oct»
 export const formatShortRange = (from: number, to: number) => `${dayMonthShort(from, getLang())} — ${dayMonthShort(to, getLang())}`
+
+// «20.11» / «20 Nov» — короткая дата в строках хода предмета
+export const formatDayShort = (day: number) => {
+  const d = dateOf(day)
+  return getLang() === 'en' ? dayMonthShort(day, 'en') : `${String(d.date).padStart(2, '0')}.${String(d.month + 1).padStart(2, '0')}`
+}
+
+// Недели пары: «2–12, чётные», «1–13», «5, 7, 9–11» / «2–12, even»
+export function weeksText(weeks: number[]): string {
+  const list = [...new Set(weeks)].sort((a, b) => a - b)
+  if (!list.length) return ''
+  if (list.length === 1) return String(list[0])
+  const step = list[1] - list[0]
+  const regular = (step === 1 || step === 2) && list.every((w, i) => i === 0 || w - list[i - 1] === step)
+  if (regular && list.length > 2) {
+    const range = `${list[0]}–${list.at(-1)}`
+    return step === 1 ? range : `${range}, ${list[0] % 2 === 0 ? t('чётные') : t('нечётные')}`
+  }
+  // подряд идущие — диапазоном
+  const parts: string[] = []
+  let from = list[0]
+  let prev = list[0]
+  for (const w of [...list.slice(1), Infinity]) {
+    if (w === prev + 1) {
+      prev = w
+      continue
+    }
+    parts.push(from === prev ? String(from) : prev === from + 1 ? `${from}, ${prev}` : `${from}–${prev}`)
+    from = prev = w
+  }
+  return parts.join(', ')
+}

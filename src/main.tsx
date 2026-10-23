@@ -1,6 +1,6 @@
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { saveProfile } from './api'
+import { saveFavorites, saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
 import './index.css'
 import { cachedExtras, rememberExtras, type Extras } from './edits'
@@ -8,7 +8,7 @@ import { rememberHidden } from './hidden'
 import { INTRO_VERSION, introSeen, markIntroDone } from './intro'
 import { IntroFlow, type Current } from './onboarding/Intro'
 import { Onboarding, type Choice } from './onboarding/Onboarding'
-import { defaultPrefs, mergeBootPrefs, readPrefs, savePrefs, type Prefs } from './prefs'
+import { cleanFavorites, defaultPrefs, mergeBootPrefs, parsePrefs, readPrefs, savePrefs, type Prefs } from './prefs'
 import { GroupMissingError, groupsToLoad, loadSchedule } from './schedule'
 import { readCloud, readLocal } from './storage'
 import { checkIn, initTelegram, type CheckIn } from './telegram'
@@ -217,6 +217,16 @@ async function boot() {
     } else if (me?.onboarding || (!checked && !hasLocalTraces())) {
       initial = { kind: 'intro', registered: false, askLang: true }
     }
+  }
+  // избранное (этап 12): копия у бота новее (менял на другом устройстве) — берём её; наша новее — отправим боту.
+  // Только у тех, у кого настройки уже есть (новым — после онбординга)
+  if (readLocal('prefs')) {
+    const prefs = readPrefs()
+    const bot = me?.favorites
+    const botAt = me?.favorites_at ?? 0
+    if (bot && botAt > prefs.favAt) savePrefs({ ...prefs, favorites: cleanFavorites(bot), favAt: botAt })
+    else if (checked && prefs.favAt > botAt) saveFavorites(prefs.favorites, prefs.favAt).catch(() => {})
+    else if (prefs.favVersion !== parsePrefs(readLocal('prefs'))?.favVersion) savePrefs(prefs) // перенос «1-1 / 1-2»
   }
   // знакомство новой версии — всем один раз, включая старых пользователей и МБ (им — «Это твоя группа?»)
   const needIntro = introSeen(cloudIntroSeen, me?.intro) < INTRO_VERSION

@@ -71,7 +71,7 @@ export async function onDeleteMeButton(env: Env, query: TgCallbackQuery): Promis
     env.DB.prepare(
       `UPDATE users SET username = NULL, name = NULL, grp = NULL, role = NULL, teacher_id = NULL, starosta_of = NULL,
          subgroups = NULL, board_origin = 0, can_message = 0, visits = 0, starts = 0, last_open = NULL,
-         onboarded_at = NULL, intro_version = 0
+         onboarded_at = NULL, intro_version = 0, favorites = NULL, favorites_at = NULL
        WHERE id = ?1`,
     ).bind(id),
     env.DB.prepare(

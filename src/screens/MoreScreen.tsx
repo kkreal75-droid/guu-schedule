@@ -22,7 +22,6 @@ import { StarostaPage } from '../more/StarostaPage'
 import { SupportPage } from '../more/SupportPage'
 import { TeacherSchedulePage } from '../more/TeacherSchedulePage'
 import { TeachersPage } from '../more/TeachersPage'
-import type { Prefs } from '../prefs'
 import { haptic, openTelegramLink } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { t, useLang } from '../i18n'
@@ -45,13 +44,11 @@ type Item = {
 type Group = { title?: string; items: Item[] }
 
 // group — группа на экране расписания; teacherMode — роль «Преподаватель» (сессия и календарь — для групп);
-// prefs / onPrefsChange — избранные группы; channel — ссылка «Канал новостей» из админки
+// channel — ссылка «Канал новостей» из админки (избранное — из контекста, src/favorites.tsx)
 type Props = {
   admin: boolean
   group: string
   teacherMode: boolean
-  prefs: Prefs
-  onPrefsChange: (patch: Partial<Prefs>) => void
   extras: Extras
   starosta: string | null // староста этой группы — «Правки группы»
   onGroupExtras: (group: string, extras: Extras) => void
@@ -61,11 +58,16 @@ type Props = {
   onRequestBack?: () => void
 }
 
-// session — кнопка «Открыть расписание сессии» из рассылки бота (?open=session)
-export type MoreRequest = { item: 'teachers'; teacher: TeacherInfo } | ({ item: 'places' } & PlacesTarget) | { item: 'session' }
+// session — кнопка «Открыть расписание сессии» из рассылки бота (?open=session); group-schedule — нажали группу
+// у пары преподавателя
+export type MoreRequest =
+  | { item: 'teachers'; teacher: TeacherInfo }
+  | ({ item: 'places' } & PlacesTarget)
+  | { item: 'session' }
+  | { item: 'group-schedule'; group: string }
 
 export function MoreScreen({
-  admin, group, teacherMode, prefs, onPrefsChange, starosta, onGroupExtras, channel, request,
+  admin, group, teacherMode, starosta, onGroupExtras, channel, request,
   onRequestBack,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(request?.item ?? null)
@@ -107,7 +109,7 @@ export function MoreScreen({
           sub: t('Любая группа ГУУ'),
           icon: PeopleIcon,
           color: 'blue',
-          render: () => <GroupSchedulePage prefs={prefs} onPrefsChange={onPrefsChange} />,
+          render: () => <GroupSchedulePage initial={request?.item === 'group-schedule' ? request.group : undefined} />,
         },
         { id: 'rooms', title: t('Свободные аудитории'), sub: t('Где посидеть между парами'), icon: DoorIcon, color: 'teal', render: () => <FreeRoomsPage /> },
         { id: 'documents', title: t('Документы'), sub: t('Таблицы с расписанием'), icon: TableIcon, color: 'sky', render: () => <DocumentsPage group={group} /> },

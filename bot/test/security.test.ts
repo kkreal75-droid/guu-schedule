@@ -10,7 +10,7 @@ beforeAll(() => mockOutbound())
 
 const PRIVATE = [
   '/seen', '/profile', '/support', '/intro', '/my-subgroups', '/extras', '/starosta/info', '/cal/status',
-  '/reviews/top', '/admin/dashboard', '/hidden/add', '/hidden/delete', '/lang',
+  '/reviews/top', '/admin/dashboard', '/hidden/add', '/hidden/delete', '/lang', '/favorites',
 ]
 const ADMIN_ACTIONS = [
   'dashboard', 'users', 'user', 'ban', 'unban', 'review-ban', 'reset-intro', 'places', 'academic',

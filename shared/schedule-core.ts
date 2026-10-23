@@ -17,7 +17,10 @@ export type Lesson = {
   teachers?: string[] // в ячейке несколько преподавателей (teacher — первый из них)
   pair?: number | null // номер пары, если известен заранее (в расписании преподавателя)
   stream?: boolean // языковой блок потока: стоит у многих групп в нескольких окнах, студент ходит в одно (update.py)
+  audience?: Audience[] // в расписании преподавателя — у каких групп пара (teacher — их имена через запятую)
 }
+
+export type Audience = { id: string; name: string } // id группы и имя («МБ(МП) 1-2»)
 
 export type Schedule = {
   updated_at?: string // когда update.py нашёл изменение, ISO по Москве
@@ -55,7 +58,10 @@ export type TeacherFile = {
 
 export const teacherKey = (id: string) => `t-${id}` // «группа» в расписании преподавателя
 
+export const isTeacherKey = (group: string) => group.startsWith('t-')
+
 // Расписание преподавателя как расписание одной «группы»: вместо преподавателя у пары — группы
+// (teacher — имена строкой, для бота и календаря; audience — id и имена, для чипов в приложении)
 export function teacherAsGroup(file: TeacherFile): GroupFile {
   return {
     id: teacherKey(file.id),
@@ -63,7 +69,11 @@ export function teacherAsGroup(file: TeacherFile): GroupFile {
     updated_at: '',
     semester_start: file.semester_start,
     grid: {},
-    lessons: file.lessons.map(({ groups: _, group_names, ...l }) => ({ ...l, teacher: group_names.join(', ') })),
+    lessons: file.lessons.map(({ groups, group_names, ...l }) => ({
+      ...l,
+      teacher: group_names.join(', '),
+      audience: groups.map((id, i) => ({ id, name: group_names[i] ?? id })),
+    })),
   }
 }
 

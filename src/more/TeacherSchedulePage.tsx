@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { teacherKey } from '../../shared/schedule-core'
 import type { TeacherInfo } from '../data'
 import { TeacherPicker } from '../onboarding/TeacherPicker'
+import { FavoriteToggle } from '../components/FavoriteToggle'
 import { ScheduleViewer } from './ScheduleViewer'
 import { t } from '../i18n'
 import { trTeacher } from '../guu'
@@ -20,6 +21,7 @@ export function TeacherSchedulePage({ initial }: { initial?: { id: string; name:
             <span className="viewer-sub">{t('Расписание по файлам ГУУ · у пар — группы')}</span>
           </div>
           <div className="viewer-actions">
+            <FavoriteToggle id={teacherKey(picked.id)} />
             <button type="button" className="chip" onClick={() => setPicked(null)}>
               {t('Другой преподаватель')}
             </button>

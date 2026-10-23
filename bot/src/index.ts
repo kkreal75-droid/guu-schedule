@@ -50,7 +50,7 @@ import { detectChanges, runDigests } from './digest'
 import { extrasFor, loadExtras } from './edits'
 import { reportError, safely } from './errors'
 import { handleInlineQuery } from './inline'
-import { handleIntro, handleLang, handleProfile } from './profile'
+import { handleFavorites, handleIntro, handleLang, handleProfile } from './profile'
 import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { cleanupHidden, handleHiddenApi, userHidden } from './hidden'
 import { loadSettings } from './settings'
@@ -171,7 +171,7 @@ async function handleSeen(env: Env, request: Request): Promise<Response> {
       group = parsed.group ?? null
       version = typeof parsed.v === 'number' ? parsed.v : 1
       if (Array.isArray(parsed.groups)) {
-        groups = parsed.groups.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, 10)
+        groups = parsed.groups.map(normalizeGroup).filter((g): g is string => Boolean(g)).slice(0, 60)
       }
     } catch {
       return json({ ok: false }, 400)
@@ -275,6 +275,7 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env, request))
   if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
   if (url.pathname === '/lang' && request.method === 'POST') return guarded(env, 'Язык', () => handleLang(env, request))
+  if (url.pathname === '/favorites' && request.method === 'POST') return guarded(env, 'Избранное', () => handleFavorites(env, request))
   if (url.pathname === '/my-subgroups' && request.method === 'POST') return guarded(env, 'Подгруппы', () => handleMySubgroups(env, request))
   if (url.pathname === '/extras' && request.method === 'POST') return guarded(env, 'Правки групп', () => handleExtras(env, request))
   const hidden = url.pathname.match(/^\/hidden\/(add|delete)$/)
