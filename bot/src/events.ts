@@ -16,6 +16,7 @@ let memory: { at: number; events: MakeEvent[] } | null = null
 export async function loadEvents(env: Env): Promise<MakeEvent[]> {
   if (memory && Date.now() - memory.at < TTL_MS) return memory.events
   const res = await fetch(new URL('data/events.json', env.WEBAPP_URL).toString(), { cf: { cacheTtl: 300, cacheEverything: true } })
+  if (res.status === 404) return [] // сайт ещё без файла (первый деплой) — мероприятий нет, это не ошибка
   if (!res.ok) throw new Error(`events.json: HTTP ${res.status}`)
   const data = (await res.json()) as EventsFile
   const events = Array.isArray(data.events) ? data.events : []
