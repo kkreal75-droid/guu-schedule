@@ -17,6 +17,8 @@ on:
     branches: [main]
   schedule:
     - cron: "17 * * * *" # раз в час, в :17 UTC — в ровные часы очереди GitHub длиннее
+    # GitHub пропускает часть запусков по расписанию (в октябре — раз в 3–5 часов): второй слот на :47
+    - cron: "47 * * * *"
   workflow_dispatch:
     inputs:
       force:

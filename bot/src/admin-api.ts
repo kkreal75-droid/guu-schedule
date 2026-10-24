@@ -291,7 +291,7 @@ async function reviewModerate({ env, req }: Call): Promise<Response> {
 
 // ---------- расписание ----------
 
-function github(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
+export function github(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
   const base = env.GITHUB_API || 'https://api.github.com'
   return fetch(`${base}/repos/${env.GITHUB_REPO}${path}`, {
     ...init,

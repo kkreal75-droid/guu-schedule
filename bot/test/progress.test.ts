@@ -24,18 +24,19 @@ const at = (iso: string, hhmm = '00:00') => ({ day: dayFromIso(iso), minutes: Nu
 const extrasWith = (edits: Partial<ScheduleEdit>[]): Extras => ({ ...NO_EXTRAS, edits: edits.map((e, i) => ({ id: i + 1, text: '', start: null, ...e }) as ScheduleEdit) })
 
 describe('ход предмета', () => {
-  // В файле ГУУ у МБ(МП) 1-2 практика Королевой — пятница 10:40 по чётным 2–12 (6 занятий) и вторник 16:15 по
-  // неделям 3, 5, 7, 9, 11, 15 (ещё 6): связка «преподаватель + предмет + вид + группа» — 12 занятий
-  it('Королева Н.Ш., Макроэкономика, ПЗ, МБ(МП) 1-2: 12 занятий (пт чётные 2–12 + вт 3–11, 15), 24 ак. ч, последнее 08.12', () => {
+  // В файле ГУУ (-143, 24.10) у МБ(МП) 1-2 практика Королевой — пятница 10:40 по неделям 2, 4, 6, 8, 12, 14 (6 занятий;
+  // в -142 было 2–12 по чётным) и вторник 16:15 по неделям 3, 5, 7, 9, 11, 15 (ещё 6): связка «преподаватель + предмет +
+  // вид + группа» — 12 занятий
+  it('Королева Н.Ш., Макроэкономика, ПЗ, МБ(МП) 1-2: 12 занятий (пт 2–8, 12, 14 + вт 3–11, 15), 24 ак. ч, последнее 08.12', () => {
     for (const [tt, group, key] of [[student, 'b1-mb-mp-2', MACRO_STUDENT], [teacher, T, MACRO_TEACHER]] as const) {
       const list = courseOccurrences(tt, group, NO_EXTRAS).get(key)!
-      expect(list.map((o) => o.week)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15])
-      expect(list.filter((o) => o.start === '10:40').map((o) => o.week)).toEqual([2, 4, 6, 8, 10, 12]) // пятница — как в примере
+      expect(list.map((o) => o.week)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15])
+      expect(list.filter((o) => o.start === '10:40').map((o) => o.week)).toEqual([2, 4, 6, 8, 12, 14]) // пятница
       const p = progressOf(list, at('2026-10-23', '13:00'))!
       expect(p).toMatchObject({ total: 12, hours: 24, done: 7, left: 5, finished: false })
       expect(isoFromDay(p.last.day)).toBe('2026-12-08')
       expect(p.last.week).toBe(15)
-      expect(isoFromDay(list.filter((o) => o.start === '10:40').at(-1)!.day)).toBe('2026-11-20') // последняя пятничная — 12-я неделя
+      expect(isoFromDay(list.filter((o) => o.start === '10:40').at(-1)!.day)).toBe('2026-12-04') // последняя пятничная — 14-я неделя
       expect(occurrenceIndex(list, dayFromIso('2026-10-23'), '10:40')).toBe(7)
     }
     // до конца пары 23.10 — прошло 6
@@ -53,7 +54,7 @@ describe('ход предмета', () => {
   })
 
   it('отмена старостой — у студента и у преподавателя на одно занятие меньше', () => {
-    const extras = extrasWith([{ group: 'b1-mb-mp-2', date: '2026-11-06', start: '10:40', kind: 'cancel' }])
+    const extras = extrasWith([{ group: 'b1-mb-mp-2', date: '2026-11-20', start: '10:40', kind: 'cancel' }])
     expect(courseOccurrences(student, 'b1-mb-mp-2', extras).get(MACRO_STUDENT)!.length).toBe(11)
     expect(courseOccurrences(teacher, T, extras).get(MACRO_TEACHER)!.length).toBe(11)
   })

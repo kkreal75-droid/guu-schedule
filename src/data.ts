@@ -37,6 +37,9 @@ export function cachedList<T>(path: string, key: string) {
 
 export const loadGroups = cachedList<GroupsIndex>('groups.json', 'groups_index')
 
+// последняя успешная проверка guu.ru (update.py) — «Обновлено …» внизу расписания
+export const loadStatus = cachedList<{ checked_at?: string; via?: string }>('status.json', 'data_status')
+
 export type TeacherInfo = { id: string; name: string; subjects: string[]; groups: string[]; lessons: number }
 export const loadTeachers = cachedList<{ updated_at: string; teachers: TeacherInfo[] }>('teachers.json', 'teachers_index')
 

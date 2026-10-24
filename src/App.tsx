@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AddFavoriteSheet } from './components/AddFavoriteSheet'
 import { FavoritesBar } from './components/FavoritesBar'
 import { FavoritesContext, type Favorites } from './favorites'
-import { loadTeachers } from './data'
+import { loadStatus, loadTeachers } from './data'
 import type { Choice } from './onboarding/Onboarding'
 import { isTeacherKey } from '../shared/schedule-core'
 import { NoticeBar } from './components/NoticeBar'
@@ -21,6 +21,8 @@ import { confirmAction, haptic, showAlert, type CheckIn } from './telegram'
 import { trTeacher } from './guu'
 import { useTheme } from './theme'
 import { t } from './i18n'
+
+const STALE_MS = 6 * 3_600_000
 
 export type { Tab }
 
@@ -161,7 +163,15 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
     window.scrollTo(0, 0)
   }
 
-  const updatedAt = schedule.updated_at ? formatStamp(schedule.updated_at) : null
+  // «Обновлено» — последняя УСПЕШНАЯ проверка guu.ru (data/status.json), а не последняя смена пар; файла нет —
+  // как раньше, время данных. Старше 6 часов — мелкая пометка «данные могут быть устаревшими».
+  const [checkedAt, setCheckedAt] = useState<string | null>(null)
+  useEffect(() => {
+    loadStatus().then((s) => setCheckedAt(typeof s.checked_at === 'string' ? s.checked_at : null), () => {})
+  }, [])
+  const stamp = checkedAt ?? schedule.updated_at ?? null
+  const updatedAt = stamp ? formatStamp(stamp) : null
+  const outdated = stamp !== null && Date.now() - Date.parse(stamp) > STALE_MS
 
   // нажатие на преподавателя в паре — его карточка в «Другое → Рейтинг преподавателей»; «Назад» — сюда
   const [moreRequest, setMoreRequest] = useState<MoreRequest | null>(() => (startTab ? null : openedFrom()))
@@ -303,6 +313,7 @@ export default function App({ status, extras: initialExtras, startTab, onReload,
         <p className="updated">
           {t('Обновлено: {at}', { at: updatedAt })}
           {fromCache && ` · ${t('нет сети, сохранённая копия')}`}
+          {outdated && !fromCache && ` · ${t('данные могут быть устаревшими')}`}
         </p>
       )}
 

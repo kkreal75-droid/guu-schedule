@@ -14,6 +14,7 @@
 //   GET  /translations — правки английских названий ГУУ (translations.ts), правит владелец в админке.
 //   GET  /academic — правки учебного графика поверх типового (academic.ts), правит владелец в админке.
 //   GET  /event/<id>.ics — мероприятие make.events в календарь (events.ts, этап 13).
+//   GET  /guu?url=… — запасной путь к guu.ru для update.py (guu-relay.ts): только страницы и файлы расписания.
 //   POST /hidden/add|delete — «Это не моя пара»: свои скрытые пары (hidden.ts).
 //   POST /support — «Написать в поддержку»: владельцу в бот, ответ — через кнопку «Ответить» (support.ts).
 //   POST /admin/<действие> — админ-панель (admin-api.ts), только OWNER_ID.
@@ -59,6 +60,8 @@ import { handleExtras, handleMySubgroups, handleStarostaApi } from './starosta'
 import { cleanupHidden, handleHiddenApi, userHidden } from './hidden'
 import { loadSettings } from './settings'
 import { afterDeploy, watchWebhook, webhookCheck } from './setup'
+import { handleGuuRelay } from './guu-relay'
+import { notifyChanges, watchUpdates } from './updates'
 import { answerCallback, type TgUpdate } from './telegram'
 
 // Кто прислал обновление и стоит ли его считать в лимит: личка, кнопки, inline и команды в беседах.
@@ -283,7 +286,8 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   // публичное (без initData) — свой лимит по IP: из кэша, но запрос всё равно стоит денег
   const publicGet =
-    request.method === 'GET' && (['/health', '/places', '/academic', '/translations'].includes(url.pathname) || url.pathname.startsWith('/event/'))
+    request.method === 'GET' &&
+    (['/health', '/places', '/academic', '/translations', '/guu'].includes(url.pathname) || url.pathname.startsWith('/event/'))
   if (publicGet && !(await allow(env, 'RL_PUBLIC', clientIp(request)))) return tooMany()
   if (url.pathname === '/health' && request.method === 'GET') return handleHealth(env)
 
@@ -293,6 +297,8 @@ async function route(env: Env, ctx: ExecutionContext, request: Request, url: URL
   if (url.pathname === '/places' && request.method === 'GET') return guarded(env, 'Места', () => handlePlacesGet(env, request))
   if (url.pathname === '/translations' && request.method === 'GET') return guarded(env, 'Переводы', () => handleTranslationsGet(env, request))
   if (url.pathname === '/academic' && request.method === 'GET') return guarded(env, 'Учебный график', () => handleAcademicGet(env, request))
+  // запасной путь к guu.ru для автообновления (guu-relay.ts): только файлы и страницы расписания guu.ru
+  if (url.pathname === '/guu' && request.method === 'GET') return guarded(env, 'Запасной путь к guu.ru', () => handleGuuRelay(url))
   const event = url.pathname.match(/^\/event\/([A-Za-z0-9_-]{1,40})\.ics$/)
   if (event && request.method === 'GET') return guarded(env, 'Мероприятие .ics', () => handleEventIcs(env, event[1]))
   if (url.pathname === '/intro' && request.method === 'POST') return guarded(env, 'Знакомство', () => handleIntro(env, request))
@@ -352,6 +358,11 @@ async function runCron(controller: ScheduledController, env: Env, ctx: Execution
     }
     if (new Date(now).getUTCMinutes() % 10 === 7) {
       used += await notifySessions(env).catch((err) => (reportError(env, 'Рассылка о сессии', err), 0))
+    }
+    // автообновление: 3 часа без успешной проверки, неопубликованный файл guu.ru, «🔄 Расписание обновилось» (updates.ts)
+    if (new Date(now).getUTCMinutes() % 10 === 9) {
+      used += await watchUpdates(env, now).catch((err) => (reportError(env, 'Присмотр за автообновлением', err), 0))
+      used += await notifyChanges(env, now).catch((err) => (reportError(env, 'Рассылка об изменениях', err), 0))
     }
     // расход лимитов: тревога владельцу и режим экономии на 80% (usage.ts)
     if (new Date(now).getUTCMinutes() % 10 === 3) {

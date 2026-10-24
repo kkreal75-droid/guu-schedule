@@ -657,6 +657,8 @@ export const EN: Record<string, string> = {
   "своё расписание": "your schedule",
   "Убрать из избранного": "Remove from favourites",
 
+  "данные могут быть устаревшими": "data may be outdated",
+
   // ---------- этап 13: мероприятия make.events ----------
   "мероприятие|мероприятия|мероприятий": "event|events",
   "Начало: {time}": "Starts at {time}",

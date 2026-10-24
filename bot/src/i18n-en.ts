@@ -24,6 +24,8 @@ export const EN: Record<string, string> = {
   'Сегодня проектное обучение — {n} {events}': 'Project learning today — {n} {events}',
   'мероприятие|мероприятия|мероприятий': 'event|events',
   'Сегодня проектное обучение — мероприятий пока нет': 'Project learning today — no events yet',
+  '🔄 <b>Расписание обновилось</b>\nВ файле ГУУ поменялись пары твоей группы — загляни в расписание.':
+    "🔄 <b>Schedule updated</b>\nGUU changed your group's classes — check your schedule.",
   // виды пар и места без номера аудитории (как в файлах ГУУ)
   Лекция: 'Lecture',
   Практика: 'Seminar',

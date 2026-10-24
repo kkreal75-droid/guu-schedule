@@ -48,6 +48,10 @@ const SITE: Record<string, unknown> = {
   '/data/events.json': EVENTS,
 }
 
+// подмена файлов сайта на время теста (status.json, changes.json…) и страниц guu.ru
+export const siteData: Record<string, unknown> = {}
+export const guuPages: Record<string, string> = {}
+
 // что воркер отправил в Telegram — для проверок
 export const telegramCalls: { method: string; body: unknown }[] = []
 
@@ -91,8 +95,13 @@ export function mockOutbound() {
       return Response.json({ ok: true, result })
     }
     if (url.host === 'site.test') {
-      const data = SITE[url.pathname]
+      const data = url.pathname in siteData ? siteData[url.pathname] : SITE[url.pathname]
       return data ? Response.json(data) : new Response('not found', { status: 404 })
+    }
+    if (url.host === 'guu.ru') {
+      if (guuPages[url.pathname] !== undefined) return new Response(guuPages[url.pathname], { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+      if (url.pathname.startsWith('/wp-content/uploads/')) return new Response(new Uint8Array([80, 75, 3, 4]), { headers: { 'Content-Type': 'application/vnd.ms-excel' } })
+      return new Response('not found', { status: 404 })
     }
     if (url.host === 'bot.test') return real(input, init)
     return new Response('outbound blocked in tests', { status: 599 })

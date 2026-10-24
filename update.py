@@ -25,6 +25,10 @@
   public/data/subjects.json             — все предметы и какие без английского перевода (data/i18n/subjects.en.json)
   public/data/kug.json                  — календарные учебные графики программ (PDF) со страницы
                                           «Сведения → Образование»; раз в сутки (в 4 ч МСК) или с --force
+  public/data/status.json               — последняя УСПЕШНАЯ проверка guu.ru (время, напрямую или через воркер, файлы):
+                                          «Обновлено …» в приложении, тревоги воркера (bot/src/updates.ts)
+  public/data/changes.json              — у каких групп поменялись пары в последней публикации («🔄 Расписание
+                                          обновилось» — рассылка воркера, bot/src/updates.ts)
   public/data/events.json               — мероприятия проектного обучения с make.events (каждый час; прошедшие —
                                           7 дней); data/events_state.json — с какого времени make.events не отвечает
   schedule.json                         — как раньше: только МБ(МП) 1-1 и 1-2 (для старых версий приложения)
@@ -38,8 +42,10 @@ MIN_LESSONS пар — файл не публикуем (остаются про
 Ручные правки сюда не попадают: overrides.json и замены дней (overrides/thursday*.json) накладываются
 поверх при показе (shared/schedule-core.ts), автообновление их не стирает.
 
-Код выхода: 0 — всё в порядке (обновилось или нет; guu.ru не ответил даже после повторов — тоже 0,
-с предупреждением: ничего не публикуем, следующий запуск через час попробует снова), 1 — ссылок нет вовсе,
+guu.ru не отвечает напрямую (так бывает с раннерами GitHub) — качаем через воркер Cloudflare (GUU_RELAY).
+
+Код выхода: 0 — всё в порядке (обновилось или нет; guu.ru не ответил ни напрямую, ни через воркер — тоже 0,
+с предупреждением: ничего не публикуем, воркер пришлёт тревогу через 3 часа без успешной проверки), 1 — ссылок нет вовсе,
 ответ не тот (HTTP 4xx, не файл) или ошибка разбора.
 В GitHub Actions пишет changed=true|false, message=..., need_soffice=true|false в $GITHUB_OUTPUT.
 """
@@ -206,24 +212,44 @@ def allowed_host(url: str) -> bool:
     return parts.scheme == "https" and any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS)
 
 
-def fetch(url: str, method: str = "GET", attempts: int = 3) -> tuple[dict[str, str], bytes]:
+# Запасной путь: guu.ru временами не отвечает раннерам GitHub (таймауты с 21.10), а из сети Cloudflare отвечает.
+# Если напрямую не вышло — весь остаток запуска качаем через наш воркер: GET /guu?url=… (только guu.ru, только
+# страницы расписания/сессии/«Сведений» и файлы из /wp-content/uploads/; bot/src/guu-relay.ts). GUU_RELAY="" — выключить.
+GUU_RELAY = os.environ.get("GUU_RELAY", "https://guu-schedule-bot.guu-schedule-bot.workers.dev/guu")
+VIA = {"mode": "direct"}  # direct → relay после первой неудачи напрямую
+
+
+def fetch(url: str, method: str = "GET", attempts: int = 2) -> tuple[dict[str, str], bytes]:
+    if VIA["mode"] == "direct" or not GUU_RELAY or not allowed_host(url):
+        try:
+            return fetch_once(url, method, attempts, timeout=30)
+        except SiteUnavailable as e:
+            if not GUU_RELAY or not allowed_host(url):
+                raise
+            warn(f"guu.ru напрямую не отвечает ({e}) — дальше через запасной путь (воркер Cloudflare)")
+            VIA["mode"] = "relay"
+    return fetch_once(f"{GUU_RELAY}?url={quote(to_ascii_url(url), safe='')}", method, 3, timeout=60, label=url)
+
+
+def fetch_once(url: str, method: str, attempts: int, timeout: int, label: str | None = None) -> tuple[dict[str, str], bytes]:
+    label = label or url
     for attempt in range(1, attempts + 1):
         try:
             req = Request(to_ascii_url(url), method=method,
                           headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"})
-            with urlopen(req, timeout=60, context=SSL_CONTEXT) as resp:
+            with urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
                 headers = {k.lower(): v for k, v in resp.headers.items()}
                 if method != "GET":
                     return headers, b""
                 return headers, decompress(read_limited(resp), headers.get("content-encoding"))
         except HTTPError as e:
             if e.code < 500:
-                raise UpdateError(f"{method} {unquote(url)}: HTTP {e.code}") from e
+                raise UpdateError(f"{method} {unquote(label)}: HTTP {e.code}") from e
             if attempt == attempts:
-                raise SiteUnavailable(f"{method} {unquote(url)}: HTTP {e.code}") from e
+                raise SiteUnavailable(f"{method} {unquote(label)}: HTTP {e.code}") from e
         except (URLError, TimeoutError, ConnectionError) as e:
             if attempt == attempts:
-                raise SiteUnavailable(f"{method} {unquote(url)}: {e}") from e
+                raise SiteUnavailable(f"{method} {unquote(label)}: {e}") from e
         time.sleep(5 * attempt)
     raise AssertionError("unreachable")
 
@@ -908,8 +934,8 @@ def academic_year_now() -> str:
     return f"{y}/{y + 1}"
 
 
-def build(sources: list[Source], contents: dict[str, bytes], state: dict, force: bool) -> tuple[bool, str, bool]:
-    """Возвращает (что-то поменялось, сообщение для коммита, нужен LibreOffice)."""
+def build(sources: list[Source], contents: dict[str, bytes], state: dict, force: bool) -> tuple[bool, str, bool, list[str]]:
+    """Возвращает (что-то поменялось, сообщение для коммита, нужен LibreOffice, группы с изменившимися парами)."""
     now = datetime.now(MSK).isoformat(timespec="seconds")
     registry = load_json(IDS_FILE, {})
     prev_groups = {g["id"]: g for g in (load_json(OUT / "groups.json", {}) or {}).get("groups", [])}
@@ -1325,7 +1351,7 @@ def build(sources: list[Source], contents: dict[str, bytes], state: dict, force:
     changed = any(p.parent != ROOT / "data" for p in writer.changed if p.name not in ("alerts.json",)) or bool(changed_groups)
     message = (f"Расписание ГУУ: изменились пары у {len(changed_groups)} групп" if changed_groups
                else "Расписание ГУУ: служебные данные")
-    return bool(writer.changed), message, need_soffice
+    return bool(writer.changed), message, need_soffice, changed_groups
 
 
 def print_summary(report: dict, changed_groups: list[str]) -> None:
@@ -1372,6 +1398,28 @@ def check_overrides(lessons: list[dict]) -> None:
                 break
 
 
+STATUS_FILE = OUT / "status.json"
+CHANGES_FILE = OUT / "changes.json"
+
+
+def write_status(sources: list[Source]) -> bool:
+    """Успешная проверка guu.ru (страницы и все файлы скачаны): время — для «Обновлено …» в приложении и для
+    тревог воркера (3 часа без успешной проверки; новый файл на guu.ru, не опубликованный за 2 часа)."""
+    now = datetime.now(MSK).isoformat(timespec="seconds")
+    body = {"checked_at": now, "via": VIA["mode"], "files": sorted({s.name for s in sources})}
+    writer = Writer()
+    writer.write(STATUS_FILE, dump(body))
+    return bool(writer.changed)
+
+
+def write_changes(changed_groups: list[str], sources: list[Source]) -> None:
+    """Каким группам обновились пары в этой публикации — воркер разошлёт им «🔄 Расписание обновилось» (changes.ts)."""
+    now = datetime.now(MSK).isoformat(timespec="seconds")
+    files = sorted({s.name for s in sources})
+    pid = hashlib.sha1(f"{now}|{','.join(sorted(changed_groups))}".encode()).hexdigest()[:12]
+    Writer().write(CHANGES_FILE, dump({"id": pid, "at": now, "groups": sorted(changed_groups), "files": files}))
+
+
 def update(force: bool, local: Path | None) -> tuple[bool, str, bool]:
     events_changed = False
     if not local:
@@ -1385,16 +1433,24 @@ def update(force: bool, local: Path | None) -> tuple[bool, str, bool]:
             contents[src.url] = Path(unquote(src.url[7:])).read_bytes() if local else fetch(src.url)[1]
         except UpdateError as e:
             warn(str(e))
-    print(f"Файлов: {len(sources)} (скачано {len(contents)})")
+    print(f"Файлов: {len(sources)} (скачано {len(contents)}{', через запасной путь' if VIA['mode'] == 'relay' else ''})")
+    complete = not local and len(contents) == len(sources)
     shas = {s.key: hashlib.sha256(contents[s.url]).hexdigest() for s in sources if s.url in contents}
     old = {k: v.get("sha256") for k, v in state.get("files", {}).items()}
     if not force and shas == {k: old.get(k) for k in shas} and set(old) == set(shas) and (OUT / "groups.json").exists():
         print("Ни один файл не изменился — расписание то же.")
-        return events_changed, "Мероприятия проектного обучения обновились" if events_changed else "", False
+        if complete:
+            write_status(sources)
+        return True, "Проверка guu.ru: расписание то же" + (", мероприятия обновились" if events_changed else ""), False
     for key, sha in shas.items():
         if old.get(key) != sha:
             print(f"  изменился: {key}")
-    return build(sources, contents, state, force)
+    changed, message, need_soffice, changed_groups = build(sources, contents, state, force)
+    if changed_groups and not local:
+        write_changes(changed_groups, sources)
+    if complete and not need_soffice:
+        write_status(sources)
+    return True if complete else changed, message, need_soffice
 
 
 def main() -> int:
