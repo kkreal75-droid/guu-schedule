@@ -21,6 +21,7 @@ import { htmlProblem, loadSettings, renderGreeting, saveSettings, type Settings 
 import { TelegramError, sendMessage } from './telegram'
 import { escapeHtml } from './util'
 import { setupBot, webhookCheck } from './setup'
+import { github } from './github'
 
 const DAY_MS = 86_400_000
 const MSK_OFFSET_MS = 3 * 3_600_000
@@ -291,19 +292,6 @@ async function reviewModerate({ env, req }: Call): Promise<Response> {
 
 // ---------- расписание ----------
 
-export function github(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
-  const base = env.GITHUB_API || 'https://api.github.com'
-  return fetch(`${base}/repos/${env.GITHUB_REPO}${path}`, {
-    ...init,
-    headers: {
-      'User-Agent': 'guu-schedule-bot',
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(env.GITHUB_TOKEN ? { Authorization: `Bearer ${env.GITHUB_TOKEN}` } : {}),
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-  })
-}
 
 type Run = { id: number; event: string; status: string; conclusion: string | null; created_at: string; html_url: string }
 

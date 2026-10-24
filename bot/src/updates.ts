@@ -8,7 +8,7 @@
 //     (группе — не чаще раза в 6 часов, публикации старше суток не рассылаем).
 // Тревоги — sendMessage напрямую в Telegram: доходят, даже если вебхук бота сломан.
 import { normalizeGroup } from '../../shared/groups'
-import { github } from './admin-api'
+import { dailyTokenCheck, github } from './github'
 import { systemBroadcast } from './broadcast'
 import { GUU_USER_AGENT } from './guu-relay'
 import { reportError } from './errors'
@@ -74,6 +74,8 @@ async function dispatchUpdate(env: Env): Promise<boolean> {
     method: 'POST',
     body: JSON.stringify({ ref: 'main', inputs: { force: 'false' } }),
   })
+  // 401/403 — владельцу уже написал github.ts (про токен), здесь не дублируем
+  if (res.status === 401 || res.status === 403) return false
   if (res.status !== 204) throw new Error(`GitHub: запуск обновления — HTTP ${res.status}`)
   return true
 }
@@ -125,6 +127,7 @@ export async function watchUpdates(env: Env, now = Date.now()): Promise<number> 
     await dispatchUpdate(env).catch((err) => reportError(env, 'Запуск автообновления', err))
     used += 1
   }
+  used += await dailyTokenCheck(env).catch((err) => (reportError(env, 'Проверка GITHUB_TOKEN', err), 0))
   return used
 }
 

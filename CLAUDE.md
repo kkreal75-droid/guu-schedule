@@ -144,7 +144,8 @@ GitHub (таймауты с 21.10) — после первой неудачи н
 **KV** (редкие записи, лимит 1000/сутки): `chats` (настройки бесед, тема форума; группа — id), `settings`
 (приветствия, техработы, объявление, канал новостей), `sent:<дата>:<слот>` (уже отправленные сводки, TTL 3 дня),
 `alerts-sent` (присланные тревоги), `webhook-alert`, `worker-version`, `update-stale-alert`, `guu-unpublished`,
-`guu-unpublished-alert`, `update-dispatch`, `changes-notified`, `err:<хэш>` (одинаковая ошибка владельцу — не чаще
+`guu-unpublished-alert`, `update-dispatch`, `changes-notified`, `github-token-expiry`, `github-token-expiry-alert`,
+`github-token-auth-alert`, `github-token-checked`, `err:<хэш>` (одинаковая ошибка владельцу — не чаще
 раза в час, `errors.ts`). Старые `snapshot:1-1|1-2` и `board-snapshot:<id>` больше не используются.
 
 **Команды бота.** Личка: `/start` (одно из 3 приветствий), `/today`, `/tomorrow`.
@@ -174,7 +175,10 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 ## Секреты (Cloudflare, `npx wrangler secret put <ИМЯ>` в `bot/`)
 
 `BOT_TOKEN`, `OWNER_ID` (Telegram ID владельца), `BOARD_SALT` (был ключ псевдонимов чата — с этапа 9 не нужен),
-`GITHUB_TOKEN` (fine-grained PAT только на этот репозиторий, Actions: read & write — для «Обновить сейчас»).
+`GITHUB_TOKEN` (fine-grained PAT только на этот репозиторий, Actions: read & write — «Обновить сейчас» и автозапуск
+обновления воркером; задан 24.10.2026). `bot/src/github.ts`: срок токена — из заголовка
+`github-authentication-token-expiration` (KV `github-token-expiry`), за 14 дней до конца — предупреждение владельцу
+(раз в сутки), ответ 401/403 — сразу (раз в час); раз в сутки — проверочный запрос. Токен нигде не выводится.
 Только для локальной проверки: `TELEGRAM_API`, `GITHUB_API`. Vars в `wrangler.jsonc`: `WEBAPP_URL`,
 `BOT_USERNAME`, `GITHUB_REPO`, `GITHUB_WORKFLOW`. **Секреты вводит владелец сам** — не вводить за него,
 не писать в код, git и чат.
@@ -293,7 +297,6 @@ cd bot && npx wrangler d1 migrations apply guu-bot --remote   # и провер�
 со схемой кампуса, профиль с «Параметрами аккаунта», «Написать в поддержку», КУГ, документы.
 
 Известные проблемы:
-- `GITHUB_TOKEN` не задан → «Обновить сейчас» в админке выключена (автообновление по часам работает).
 - Ссылка `t.me/GUU_Scheduule_bot/schedule` (кнопка в inline) не проверена; если не открывает приложение —
   BotFather → `/newapp`, короткое имя `schedule`.
 - Не проверено вживую: inline в чужом чате, `/setup` в новой беседе.

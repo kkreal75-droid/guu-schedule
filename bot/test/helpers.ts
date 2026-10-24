@@ -48,6 +48,10 @@ const SITE: Record<string, unknown> = {
   '/data/events.json': EVENTS,
 }
 
+// поддельный GitHub API (GITHUB_API=https://gh.test): ответ и срок токена в заголовке
+export const githubState: { status: number; expiration: string | null } = { status: 204, expiration: null }
+export const githubCalls: { path: string; auth: string | null }[] = []
+
 // подмена файлов сайта на время теста (status.json, changes.json…) и страниц guu.ru
 export const siteData: Record<string, unknown> = {}
 export const guuPages: Record<string, string> = {}
@@ -97,6 +101,11 @@ export function mockOutbound() {
     if (url.host === 'site.test') {
       const data = url.pathname in siteData ? siteData[url.pathname] : SITE[url.pathname]
       return data ? Response.json(data) : new Response('not found', { status: 404 })
+    }
+    if (url.host === 'gh.test') {
+      githubCalls.push({ path: url.pathname, auth: request.headers.get('Authorization') })
+      const headers = githubState.expiration ? { 'github-authentication-token-expiration': githubState.expiration } : undefined
+      return new Response(githubState.status === 204 ? null : '{}', { status: githubState.status, headers })
     }
     if (url.host === 'guu.ru') {
       if (guuPages[url.pathname] !== undefined) return new Response(guuPages[url.pathname], { headers: { 'Content-Type': 'text/html; charset=utf-8' } })

@@ -126,3 +126,65 @@ describe('«🔄 Расписание обновилось»', () => {
     expect(toOwner()).toHaveLength(0)
   })
 })
+
+describe('GITHUB_TOKEN: автозапуск обновления, срок и ошибки', async () => {
+  const { githubState, githubCalls } = await import('./helpers')
+  const { parseExpiry } = await import('../src/github')
+  const SECRET = 'github_pat_TEST-SECRET-VALUE'
+  const withToken = { ...E, GITHUB_TOKEN: SECRET, GITHUB_API: 'https://gh.test' } as unknown as Env
+  const files = ['1-курс-бакалавриат-ОФО-143.xlsx', 'Сессия-1-курс-бакалавриат-ОФО-11.xlsx']
+  const reset = async () => {
+    for (const key of ['github-token-expiry', 'github-token-expiry-alert', 'github-token-auth-alert', 'github-token-checked', 'update-dispatch']) await E.KV.delete(key)
+    githubCalls.length = 0
+    githubState.status = 204
+    githubState.expiration = null
+  }
+
+  it('срок токена из заголовка GitHub', () => {
+    expect(parseExpiry('2027-01-23 12:00:00 UTC')).toBe(Date.parse('2027-01-23T12:00:00Z'))
+    expect(parseExpiry('2027-01-23 15:00:00 +0300')).toBe(Date.parse('2027-01-23T12:00:00Z'))
+    expect(parseExpiry('nonsense')).toBeNull()
+    expect(parseExpiry(null)).toBeNull()
+  })
+
+  it('проверка старше часа — бот сам запускает workflow (не чаще раза в 30 минут), токен — только в заголовке', async () => {
+    await reset()
+    const now = Date.now()
+    siteData['/data/status.json'] = { checked_at: iso(now - 2 * HOUR), files }
+    githubState.expiration = '2027-10-01 00:00:00 UTC'
+    await watchUpdates(withToken, now)
+    const dispatch = githubCalls.filter((c) => c.path.endsWith('/dispatches'))
+    expect(dispatch).toHaveLength(1)
+    expect(dispatch[0].auth).toBe(`Bearer ${SECRET}`)
+    await watchUpdates(withToken, now + 10 * 60_000)
+    expect(githubCalls.filter((c) => c.path.endsWith('/dispatches'))).toHaveLength(1)
+    expect(await E.KV.get('github-token-expiry')).toBe(String(Date.parse('2027-10-01T00:00:00Z')))
+    expect(toOwner().some((t) => t.includes('GITHUB_TOKEN'))).toBe(false) // срок далеко — молчим
+    expect(toOwner().join('\n')).not.toContain(SECRET)
+  })
+
+  it('до конца срока меньше 14 дней — предупреждение (раз в сутки)', async () => {
+    await reset()
+    const now = Date.now()
+    siteData['/data/status.json'] = { checked_at: iso(now - 2 * HOUR), files }
+    const soon = new Date(now + 10 * 86_400_000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
+    githubState.expiration = soon
+    await watchUpdates(withToken, now)
+    const warn = toOwner().filter((t) => t.includes('GITHUB_TOKEN</b> истекает'))
+    expect(warn).toHaveLength(1)
+    expect(warn[0]).toMatch(/через 10 дн\./)
+    expect(warn[0]).not.toContain(SECRET)
+  })
+
+  it('401 / 403 — сразу владельцу, без токена в тексте', async () => {
+    await reset()
+    const now = Date.now()
+    siteData['/data/status.json'] = { checked_at: iso(now - 2 * HOUR), files }
+    githubState.status = 401
+    await watchUpdates(withToken, now)
+    const msg = toOwner().filter((t) => t.includes('GitHub ответил 401'))
+    expect(msg).toHaveLength(1)
+    expect(msg[0]).toContain('недействителен')
+    expect(msg[0]).not.toContain(SECRET)
+  })
+})
