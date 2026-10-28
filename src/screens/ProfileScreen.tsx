@@ -220,8 +220,8 @@ export function ProfileScreen({
       </section>
 
       <div className="list profile-links">
-        {!teacher && <Row emoji="📱" title={t('Календарь на телефоне')} chevron onClick={() => (haptic(), setSub('calendar'), window.scrollTo(0, 0))} />}
-        <Row emoji="👋" title={t('Показать знакомство ещё раз')} chevron onClick={() => (haptic(), onShowIntro())} />
+        {!teacher && <Row icon="phone" title={t('Календарь на телефоне')} chevron onClick={() => (haptic(), setSub('calendar'), window.scrollTo(0, 0))} />}
+        <Row icon="repeat" title={t('Показать знакомство ещё раз')} chevron onClick={() => (haptic(), onShowIntro())} />
       </div>
 
       <Section
@@ -234,7 +234,7 @@ export function ProfileScreen({
         />
         <Row title={t('Заметок')} value={noteCount} />
         {schedule.source_file && <Row title={t('Файл ГУУ')} value={sourceVersion ? `№${sourceVersion}` : schedule.source_file} />}
-        <Row title={t('Расписание на guu.ru')} value="↗" onClick={() => openLink(SOURCE_URL)} />
+        <Row title={t('Расписание на guu.ru')} out onClick={() => openLink(SOURCE_URL)} />
       </Section>
     </div>
   )

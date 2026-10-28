@@ -90,8 +90,8 @@ export function LessonMenu({ lesson, subtitle, week, start, progress, actions = 
 
       {!actions ? null : step === 'menu' ? (
         <div className="list">
-          {onNote && <Row emoji="📝" title={t('Заметка к паре')} chevron onClick={() => (haptic(), onNote())} />}
-          <Row emoji="🙈" title={t('Это не моя пара')} sub={t('Скрыть, если это не твой поток')} chevron onClick={() => (haptic(), setStep('hide'))} />
+          {onNote && <Row icon="pencil" title={t('Заметка к паре')} chevron onClick={() => (haptic(), onNote())} />}
+          <Row icon="eye-off" title={t('Это не моя пара')} sub={t('Скрыть, если это не твой поток')} chevron onClick={() => (haptic(), setStep('hide'))} />
         </div>
       ) : (
         <>

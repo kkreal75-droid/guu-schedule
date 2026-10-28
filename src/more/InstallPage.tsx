@@ -36,7 +36,7 @@ export function InstallPage() {
         </p>
       ) : null}
       <div className="list">
-        <Row emoji="📌" title={t('Ещё можно закрепить чат с ботом')} sub={t('вверху списка чатов Telegram')} />
+        <Row icon="pin" title={t('Ещё можно закрепить чат с ботом')} sub={t('вверху списка чатов Telegram')} />
       </div>
       {canAdd && (
         <BottomAction>

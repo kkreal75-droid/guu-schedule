@@ -360,8 +360,8 @@ export function Onboarding({ reason, startSearch, onDone, onCancel }: Props) {
         <p className="ob-text ob-text-s">{t('Покажем пары твоей группы или твои занятия.')}</p>
         {reason && <p className="callout ob-reason">{reason}</p>}
         <div className="list">
-          <Row emoji="🎓" title={t('Учусь')} sub={t('Расписание своей группы')} chevron onClick={() => (haptic(), setScreen('student'))} />
-          <Row emoji="👩‍🏫" title={t('Преподаю')} sub={t('Расписание по своей фамилии')} chevron onClick={() => (haptic(), setScreen('teacher'))} />
+          <Row icon="cap" title={t('Учусь')} sub={t('Расписание своей группы')} chevron onClick={() => (haptic(), setScreen('student'))} />
+          <Row icon="board" title={t('Преподаю')} sub={t('Расписание по своей фамилии')} chevron onClick={() => (haptic(), setScreen('teacher'))} />
         </div>
         <p className="ob-note">{t('Это займёт меньше минуты. Поменять можно в профиле.')}</p>
       </Shell>

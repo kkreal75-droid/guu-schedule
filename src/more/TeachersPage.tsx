@@ -288,10 +288,10 @@ function TeacherView({ teacher }: { teacher: TeacherInfo }) {
       </p>
 
       <div className="list teacher-actions">
-        <Row emoji="📅" title={t('Расписание преподавателя')} chevron onClick={() => (haptic(), setMode('schedule'), window.scrollTo(0, 0))} />
+        <Row icon="person" title={t('Расписание преподавателя')} chevron onClick={() => (haptic(), setMode('schedule'), window.scrollTo(0, 0))} />
         {favorites && !isHome && (
           <Row
-            emoji="⭐"
+            icon="star"
             title={inFavorites ? t('В избранном') : t('Добавить в избранное')}
             check={inFavorites}
             chevron={!inFavorites}

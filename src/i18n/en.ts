@@ -229,7 +229,7 @@ export const EN: Record<string, string> = {
   "Переключить на {group} (как в профиле)": "Switch to {group} (as in your profile)",
   "Apple Календарь": "Apple Calendar",
   "Google Календарь": "Google Calendar",
-  "Скопировано ✓": "Copied ✓",
+  "Скопировано": "Copied",
   "Скопировать ссылку": "Copy link",
   "Google и iPhone обновляют подписки сами: Google — бывает, что и раз в сутки. Срочные изменения смотрите в боте.": "Google and iPhone refresh subscriptions on their own; Google sometimes only once a day. Check the bot for urgent changes.",
   "Не получилось загрузить расписание сессии. Проверьте интернет.": "Couldn't load the exam schedule. Check your internet connection.",

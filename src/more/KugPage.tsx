@@ -145,7 +145,7 @@ export function KugPage({ group }: { group: string }) {
               <Row
                 title={<span lang={trProgram(best.title) === best.title ? 'ru' : undefined}>{trProgram(best.title)}</span>}
                 sub={meta(best)}
-                value="↗"
+                out
                 onClick={() => openLink(best.url)}
               />
             </Section>
@@ -164,7 +164,7 @@ export function KugPage({ group }: { group: string }) {
                   key={k.url + k.title}
                   title={<span lang={trProgram(k.title) === k.title ? 'ru' : undefined}>{trProgram(k.title)}</span>}
                   sub={meta(k)}
-                  value="↗"
+                  out
                   onClick={() => openLink(k.url)}
                 />
               ))}

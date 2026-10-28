@@ -8,13 +8,19 @@
     <title>Расписание ГУУ</title>
     <!-- Telegram WebApp SDK: должен грузиться до кода приложения -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- тема до запуска приложения (дальше — src/theme.ts): без вспышки светлого фона в тёмном Telegram -->
+    <!-- тема до запуска приложения (дальше — src/theme.ts): без вспышки светлого фона в тёмном Telegram;
+         шапка Telegram — верх градиента фона, фон — цвет экрана, нижняя панель — цвет нижнего меню (index.css) -->
     <script>
       try {
         var mode = JSON.parse(localStorage.getItem('prefs') || '{}').theme || 'system'
         var app = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null
         var dark = mode === 'system' ? (app ? app.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) : mode === 'dark'
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        if (app && app.isVersionAtLeast('6.1')) {
+          app.setHeaderColor(dark ? '#16292c' : '#e2eff2')
+          app.setBackgroundColor(dark ? '#141517' : '#ffffff')
+          if (app.isVersionAtLeast('7.10')) app.setBottomBarColor(dark ? '#1d1f22' : '#ffffff')
+        }
       } catch (e) {}
     </script>
   </head>

@@ -1,26 +1,27 @@
 import type { ReactNode } from 'react'
-import { CheckIcon, ChevronRight } from '../icons'
+import { CheckIcon, ChevronRight, Icon, type IconName } from '../icons'
 
 type Props = {
-  emoji?: string // 21 px в колонке 28 px слева
+  icon?: IconName // 22 px в колонке 26 px слева
   title: ReactNode
   sub?: ReactNode // подпись 13 px под заголовком
   value?: ReactNode // значение справа
+  out?: boolean // ↗ — ссылка наружу
   chevron?: boolean
-  check?: boolean // выбранное — красная галочка
+  check?: boolean // выбранное — галочка цвета акцента
   onClick?: () => void
   lang?: string // данные ГУУ, что остаются русскими
   className?: string
   disabled?: boolean
 }
 
-// Строка списка: эмодзи, заголовок с подписью, значение справа, шеврон или галочка
-export function Row({ emoji, title, sub, value, chevron, check, onClick, lang, className, disabled }: Props) {
+// Строка списка: иконка, заголовок с подписью, значение справа, шеврон, ↗ или галочка
+export function Row({ icon, title, sub, value, out, chevron, check, onClick, lang, className, disabled }: Props) {
   const inner = (
     <>
-      {emoji && (
-        <span className="row-emoji" aria-hidden="true">
-          {emoji}
+      {icon && (
+        <span className="row-icon">
+          <Icon name={icon} />
         </span>
       )}
       <span className="row-label">
@@ -30,6 +31,7 @@ export function Row({ emoji, title, sub, value, chevron, check, onClick, lang, c
         {sub && <span className="row-sub">{sub}</span>}
       </span>
       {value !== undefined && value !== null && <span className="row-value">{value}</span>}
+      {out && <Icon name="arrow-up-right" size={18} strokeWidth={1.8} className="row-out" />}
       {check && <CheckIcon className="row-check" />}
       {chevron && <ChevronRight className="row-chevron" />}
     </>

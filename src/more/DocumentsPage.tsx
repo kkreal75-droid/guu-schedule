@@ -82,7 +82,7 @@ export function DocumentsPage({ group }: { group: string }) {
             {!mine && f.groups ? ` · ${tn(f.groups, '{n} группа|{n} группы|{n} групп')}` : ''}
           </>
         }
-        value="↗"
+        out
         onClick={() => openLink(f.url)}
       />
     )
@@ -112,11 +112,11 @@ export function DocumentsPage({ group }: { group: string }) {
         </Section>
       )}
       <Section>
-        <Row title={t('Страница расписания на guu.ru')} value="↗" onClick={() => openLink('https://guu.ru/student/schedule/')} />
+        <Row title={t('Страница расписания на guu.ru')} out onClick={() => openLink('https://guu.ru/student/schedule/')} />
         <Row
           title={t('Страница сессии на guu.ru')}
           sub={sessionPage ? t('сейчас там {what}', { what: sessionPageText(sessionPage) }) : undefined}
-          value="↗"
+          out
           onClick={() => openLink('https://guu.ru/student/session/')}
         />
       </Section>

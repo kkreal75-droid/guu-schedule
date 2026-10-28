@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { CloseIcon } from '../icons'
+import { CloseIcon, Icon } from '../icons'
 import { t } from '../i18n'
 
 type Props = {
@@ -10,14 +10,12 @@ type Props = {
   autoFocus?: boolean
 }
 
-// Поле поиска: 🔎 слева, круглый крестик очистки справа
+// Поле поиска: лупа слева, круглый серый крестик очистки справа
 export function SearchField({ value, onChange, placeholder, label, autoFocus }: Props) {
   const input = useRef<HTMLInputElement>(null)
   return (
     <label className="search">
-      <span className="search-emoji" aria-hidden="true">
-        🔎
-      </span>
+      <Icon name="search" size={18} strokeWidth={2} className="search-icon" />
       <input
         ref={input}
         className="search-input"
@@ -40,7 +38,7 @@ export function SearchField({ value, onChange, placeholder, label, autoFocus }: 
             input.current?.focus()
           }}
         >
-          <CloseIcon strokeWidth={4} />
+          <CloseIcon />
         </button>
       )}
     </label>
