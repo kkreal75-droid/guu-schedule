@@ -140,9 +140,8 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
         {metro && (
           <g transform={`translate(${toMap(map, metro.lat, metro.lon).join(' ')})`} className="cm-metro">
             <circle r={fs * 0.62} />
-            <text fontSize={fs * 0.78}>
-              М
-            </text>
+            {/* i18n-ignore — знак метро */}
+            <text fontSize={fs * 0.78}>{'М'}</text>
           </g>
         )}
         {pin && (
