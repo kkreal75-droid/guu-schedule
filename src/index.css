@@ -2314,7 +2314,7 @@ select.input {
 .ob-progress {
   flex: none;
   height: 3px;
-  margin: 2px 0 12px;
+  margin: 2px 0 10px;
   border-radius: 2px;
   background: var(--track);
   overflow: hidden;
@@ -2364,14 +2364,14 @@ select.input {
 }
 
 .ob-emoji {
-  margin: 0 0 14px;
-  font-size: 52px;
+  margin: 0 0 16px;
+  font-size: 40px;
   line-height: 1;
 }
 
 .ob-title {
-  margin: 0 0 10px;
-  font: 700 28px/1.15 var(--font);
+  margin: 0 0 8px;
+  font: 700 26px/1.18 var(--font);
   letter-spacing: -0.02em;
 }
 

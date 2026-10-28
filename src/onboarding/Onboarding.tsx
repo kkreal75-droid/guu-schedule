@@ -11,6 +11,7 @@ import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { GroupSearch } from './GroupSearch'
 import { Progress } from './Stories'
+import { Icon } from '../icons'
 import { TeacherPicker } from './TeacherPicker'
 import { t, tn } from '../i18n'
 import { instituteShort, trDirection, trInstitute, trProgram, trSubject, trTeacher } from '../guu'
@@ -424,9 +425,7 @@ export function Onboarding({ reason, startSearch, onDone, onCancel }: Props) {
       progress={(1 + stepNo) / STAGES}
       top={
         <button type="button" className="search ob-search" onClick={() => (haptic(), setScreen('search'))}>
-          <span className="search-emoji" aria-hidden="true">
-            🔎
-          </span>
+          <Icon name="search" size={18} strokeWidth={2} className="search-icon" />
           <span>{t('Знаю свою группу, найти по названию')}</span>
         </button>
       }
