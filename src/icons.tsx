@@ -10,7 +10,7 @@ const line = {
   'aria-hidden': true,
 } as const
 
-// Тонкие линейные иконки: сетка 24×24, линия 1.7, скруглённые концы, цвет — currentColor
+// Линейные иконки: сетка 24×24, линия 2, скруглённые концы, цвет — currentColor
 const PATHS = {
   calendar: (
     <>
@@ -175,6 +175,13 @@ const PATHS = {
       <path d="M16.2 10.4h1.4a2.4 2.4 0 0 1 0 4.8h-1.4M8.6 3.8v2.6M12.4 3.8v2.6" />
     </>
   ),
+  book: (
+    <>
+      <path d="M12 6.6C10.3 5.3 7.9 4.6 4.5 4.6v13c3.4 0 5.8.7 7.5 2 1.7-1.3 4.1-2 7.5-2v-13c-3.4 0-5.8.7-7.5 2Z" />
+      <path d="M12 6.6v13" />
+    </>
+  ),
+  bolt: <path d="M13.2 3.4 5.6 13.1h6.2l-1 7.5 7.6-9.7h-6.2Z" />,
   search: (
     <>
       <circle cx="10.8" cy="10.8" r="6.3" />
@@ -188,8 +195,8 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS
 
-// <Icon name="calendar" /> — 22 px, линия 1.7; в нижнем меню 25 px
-export function Icon({ name, size = 22, strokeWidth = 1.7, ...p }: { name: IconName; size?: number; strokeWidth?: number } & P) {
+// <Icon name="calendar" /> — 22 px, линия 2; в нижнем меню 25 px
+export function Icon({ name, size = 22, strokeWidth = 2, ...p }: { name: IconName; size?: number; strokeWidth?: number } & P) {
   return (
     <svg {...line} width={size} height={size} viewBox="0 0 24 24" strokeWidth={strokeWidth} {...p}>
       {PATHS[name]}
