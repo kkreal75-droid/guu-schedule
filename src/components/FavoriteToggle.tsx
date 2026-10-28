@@ -1,8 +1,9 @@
 import { useFavorites } from '../favorites'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
+import { Icon } from '../icons'
 
-// «⭐ В избранное» / «⭐ В избранном» — маленькая красная кнопка: группа или преподаватель («t-<id>») вкладкой
+// «☆ В избранное» / «★ В избранном» — маленькая кнопка светлого акцента: группа или преподаватель («t-<id>») вкладкой
 // над расписанием (этап 12); нажатие ещё раз — убрать
 export function FavoriteToggle({ id }: { id: string }) {
   const favorites = useFavorites()
@@ -20,7 +21,8 @@ export function FavoriteToggle({ id }: { id: string }) {
         else favorites.add(id)
       }}
     >
-      ⭐ {on ? t('В избранном') : t('В избранное')}
+      <Icon name="star" size={15} strokeWidth={1.9} fill={on ? 'currentColor' : 'none'} />
+      {on ? t('В избранном') : t('В избранное')}
     </button>
   )
 }

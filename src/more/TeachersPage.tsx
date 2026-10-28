@@ -9,7 +9,7 @@ import { Section } from '../components/Section'
 import { Sheet } from '../components/Sheet'
 import { loadTeachers, searchTeachers, type TeacherInfo } from '../data'
 import { useFavorites } from '../favorites'
-import { CheckIcon } from '../icons'
+import { CheckIcon, ChevronDownSmall, Icon } from '../icons'
 import {
   formatAverage, reviewError, reviewsApi, reviewsWord, type Criteria, type Rated, type Review, type ReviewDraft, type TeacherCard,
 } from '../reviews/api'
@@ -28,7 +28,7 @@ import { TeacherLoad } from './TeacherLoad'
 // это проверяет бот.
 
 type Sort = 'rating' | 'count' | 'name'
-const sortLabel = (sort: Sort) => ({ rating: t('По оценке ↓'), count: t('По отзывам ↓'), name: t('По алфавиту') })[sort]
+const sortLabel = (sort: Sort) => ({ rating: t('По оценке'), count: t('По отзывам'), name: t('По алфавиту') })[sort]
 const sorts: Sort[] = ['rating', 'count', 'name']
 type Filter = 'all' | 'rated' | 'mine'
 const filters = (): { value: Filter; label: string }[] => [
@@ -134,6 +134,7 @@ export function TeachersPage({ initial, onClose, group }: { initial?: TeacherInf
         </span>
         <button type="button" className="link-btn" onClick={() => (haptic(), setOptions(true))}>
           {sortLabel(sort)}
+          <ChevronDownSmall />
         </button>
       </div>
 
@@ -168,7 +169,7 @@ export function TeachersPage({ initial, onClose, group }: { initial?: TeacherInf
           <h2 className="sheet-title">{t('Сортировка')}</h2>
           <div className="list">
             {sorts.map((s) => (
-              <Row key={s} title={sortLabel(s).replace(' ↓', '')} check={sort === s} onClick={() => (haptic(), setSort(s), setLimit(PAGE))} />
+              <Row key={s} title={sortLabel(s)} check={sort === s} onClick={() => (haptic(), setSort(s), setLimit(PAGE))} />
             ))}
           </div>
           <h3 className="section-title sheet-caption">{t('Показывать')}</h3>
@@ -363,7 +364,8 @@ function TeacherView({ teacher }: { teacher: TeacherInfo }) {
               </h3>
               {others.length > 1 && (
                 <button type="button" className="link-btn reviews-order" onClick={() => (haptic(), setOrder(order === 'useful' ? 'new' : 'useful'))}>
-                  {order === 'useful' ? t('Полезные') : t('Новые')} ↓
+                  {order === 'useful' ? t('Полезные') : t('Новые')}
+                  <ChevronDownSmall />
                 </button>
               )}
             </div>
@@ -404,7 +406,7 @@ function TeacherView({ teacher }: { teacher: TeacherInfo }) {
   )
 }
 
-// сколько оценок 5, 4, 3, 2, 1 — красными полосками
+// сколько оценок 5, 4, 3, 2, 1 — полосками цвета акцента
 function Distribution({ card }: { card: TeacherCard }) {
   const max = Math.max(1, ...card.distribution)
   return (
@@ -466,10 +468,12 @@ function ReviewItem({ review, onReport, onVote }: { review: Review; onReport?: (
           {onVote && (
             <>
               <button type="button" className="vote-btn" aria-pressed={review.helpful.mine === 1} aria-label={t('Полезно')} onClick={() => onVote(1)}>
-                👍 {review.helpful.up || ''}
+                <Icon name="thumb" size={17} />
+                {review.helpful.up || ''}
               </button>
               <button type="button" className="vote-btn" aria-pressed={review.helpful.mine === -1} aria-label={t('Не полезно')} onClick={() => onVote(-1)}>
-                👎 {review.helpful.down || ''}
+                <Icon name="thumb" size={17} className="icon-flip" />
+                {review.helpful.down || ''}
               </button>
             </>
           )}
@@ -486,7 +490,7 @@ function ReviewItem({ review, onReport, onVote }: { review: Review; onReport?: (
 
 // ---------- форма отзыва ----------
 
-// оценка цифрами 1–5: выбранная — красная
+// оценка цифрами 1–5: выбранная — цвета акцента
 function ScorePicker({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div className="row score-pick">
@@ -544,7 +548,7 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
 
   return (
     <div className="review-form page-fill">
-      <p className="ob-overline ob-overline-red">{old ? t('Изменить отзыв') : t('Отзыв анонимный')}</p>
+      <p className="ob-overline">{old ? t('Изменить отзыв') : t('Отзыв анонимный')}</p>
       <h1 className="page-title review-form-name">{trTeacher(teacher.name)}</h1>
       <p className="page-lead">{t('Оценивай преподавание, а не человека. Без оскорблений и личных данных.')}</p>
 
@@ -556,10 +560,10 @@ function ReviewForm({ teacher, card, onSaved }: { teacher: TeacherInfo; card: Te
 
       <div className="segmented review-rec" role="radiogroup" aria-label={t('Советуешь?')}>
         <button type="button" role="radio" aria-checked={draft.recommend === true} className="segmented-item" onClick={() => (haptic(), set({ recommend: true }))}>
-          {t('👍 Советую')}
+          {t('Советую')}
         </button>
         <button type="button" role="radio" aria-checked={draft.recommend === false} className="segmented-item" onClick={() => (haptic(), set({ recommend: false }))}>
-          {t('👎 Не советую')}
+          {t('Не советую')}
         </button>
       </div>
 

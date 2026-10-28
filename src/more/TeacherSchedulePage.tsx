@@ -28,7 +28,7 @@ export function TeacherSchedulePage({ initial }: { initial?: { id: string; name:
           <p className="viewer-sub">{t('По файлам ГУУ, у пар указаны группы')}</p>
           <div className="viewer-actions">
             <FavoriteToggle id={teacherKey(picked.id)} />
-            <button type="button" className="link-btn" onClick={() => setPicked(null)}>
+            <button type="button" className="link-btn link-btn-gray" onClick={() => setPicked(null)}>
               {t('Другой преподаватель')}
             </button>
           </div>
