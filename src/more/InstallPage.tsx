@@ -29,7 +29,7 @@ export function InstallPage() {
     <div className="page-fill">
       <h1 className="page-title">{t('На домашний экран')}</h1>
       <p className="page-lead">{t('Иконка расписания рядом с остальными приложениями. Открывается одним касанием, без поиска бота в чатах.')}</p>
-      {status === 'added' && <p className="callout install-note">{t('✅ Уже на домашнем экране')}</p>}
+      {status === 'added' && <p className="callout install-note">{t('Уже на домашнем экране')}</p>}
       {!can || status === 'unsupported' ? (
         <p className="callout install-note">
           {can ? t('На этом устройстве Telegram не умеет добавлять иконку.') : t('Нужна свежая версия Telegram — обнови приложение и открой этот экран снова.')}

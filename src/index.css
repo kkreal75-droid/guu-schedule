@@ -1468,6 +1468,11 @@ button.lesson-hint {
   line-height: 1;
 }
 
+/* иконка вместо эмодзи (поддержка: «Отправлено») */
+.empty-icon {
+  color: var(--accent-text);
+}
+
 .empty-title {
   margin-top: 12px;
   font: 700 20px/1.25 var(--font);
@@ -2698,7 +2703,7 @@ select.input {
 
 .rooms-free {
   font: 700 34px/1.1 var(--font);
-  color: var(--accent-text);
+  color: var(--accent-ink);
 }
 
 .rooms-total {
@@ -3169,11 +3174,19 @@ body[data-no-tabbar] .app > .screen {
 /* ---------- документы ---------- */
 
 /* «твоя группа» красным после названия файла */
+/* «твоя группа» — маленькой серой плашкой */
 .doc-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
   margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text-2);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-text);
+  font-weight: 500;
+  vertical-align: 1px;
   white-space: nowrap;
 }
 
@@ -3188,7 +3201,7 @@ body[data-no-tabbar] .app > .screen {
   font-size: 15px;
 }
 
-/* пункты с красным квадратом */
+/* пункты с серой точкой */
 .bullets {
   display: flex;
   flex-direction: column;
@@ -3209,19 +3222,23 @@ body[data-no-tabbar] .app > .screen {
 .bullets li::before {
   content: '';
   flex: none;
-  width: 6px;
-  height: 6px;
-  margin-top: 8px;
-  background: var(--accent);
+  width: 5px;
+  height: 5px;
+  margin-top: 8.5px;
+  border-radius: 50%;
+  background: var(--hint);
 }
 
-/* шаги настройки красными цифрами */
+/* шаги настройки пронумерованы */
 .step-no {
-  font-weight: 700;
-  color: var(--accent-text);
+  flex: none;
+  width: 26px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
 }
 
-/* вопросы одним списком: «+» серый, у открытого — красный «−» */
+/* вопросы одним списком: «+» серый, у открытого — «−» цвета акцента */
 .faq-item + .faq-item {
   border-top: 1px solid var(--separator);
 }
@@ -3406,6 +3423,17 @@ body[data-no-tabbar] .app > .screen {
   color: var(--text-2);
 }
 
+.place-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.place-address svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 .place-apps {
   display: flex;
   justify-content: center;
@@ -3515,12 +3543,23 @@ body[data-no-tabbar] .app > .screen {
 
 .cm-label-focus {
   fill: var(--on-accent);
-  stroke: var(--accent-text);
+  stroke: var(--accent);
 }
 
-.cm-emoji {
-  fill: var(--accent-text);
+/* метро — красный круг с белой «М» */
+.cm-metro circle {
+  fill: #d6303f;
+  stroke: #fff;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.cm-metro text {
+  fill: #fff;
   font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
 }
 
 .cm-pin path {
@@ -3570,9 +3609,9 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .cd-number {
-  font: 700 60px/1 var(--font);
+  font: 700 56px/1 var(--font);
   letter-spacing: -0.02em;
-  color: var(--accent-text);
+  color: var(--accent-ink);
 }
 
 .cd-label {

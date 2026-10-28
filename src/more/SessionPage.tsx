@@ -98,7 +98,7 @@ export function SessionPage({ group }: { group: string }) {
     const waiting = upcoming(moscowNow().day)
     return (
       <>
-        <p className="callout session-wait">📚 {waiting}</p>
+        <p className="callout session-wait">{waiting}</p>
         {plan && plan.length > 0 && <SessionPlan periods={plan} />}
         {page && page.includes('прошлого года') /* i18n-ignore — текст из session_status.json */ && (
           <p className="section-footer">

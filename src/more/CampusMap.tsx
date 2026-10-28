@@ -55,13 +55,13 @@ const ROAD_WIDTH = [2.5, 4, 5.5, 7] // w из campus.json: 0 — проезд, 1
 
 export function CampusMap({ map, places, focus, onPick, className }: Props) {
   const byId = useMemo(() => new Map(places.map((p) => [p.id, p])), [places])
-  // подписи: корпуса и спорт — сокращением (бассейн — значком), проходная — мелко «КПП»; общежития без подписи
+  // подписи: корпуса и спорт — сокращением (без сокращения — без подписи), проходная — мелко «КПП»; общежития без подписи
   const labels = useMemo(
     () =>
       map.buildings
         .filter((b) => b.place && byId.has(b.place))
         .map((b) => ({ place: byId.get(b.place!)!, at: centroid(b.d) }))
-        .filter(({ place }) => place.group === 'buildings' || place.group === 'sport' || place.id === 'kpp')
+        .filter(({ place }) => ((place.group === 'buildings' || place.group === 'sport') && place.short) || place.id === 'kpp')
         // у проходной два здания — подпись одна
         .filter((l, i, all) => all.findIndex((o) => o.place.id === l.place.id) === i),
     [map, byId],
@@ -120,15 +120,14 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
         })}
         {labels.map(({ place, at }) => {
           const kpp = place.id === 'kpp'
-          const text = kpp ? t('КПП') : (place.short ?? place.icon)
-          const emoji = !kpp && !place.short
+          const text = kpp ? t('КПП') : place.short
           return (
             <text
               key={place.id}
               x={at[0]}
               y={at[1]}
               fontSize={kpp ? fs * 0.62 : fs}
-              strokeWidth={emoji ? 0 : fs * 0.22}
+              strokeWidth={fs * 0.22}
               className={focus?.id === place.id ? 'cm-label cm-label-focus' : 'cm-label'}
               onClick={onPick ? () => (haptic(), onPick(place)) : undefined}
               lang={kpp ? undefined : 'ru'}
@@ -137,10 +136,14 @@ export function CampusMap({ map, places, focus, onPick, className }: Props) {
             </text>
           )
         })}
+        {/* метро — красный круг с «М» */}
         {metro && (
-          <text x={toMap(map, metro.lat, metro.lon)[0]} y={toMap(map, metro.lat, metro.lon)[1]} fontSize={fs * 1.1} strokeWidth={fs * 0.22} className="cm-label cm-emoji">
-            Ⓜ
-          </text>
+          <g transform={`translate(${toMap(map, metro.lat, metro.lon).join(' ')})`} className="cm-metro">
+            <circle r={fs * 0.62} />
+            <text fontSize={fs * 0.78}>
+              М
+            </text>
+          </g>
         )}
         {pin && (
           <g transform={`translate(${pin[0]} ${pin[1]}) scale(${vw / 300})`} className="cm-pin">

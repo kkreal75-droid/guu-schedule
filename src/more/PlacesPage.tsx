@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight } from '../icons'
+import { ChevronRight, Icon, type IconName } from '../icons'
 import { SearchField } from '../components/SearchField'
 import {
   PLACE_GROUPS, placeGroupTitle, howtoLines, localPlace, loadCampus, loadPlaces, mapApps, placeForRoom, placeTitle, searchPlaces,
@@ -10,11 +10,14 @@ import { CampusMap, onCampusMap } from './CampusMap'
 import { t, useLang } from '../i18n'
 
 // «Сервисы → Корпуса ГУУ» (этап 7.7): поиск, схема кампуса без рамки (корпуса нажимаются), адрес и метро
-// строкой под ней, места списками по группам «Корпуса / Спорт / Еда / Другое» с эмодзи. Строка раскрывается:
+// строкой под ней, места списками по группам «Корпуса / Спорт / Еда / Другое» с тонкими иконками. Строка раскрывается:
 // схема с меткой у входа, «Как пройти», адрес, «Открыть в…» (Apple / Google / Яндекс / 2ГИС). Из пары
 // (аудитория) — сразу карточка корпуса.
 
 export type PlacesTarget = { place?: string; room?: string }
+
+// иконка места по группе
+const PLACE_ICON: Record<string, IconName> = { buildings: 'building', sport: 'dumbbell', food: 'cup', other: 'map-pin' }
 
 export function PlacesPage({ target }: { target?: PlacesTarget }) {
   const lang = useLang()
@@ -139,8 +142,8 @@ function PlaceCard({ place: p, map, places, open, room, onToggle, cardRef }: Car
   return (
     <div className="place-card" ref={cardRef} data-open={open || undefined}>
       <button type="button" className="row row-btn place-row" onClick={onToggle} aria-expanded={open}>
-        <span className="row-emoji" aria-hidden>
-          {p.icon}
+        <span className="row-icon">
+          <Icon name={PLACE_ICON[p.group] ?? 'map-pin'} />
         </span>
         <span className="row-label">
           <span className="row-text">
@@ -170,7 +173,12 @@ function PlaceCard({ place: p, map, places, open, room, onToggle, cardRef }: Car
               </ul>
             </div>
           )}
-          {p.address && <p className="place-address">📍 {p.address}</p>}
+          {p.address && (
+            <p className="place-address">
+              <Icon name="map-pin" size={17} />
+              <span>{p.address}</span>
+            </p>
+          )}
           {p.note && <p className="place-note">{p.note}</p>}
           <button type="button" className="button-primary place-open" onClick={() => (haptic(), openLink(apps[0].url))}>
             {apps[0].open}

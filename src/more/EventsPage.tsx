@@ -8,6 +8,7 @@ import { useEvents } from '../events'
 import { moscowNow } from '../schedule'
 import { haptic, openLink } from '../telegram'
 import { t } from '../i18n'
+import { Icon } from '../icons'
 
 // «Сервисы → Мероприятия ГУУ» (этап 13): все предстоящие мероприятия проектного обучения с make.events по датам,
 // поиск по названию, месту и описанию. Нажатие — окно снизу с «Записаться» и «В календарь».
@@ -63,7 +64,8 @@ export function EventsPage() {
         </button>
       )}
       <button type="button" className="button-secondary" onClick={() => (haptic(), openLink(EVENTS_COMMUNITY_URL))}>
-        {t('Все мероприятия на make.events')} ↗
+        {t('Все мероприятия на make.events')}
+        <Icon name="arrow-up-right" size={18} strokeWidth={1.8} />
       </button>
       {sheet && <EventSheet event={sheet} onClose={close} />}
     </div>

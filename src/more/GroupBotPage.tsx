@@ -4,11 +4,11 @@ import { BOT_USERNAME } from '../config'
 import { haptic, openTelegramLink } from '../telegram'
 import { t } from '../i18n'
 
-// «Сервисы → Бот в беседе группы»: что бот присылает, шаги настройки красными цифрами, кнопка внизу
+// «Сервисы → Бот в беседе группы»: что бот присылает, пронумерованные шаги настройки, кнопка внизу
 export function GroupBotPage() {
   const step = (n: number, title: string, sub?: string) => (
     <div className="row">
-      <span className="row-emoji step-no">{n}</span>
+      <span className="step-no">{n}</span>
       <span className="row-label">
         <span className="row-text">{title}</span>
         {sub && <span className="row-sub">{sub}</span>}

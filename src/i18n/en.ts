@@ -197,7 +197,7 @@ export const EN: Record<string, string> = {
   "Другая группа": "Another group",
   "Добавить в беседу": "Add to a group chat",
   "Как настроить": "How to set it up",
-  "✅ Уже на домашнем экране": "✅ Already on your home screen",
+  "Уже на домашнем экране": "Already on your home screen",
   "Добавить на домашний экран": "Add to home screen",
   "На этом устройстве Telegram не умеет добавлять иконку.": "Telegram can't add an icon on this device.",
   "Нужна свежая версия Telegram — обнови приложение и открой этот экран снова.": "You need a newer Telegram — update the app and open this screen again.",
