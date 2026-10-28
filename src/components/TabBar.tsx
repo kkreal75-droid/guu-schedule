@@ -7,7 +7,7 @@ export type Tab = 'schedule' | 'more' | 'profile'
 export function TabBar({ tab, onTab }: { tab: Tab; onTab: (tab: Tab) => void }) {
   const item = (id: Tab, label: string, icon: IconName) => (
     <button type="button" className="tab" aria-current={tab === id} onClick={() => onTab(id)}>
-      <Icon name={icon} size={25} strokeWidth={tab === id ? 1.9 : 1.6} />
+      <Icon name={icon} size={25} strokeWidth={tab === id ? 2.2 : 1.9} />
       <span>{label}</span>
     </button>
   )

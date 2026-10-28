@@ -2,7 +2,7 @@ import { isEvenWeek } from '../../shared/format-core'
 import { ChevronLeft, ChevronRight } from '../icons'
 import { t } from '../i18n'
 
-// Неделя над днями: «8 неделя, чётная» и стрелки ‹ › по бокам
+// Неделя над днями: крупно «Нечётная», под ней «9 неделя»; по бокам круглые кнопки ‹ ›
 type Props = {
   week: number
   onPrev?: () => void
@@ -17,7 +17,10 @@ export function WeekCard({ week, onPrev, onNext, prevDisabled, nextDisabled }: P
       <button type="button" className="week-arrow" aria-label={t('Предыдущая неделя')} disabled={prevDisabled} onClick={onPrev}>
         <ChevronLeft />
       </button>
-      <span className="week-title">{isEvenWeek(week) ? t('{n} неделя, чётная', { n: week }) : t('{n} неделя, нечётная', { n: week })}</span>
+      <span className="week-title">
+        <span className="week-parity">{isEvenWeek(week) ? t('Чётная') : t('Нечётная')}</span>
+        <span className="week-no">{t('{n} неделя', { n: week })}</span>
+      </span>
       <button type="button" className="week-arrow" aria-label={t('Следующая неделя')} disabled={nextDisabled} onClick={onNext}>
         <ChevronRight />
       </button>

@@ -1,4 +1,4 @@
-import { Fragment, useRef, type ReactNode } from 'react'
+import { Fragment, useRef } from 'react'
 import { formatDuration, shortTime, weeksText } from '../format'
 import { shortWhen } from '../../shared/edits-core'
 import type { ShownLesson } from '../lessons'
@@ -7,6 +7,11 @@ import { haptic } from '../telegram'
 import { Icon, MoreIcon } from '../icons'
 import { t } from '../i18n'
 import { roomLabel, trKind, trSubject, trTeacher } from '../guu'
+
+// вид занятия — цвет метки: лекция — синий, практика и семинары — акцент, лабораторная — фиолетовый, остальное —
+// янтарный
+const KIND_TONE: Record<string, string> = { Лекция: 'lecture', Практика: 'practice', Семинар: 'practice', Лабораторная: 'lab' } // i18n-ignore — виды из файлов ГУУ
+const kindTone = (kind: string) => KIND_TONE[kind] ?? 'other'
 
 // «Предпринимательство 4-1, 4-2»: у соседних групп с одинаковым началом названия повторяется только номер
 const prefixOf = (name: string) => name.slice(0, name.lastIndexOf(' ') + 1)
@@ -73,10 +78,11 @@ function useLongPress(onLong: (() => void) | undefined) {
   }
 }
 
-// Карточка пары — все одного размера: время начала, «– 10:30», номер пары (у идущей — «ещё 34 мин», у следующей —
-// «через 1 ч 19 мин»), справа карандаш (заметка) и ··· (действия); предмет не длиннее двух строк; внизу одной строкой
-// «Практика · Яценко О.Ю. · У-448/516» (у преподавателя вместо фамилии — группы). Идёт сейчас — рамка цвета акцента,
-// светлый фон, полоска по низу и мягкое свечение; прошедшие — бледнее.
+// Карточка пары: синяя полоска слева, время начала крупно, «— 10:30», номер пары, справа карандаш
+// (заметка) и ··· (действия); метка вида, предмет не длиннее двух строк; каждый преподаватель со значком (у
+// преподавателя — группы) и аудитория со значком — нажимаются. Обычные карточки одного размера, с мягким свечением.
+// Идёт сейчас — рамка цвета акцента, светлый фон, пульсирующее свечение, под чертой полоска и «⏱ 34 мин»; следующая —
+// «через 1 ч 19 мин»; прошедшие — бледнее.
 export function LessonCard({
   lesson, nowMinutes, isNext, pair, note, last, showWeeks, onEditNote, onOpen, onGroup, groupTitle, onTeacher, onRoom, onMenu,
 }: Props) {
@@ -102,54 +108,39 @@ export function LessonCard({
     </>
   )
 
-  // «Практика · Яценко О.Ю. · У-448/516»: вид — светло-серым, преподаватель (группы) и аудитория — серым, нажимаются
-  const meta: ReactNode[] = []
-  if (lesson.kind) meta.push(<span className="lesson-kind">{trKind(lesson.kind)}</span>)
-  if (teachers.length)
-    meta.push(
-      teachers.map((name, i) => (
-        <Fragment key={name}>
-          {i > 0 && ', '}
-          {onTeacher ? (
-            <button type="button" className="lesson-link" onClick={() => onTeacher(name)}>
-              {trTeacher(name)}
-            </button>
-          ) : (
-            trTeacher(name)
-          )}
-        </Fragment>
-      )),
-    )
-  if (audience && audience.length)
-    meta.push(
-      audience.map((g, i) => {
-        const title = groupTitle?.(g.id, g.name) ?? g.name
-        return (
-          <Fragment key={g.id}>
-            {i > 0 && ', '}
-            {onGroup ? (
-              <button type="button" className="lesson-link" title={title} aria-label={title} onClick={() => (haptic(), onGroup(g.id))}>
-                <span lang="ru">{groupLabels[i]}</span>
-              </button>
-            ) : (
-              <span lang="ru" title={title}>
-                {groupLabels[i]}
-              </span>
-            )}
-          </Fragment>
-        )
-      }),
-    )
-  if (roomText)
-    meta.push(
-      onRoom ? (
-        <button type="button" className="lesson-link lesson-room" onClick={() => onRoom(lesson.room!)}>
-          {roomText}
+  // каждый преподаватель со значком (у преподавателя — группы), аудитория со значком; нажимаются
+  const who = teachers.map((name) => (
+    <span key={name} className="lesson-who-item">
+      <Icon name="person" size={16} strokeWidth={2} />
+      {onTeacher ? (
+        <button type="button" className="lesson-link" onClick={() => onTeacher(name)}>
+          {trTeacher(name)}
         </button>
       ) : (
-        <span className="lesson-room">{roomText}</span>
-      ),
-    )
+        <span>{trTeacher(name)}</span>
+      )}
+    </span>
+  ))
+  const groups =
+    audience && audience.length
+      ? audience.map((g, i) => {
+          const title = groupTitle?.(g.id, g.name) ?? g.name
+          return (
+            <Fragment key={g.id}>
+              {i > 0 && ', '}
+              {onGroup ? (
+                <button type="button" className="lesson-link" title={title} aria-label={title} onClick={() => (haptic(), onGroup(g.id))}>
+                  <span lang="ru">{groupLabels[i]}</span>
+                </button>
+              ) : (
+                <span lang="ru" title={title}>
+                  {groupLabels[i]}
+                </span>
+              )}
+            </Fragment>
+          )
+        })
+      : null
 
   const tags = [
     lesson.added && t('добавлена'),
@@ -160,7 +151,7 @@ export function LessonCard({
 
   return (
     <article
-      className={`lesson${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
+      className={`lesson lesson-${lesson.kind ? kindTone(lesson.kind) : 'other'}${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
       data-clickable={onOpen ? true : undefined}
       {...press}
       onClick={(e) => {
@@ -171,16 +162,8 @@ export function LessonCard({
     >
       <div className="lesson-head">
         <span className="lesson-start">{shortTime(lesson.start)}</span>
-        <span className="lesson-end">– {shortTime(lesson.end)}</span>
-        {live ? (
-          <span className="lesson-status lesson-status-live" aria-label={t('До конца пары {d}', { d: formatDuration(end - nowMinutes!) })}>
-            {t('ещё {d}', { d: formatDuration(end - nowMinutes!) })}
-          </span>
-        ) : isNext ? (
-          <span className="lesson-status">{t('через {d}', { d: formatDuration(start - nowMinutes!) })}</span>
-        ) : pair ? (
-          <span className="lesson-pair">{t('{n} пара', { n: pair })}</span>
-        ) : null}
+        <span className="lesson-end">— {shortTime(lesson.end)}</span>
+        {pair ? <span className="lesson-pair">{t('{n} пара', { n: pair })}</span> : null}
         {(onEditNote || onMenu) && (
           <span className="lesson-actions">
             {onEditNote && (
@@ -190,17 +173,28 @@ export function LessonCard({
                 aria-label={note ? t('Изменить заметку к паре') : t('Добавить заметку к паре')}
                 onClick={onEditNote}
               >
-                <Icon name="pencil" size={17} />
+                <Icon name="pencil" size={19} strokeWidth={1.9} />
               </button>
             )}
             {onMenu && (
               <button type="button" className="lesson-act" aria-label={t('Действия с парой')} onClick={() => onMenu('menu')}>
-                <MoreIcon />
+                <MoreIcon width={19} height={4} />
               </button>
             )}
           </span>
         )}
       </div>
+
+      {(lesson.kind || tags.length > 0) && (
+        <div className="lesson-tags">
+          {lesson.kind && <span className={`badge badge-${kindTone(lesson.kind)}`}>{trKind(lesson.kind)}</span>}
+          {tags.map((tag) => (
+            <span key={tag} className="badge">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       <h3 className="lesson-subject">{subject}</h3>
       {/* по-английски — под переводом мелко оригинал, как в расписании ГУУ */}
@@ -210,24 +204,27 @@ export function LessonCard({
         </div>
       )}
 
-      {meta.length > 0 && (
-        <p className="lesson-meta">
-          {meta.map((part, i) => (
-            <Fragment key={i}>
-              {i > 0 && <span className="lesson-sep"> · </span>}
-              {part}
-            </Fragment>
-          ))}
-        </p>
-      )}
-
-      {tags.length > 0 && (
-        <div className="lesson-tags">
-          {tags.map((tag) => (
-            <span key={tag} className="tag">
-              {tag}
+      {(who.length > 0 || groups || roomText) && (
+        <div className="lesson-who">
+          {who}
+          {groups && (
+            <span className="lesson-who-item">
+              <Icon name="people" size={16} strokeWidth={2} />
+              <span>{groups}</span>
             </span>
-          ))}
+          )}
+          {roomText && (
+            <span className="lesson-who-item lesson-room">
+              <Icon name="map-pin" size={16} strokeWidth={2} />
+              {onRoom ? (
+                <button type="button" className="lesson-link" onClick={() => onRoom(lesson.room!)}>
+                  {roomText}
+                </button>
+              ) : (
+                <span>{roomText}</span>
+              )}
+            </span>
+          )}
         </div>
       )}
 
@@ -262,10 +259,17 @@ export function LessonCard({
           <span>{note}</span>
         </button>
       )}
+      {isNext && !live && <div className="lesson-soon">{t('через {d}', { d: formatDuration(start - nowMinutes!) })}</div>}
 
       {live && (
-        <div className="progress lesson-bar" aria-hidden="true">
-          <span style={{ width: `${((nowMinutes! - start) / (end - start)) * 100}%` }} />
+        <div className="lesson-live">
+          <div className="progress" aria-hidden="true">
+            <span style={{ width: `${((nowMinutes! - start) / (end - start)) * 100}%` }} />
+          </div>
+          <span className="lesson-timer" aria-label={t('До конца пары {d}', { d: formatDuration(end - nowMinutes!) })}>
+            <Icon name="clock" size={17} strokeWidth={2.1} />
+            {formatDuration(end - nowMinutes!)}
+          </span>
         </div>
       )}
     </article>
