@@ -14,12 +14,12 @@ const isForever = (until: number) => until - Date.now() > 5 * 365 * 86_400_000
 function flags(u: AdminUser) {
   const now = Date.now()
   return [
-    u.banned ? '🚫' : '',
-    u.review_banned_until && u.review_banned_until > now ? '⭐' : '',
-    u.blocked_bot ? '⛔' : '',
+    u.banned ? 'бан' : '',
+    u.review_banned_until && u.review_banned_until > now ? 'бан в отзывах' : '',
+    u.blocked_bot ? 'заблокировал бота' : '',
   ]
     .filter(Boolean)
-    .join(' ')
+    .join(' · ')
 }
 
 export function Users() {
@@ -83,7 +83,7 @@ export function Users() {
         ))}
       </div>
       <p className="section-footer">
-        Показано {list.length} из {data.users.length}. 🚫 бан · ⭐ бан в отзывах · ⛔ заблокировал бота
+        Показано {list.length} из {data.users.length}.
       </p>
     </div>
   )

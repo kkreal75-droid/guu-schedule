@@ -9,6 +9,7 @@ import { buildTimetable, dayFromIso, fetchGroup, groupName, isoFromDay, moscowNo
 import { confirmAction, haptic } from '../telegram'
 import { t } from '../i18n'
 import { trSubject } from '../guu'
+import { CloseIcon } from '../icons'
 
 // «Ещё → Правки группы» — только старосте (назначает владелец) и только своей группы.
 // Правки видят все: приложение, /today, inline, беседы, календарь. Владелец видит автора и может откатить.
@@ -37,17 +38,17 @@ function describe(e: ScheduleEdit): string {
   const comment = e.text ? ` — ${e.text}` : ''
   switch (e.kind) {
     case 'cancel':
-      return `❌ ${t('Отмена: {when}', { when: when(e.date, e.start) })}${comment}`
+      return `${t('Отмена: {when}', { when: when(e.date, e.start) })}${comment}`
     case 'note':
-      return `📌 ${when(e.date, e.start)}: ${e.text}`
+      return `${when(e.date, e.start)}: ${e.text}`
     case 'move': {
       const d = e.data as MoveData | null
       const to = d ? `${shortWhen(d.to_date, d.to_start)}${d.room ? `, ${d.room}` : ''}` : '?'
-      return `↪️ ${t('Перенос: {from} → {to}', { from: when(e.date, e.start), to })}${comment}`
+      return `${t('Перенос: {from} → {to}', { from: when(e.date, e.start), to })}${comment}`
     }
     case 'add': {
       const d = e.data as AddData | null
-      return `➕ ${d ? `${shortWhen(e.date, d.start)}–${d.end} ${d.subject}${d.room ? `, ${d.room}` : ''}` : e.date}${comment}`
+      return `${t('Добавлена: {what}', { what: d ? `${shortWhen(e.date, d.start)}–${d.end} ${d.subject}${d.room ? `, ${d.room}` : ''}` : e.date })}${comment}`
     }
   }
 }
@@ -292,8 +293,14 @@ export function StarostaPage({ group, onExtras }: { group: string; onExtras: (gr
                 {weekdayShort(tag.weekday)} {tag.start} · {trSubject(tag.subject)}
                 {tag.teacher ? ` · ${tag.teacher}` : ''} → <b>{info.subgroups.find((s) => s.id === tag.subgroup)?.name ?? '?'}</b>
               </span>
-              <button type="button" className="button-inline danger" disabled={busy} onClick={() => run('/starosta/tag-delete', { id: tag.id }, t('Убрано'))}>
-                ✕
+              <button
+                type="button"
+                className="button-inline danger"
+                aria-label={t('Убрать')}
+                disabled={busy}
+                onClick={() => run('/starosta/tag-delete', { id: tag.id }, t('Убрано'))}
+              >
+                <CloseIcon width={16} height={16} />
               </button>
             </div>
           ))}

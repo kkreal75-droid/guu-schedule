@@ -69,7 +69,7 @@ export function PlacesAdmin() {
         title={`Не проверено · ${todo.length}`}
         footer="Что стоит проверить на месте (координаты входа, этажи, часы работы). Поправь место и очисти поле «Не проверено»."
       >
-        {todo.length ? todo.map((p) => row(p)) : <div className="row row-text">Всё проверено 🎉</div>}
+        {todo.length ? todo.map((p) => row(p)) : <div className="row row-text">Всё проверено</div>}
       </Section>
       {PLACE_GROUPS.map((g) => (
         <Section key={g} title={placeGroupTitle(g)}>

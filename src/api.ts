@@ -53,6 +53,6 @@ export async function saveProfile(choice: ProfileChoice): Promise<void> {
 export function botError(err: unknown, fallback?: string): string {
   if (!(err instanceof ApiError) || err.status === 0) return t('Нет связи. Попробуй ещё раз.')
   if (err.status === 429) return t('Слишком часто — подожди минуту.')
-  if (err.code && /[а-яё]/i.test(err.code)) return tKnown(err.code) ?? fallback ?? t('Что-то сломалось 🛠')
-  return fallback ?? t('Что-то сломалось 🛠')
+  if (err.code && /[а-яё]/i.test(err.code)) return tKnown(err.code) ?? fallback ?? t('Что-то сломалось')
+  return fallback ?? t('Что-то сломалось')
 }

@@ -111,7 +111,7 @@ function statusText(row: BroadcastRow) {
     case 'sending':
       return `идёт ${row.delivered + row.blocked + row.failed}/${row.total}`
     default:
-      return `✅ ${row.delivered} · 🚫 ${row.blocked} · ⚠️ ${row.failed}`
+      return `доставлено ${row.delivered} · заблокировали ${row.blocked} · ошибки ${row.failed}`
   }
 }
 
@@ -189,7 +189,7 @@ export function BroadcastAdmin() {
       <textarea
         className="input textarea"
         rows={4}
-        placeholder="🇬🇧 Текст по-английски (необязательно)"
+        placeholder="Текст по-английски (необязательно)"
         value={textEn}
         onChange={(e) => setTextEn(e.target.value)}
         lang="en"
@@ -200,7 +200,7 @@ export function BroadcastAdmin() {
 
       <div className="row-chips">
         <button type="button" className="chip" onClick={() => fileInput.current?.click()}>
-          {photo ? 'Другое фото' : '🖼 Добавить фото'}
+          {photo ? 'Другое фото' : 'Добавить фото'}
         </button>
         {photo && (
           <button type="button" className="chip" onClick={() => setPhoto(null)}>
@@ -257,8 +257,8 @@ export function BroadcastAdmin() {
             <div className="admin-msg-body">
               <div className="admin-msg-meta">
                 #{row.id} · {stamp(row.created_at)} · {row.audience_title} · {statusText(row)}
-                {row.photo ? ' · 🖼' : ''}
-                {row.text_en ? ' · 🇬🇧' : ''}
+                {row.photo ? ' · фото' : ''}
+                {row.text_en ? ' · англ.' : ''}
               </div>
               <div className="admin-msg-text">{row.text.replace(/<[^>]+>/g, '').slice(0, 160) || 'без текста'}</div>
             </div>

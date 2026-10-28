@@ -44,8 +44,8 @@ function FileEditRow({ edit }: { edit: FileEdit }) {
 const EVENTS: Record<string, string> = { schedule: 'по часам', workflow_dispatch: 'вручную', push: 'обновление кода' }
 
 function runStatus(run: Run) {
-  if (run.status !== 'completed') return '⏳ идёт'
-  return run.conclusion === 'success' ? '✅ готово' : run.conclusion === 'skipped' ? '— пропущен' : `❌ ${run.conclusion ?? 'ошибка'}`
+  if (run.status !== 'completed') return 'идёт'
+  return run.conclusion === 'success' ? 'готово' : run.conclusion === 'skipped' ? 'пропущен' : `ошибка: ${run.conclusion ?? '?'}`
 }
 
 // пары группы (или обеих) в выбранный день — для выбора, какую отменить или пометить

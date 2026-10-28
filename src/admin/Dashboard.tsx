@@ -39,7 +39,7 @@ function BotWebhook() {
       >
         <div className="row">
           <span>Вебхук</span>
-          <span className="row-value">{ok ? '✅ на месте' : data.url ? '❌ не наш адрес' : '❌ сброшен'}</span>
+          <span className={`row-value${ok ? '' : ' text-danger'}`}>{ok ? 'на месте' : data.url ? 'не наш адрес' : 'сброшен'}</span>
         </div>
         <div className="row">
           <span>В очереди Telegram</span>
@@ -47,7 +47,7 @@ function BotWebhook() {
         </div>
         <div className="row">
           <span>Ошибка доставки</span>
-          <span className="row-value">{data.last_error ? `${data.fresh_error ? '⚠️ ' : ''}${formatStamp(data.last_error_at!)}` : 'нет'}</span>
+          <span className={`row-value${data.fresh_error ? ' text-danger' : ''}`}>{data.last_error ? formatStamp(data.last_error_at!) : 'нет'}</span>
         </div>
         {data.last_error && (
           <div className="row">

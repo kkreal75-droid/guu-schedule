@@ -89,7 +89,7 @@ export function SettingsAdmin() {
             className="input textarea"
             rows={2}
             lang="en"
-            placeholder="🇬🇧 По-английски (необязательно)"
+            placeholder="По-английски (необязательно)"
             value={form.maintenance.text_en ?? ''}
             onChange={(e) => setForm({ ...form, maintenance: { ...form.maintenance, text_en: e.target.value } })}
           />
@@ -119,7 +119,7 @@ export function SettingsAdmin() {
           <input
             className="input"
             lang="en"
-            placeholder="🇬🇧 По-английски (необязательно)"
+            placeholder="По-английски (необязательно)"
             maxLength={300}
             value={form.notice.text_en ?? ''}
             onChange={(e) => setForm({ ...form, notice: { ...form.notice, text_en: e.target.value } })}

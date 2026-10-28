@@ -17,7 +17,7 @@ type Props = {
   onClose: (text: string) => void
 }
 
-// Заметка — окно снизу: серое поле, «Сохранится при закрытии», красная «Готово»
+// Заметка — окно снизу: серое поле, «Сохранится при закрытии», кнопка «Готово»
 export function NoteEditor({ target, initial, onClose }: Props) {
   const [text, setText] = useState(initial)
   // закрыть — с последним текстом (функция не меняется от нажатия к нажатию: окно не переподписывается)
@@ -45,7 +45,7 @@ export function NoteEditor({ target, initial, onClose }: Props) {
         {(initial || text) && (
           <button
             type="button"
-            className="link-btn"
+            className="link-btn danger"
             onClick={() => {
               haptic('light')
               onClose('')

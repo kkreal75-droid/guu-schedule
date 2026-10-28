@@ -11,7 +11,7 @@ import { STEPS, type Choice, type Option, type Selection, type Step, type StepKe
 import { t } from '../i18n'
 import { trSubject, trTeacher } from '../guu'
 
-// «Профиль → Учёба» (этап 7.8): «🎓 Учусь / 👩‍🏫 Преподаю», под ним строки «название — значение»
+// «Профиль → Учёба» (этап 7.8): «Учусь / Преподаю», под ним строки «название — значение»
 // Форма → Уровень → Курс → Институт → Направление → Программа → Группа (нажатие — системный список; те же шаги,
 // что в онбординге: следующий список — из того, что осталось после предыдущих; один вариант выбирается сам)
 // и «Сохранить». У преподавателя — ФИО с поиском.
@@ -28,8 +28,8 @@ const label = (key: StepKey) =>
   })[key]
 
 const roles = (): { value: Role; label: string }[] => [
-  { value: 'student', label: `🎓 ${t('Учусь')}` },
-  { value: 'teacher', label: `👩‍🏫 ${t('Преподаю')}` },
+  { value: 'student', label: t('Учусь') },
+  { value: 'teacher', label: t('Преподаю') },
 ]
 
 type Field = { step: Step; options: Option[]; value: Value | undefined }
