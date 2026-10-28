@@ -246,10 +246,10 @@ export async function handleAppleSubscribe(env: Env, request: Request, token: st
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${tr(lang, 'Подписка на расписание')}</title>
 <style>
-body{margin:0;padding:48px 20px;font:17px/1.4 -apple-system,system-ui,sans-serif;text-align:center;background:linear-gradient(180deg,#fbe3e7 0,#fff 300px) no-repeat,#fff;color:#1c1c21}
-h1{font-size:24px;font-weight:800;margin:0 0 12px}p{color:#6b6b76;margin:8px 0}
-a.btn{display:block;max-width:360px;margin:24px auto 8px;padding:15px 24px;border-radius:12px;background:#d92949;color:#fff;font-weight:600;text-decoration:none}
-@media (prefers-color-scheme:dark){body{background:linear-gradient(180deg,#2a1418 0,#141417 300px) no-repeat,#141417;color:#f2f2f5}p{color:#a0a0ab}a.btn{background:#e8475f}}
+body{margin:0;min-height:100vh;box-sizing:border-box;padding:48px 20px;font:17px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',Roboto,'Segoe UI',system-ui,sans-serif;text-align:center;background:linear-gradient(180deg,#e2eff2 0,#fff 320px) no-repeat,#fff;color:#17171a}
+h1{font-size:24px;font-weight:700;letter-spacing:-0.02em;margin:0 0 12px}p{color:#6e6e73;margin:8px 0}
+a.btn{display:block;max-width:360px;margin:24px auto 8px;padding:15px 24px;border-radius:14px;background:#0e7c8c;color:#fff;font-size:16px;font-weight:600;text-decoration:none}
+@media (prefers-color-scheme:dark){body{background:linear-gradient(180deg,#16292c 0,#141517 320px) no-repeat,#141517;color:#f2f3f5}p{color:#a2a7ae}}
 </style></head><body>${body}</body></html>`,
       { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
     )
@@ -257,7 +257,7 @@ a.btn{display:block;max-width:360px;margin:24px auto 8px;padding:15px 24px;borde
   const webcal = feedUrl(new URL(request.url).origin, token).replace(/^https?:/, 'webcal:')
   const group = normalizeGroup(row.grp) ?? row.grp
   const title = (await loadGroupFile(env, group).catch(() => null))?.name ?? group
-  return html(`<h1>📅 ${tr(lang, 'Расписание {group}', { group: escapeHtmlText(title) })}</h1>
+  return html(`<h1>${tr(lang, 'Расписание {group}', { group: escapeHtmlText(title) })}</h1>
 <p>${tr(lang, 'Сейчас откроется Календарь — нажмите «Подписаться».')}</p>
 <a class="btn" href="${webcal}">${tr(lang, 'Подписаться в Календаре')}</a>
 <p>${tr(lang, 'Если ничего не открылось — нажмите кнопку.')}</p>
