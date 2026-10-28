@@ -1,0 +1,19 @@
+{
+  "name": "guu-schedule-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "node scripts/deploy.mjs",
+    "check": "wrangler types && tsc --noEmit",
+    "migrate": "wrangler d1 migrations apply guu-bot --remote",
+    "test": "vitest run",
+    "deploy:raw": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.6",
+    "typescript": "~7.0.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.151.2"
+  }
+}

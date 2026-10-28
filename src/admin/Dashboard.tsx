@@ -1,0 +1,130 @@
+import { useState } from 'react'
+import { Section } from '../components/Section'
+import { formatStamp } from '../format'
+import { haptic } from '../telegram'
+import { adminApi, adminError, type BotStatus } from './api'
+import { BarChart, Loading, Stat, useLoad } from './common'
+
+// Бот в Telegram: стоит ли вебхук на наш адрес, очередь, последняя ошибка доставки; «Переустановить вебхук»
+// (адрес — только из конфигурации воркера). Cron проверяет то же раз в 10 минут и пишет в бот.
+function BotWebhook() {
+  const { data, setData, error } = useLoad(adminApi.botStatus)
+  const [busy, setBusy] = useState(false)
+  const [fail, setFail] = useState<string | null>(null)
+  if (!data) {
+    return (
+      <Section title="Бот в Telegram">
+        <p className="section-footer">{error ? adminError(error) : 'Проверяю вебхук…'}</p>
+      </Section>
+    )
+  }
+  const ok = data.url_ok && data.updates_ok
+  const fix = async () => {
+    haptic()
+    setBusy(true)
+    setFail(null)
+    try {
+      setData((await adminApi.botSetup()) as BotStatus)
+    } catch (err) {
+      setFail(adminError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <Section
+        title="Бот в Telegram"
+        footer="Адрес вебхука — только из настроек воркера. Раз в 10 минут и после деплоя бот проверяет его сам и пишет в личку, если что-то не так."
+      >
+        <div className="row">
+          <span>Вебхук</span>
+          <span className="row-value">{ok ? '✅ на месте' : data.url ? '❌ не наш адрес' : '❌ сброшен'}</span>
+        </div>
+        <div className="row">
+          <span>В очереди Telegram</span>
+          <span className="row-value">{data.pending}</span>
+        </div>
+        <div className="row">
+          <span>Ошибка доставки</span>
+          <span className="row-value">{data.last_error ? `${data.fresh_error ? '⚠️ ' : ''}${formatStamp(data.last_error_at!)}` : 'нет'}</span>
+        </div>
+        {data.last_error && (
+          <div className="row">
+            <span className="row-value">{data.last_error}</span>
+          </div>
+        )}
+      </Section>
+      <button type="button" className="button-primary" disabled={busy} onClick={fix}>
+        {busy ? 'Ставлю вебхук…' : 'Переустановить вебхук'}
+      </button>
+      {fail && <p className="section-footer">{fail}</p>}
+    </>
+  )
+}
+
+export function Dashboard() {
+  const { data, error } = useLoad(adminApi.dashboard)
+  if (!data) return <Loading error={error ? adminError(error) : null} />
+  const { users, chats, calendar, reviews } = data
+  const noGroup = users.total - users.g11 - users.g12 - (users.other ?? 0) - (users.teachers ?? 0)
+
+  return (
+    <div className="page-body">
+      <BotWebhook />
+
+      <Section title="Пользователи">
+        <div className="stats">
+          <Stat label="всего" value={users.total} />
+          <Stat label="за сутки" value={users.day} />
+          <Stat label="за 7 дней" value={users.week} />
+          <Stat label="за 30 дней" value={users.month} />
+        </div>
+      </Section>
+
+      <Section title="Новые по дням — 30 дней">
+        <BarChart
+          values={data.new_by_day.map((d) => d.n)}
+          labels={data.new_by_day.map((d) => `${d.day.slice(8)}.${d.day.slice(5, 7)}`)}
+          every={7}
+        />
+      </Section>
+
+      <Section title="Открытия по часам (МСК) — 30 дней">
+        <BarChart values={data.opens_by_hour} labels={data.opens_by_hour.map((_, h) => String(h))} every={3} />
+      </Section>
+
+      <Section title="По группам">
+        <div className="stats">
+          <Stat label="1-1" value={users.g11} />
+          <Stat label="1-2" value={users.g12} />
+          <Stat label="другие группы" value={users.other ?? 0} />
+          <Stat label="преподаватели" value={users.teachers ?? 0} />
+          <Stat label="не выбрана" value={noGroup} />
+          <Stat label="открытий" value={users.opens} />
+        </div>
+      </Section>
+
+      <Section title="Беседы и календарь">
+        <div className="stats">
+          <Stat label="бесед" value={chats.total} hint={`1-1: ${chats.g11} · 1-2: ${chats.g12}`} />
+          <Stat label="со сводками" value={chats.digests} />
+          <Stat label="подписок на календарь" value={calendar.total} />
+          <Stat label="обновлялись за сутки" value={calendar.active} />
+        </div>
+      </Section>
+
+      <Section title="Отзывы о преподавателях">
+        <div className="stats">
+          <Stat label="отзывов" value={reviews.reviews} hint={`за 7 дней: ${reviews.week}`} />
+          <Stat label="преподавателей" value={reviews.teachers} />
+          <Stat label="жалоб ждут" value={reviews.reports} />
+        </div>
+      </Section>
+
+      <p className="section-footer">
+        Забанены: {users.banned} · заблокировали бота: {users.blocked}. «За сутки» — кто открывал приложение или писал боту.
+      </p>
+    </div>
+  )
+}

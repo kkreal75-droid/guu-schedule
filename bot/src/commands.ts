@@ -1,0 +1,155 @@
+// Личные сообщения боту: команды для всех и админские (только OWNER_ID).
+import { banCommand, exportUsers, listBans, sendStats, unbanCommand } from './admin'
+import { isOwner, profileOf } from './auth'
+import { listBroadcasts, startBroadcast } from './broadcast'
+import { getUser, personalOf, touchUser } from './db'
+import { logAdmin } from './journal'
+import { economyMode, usageText, usageToday } from './usage'
+import { reportError, safely } from './errors'
+import { formatDay, groupsFor, loadTimetable, personalKey, personalize, todayMsk } from './schedule'
+import { DEFAULT_GREETINGS, GREETINGS_EN, loadSettings, renderGreeting } from './settings'
+import { langOf, localeFor, tr, type Lang } from './i18n'
+import { TelegramError, answerCallback, sendMessage, type TgCallbackQuery, type TgMessage } from './telegram'
+import { escapeHtml } from './util'
+import { handleSupportReply } from './support'
+import { backupToOwner } from './backup'
+import { deleteMeCommand } from './privacy'
+import { setupBot, webhookCheck, type WebhookCheck } from './setup'
+
+export const BANNED_REPLY = 'Доступ к боту ограничен.'
+
+// lang — язык человека (выбранный в приложении или язык Telegram)
+type Context = { env: Env; ctx: ExecutionContext; message: TgMessage; args: string; lang: Lang }
+type Handler = (c: Context) => Promise<void>
+
+// ---------- для всех ----------
+
+// Приветствие — одно из трёх (русские тексты меняются в админ-панели, английские — GREETINGS_EN).
+// Telegram не принял HTML — шлём стандартное, а владельцу — ошибку.
+export async function sendGreeting(env: Env, chatId: number, firstName: string | undefined, index?: number, lang: Lang = 'ru'): Promise<void> {
+  const name = escapeHtml(firstName?.trim() || tr(lang, 'брат'))
+  const extra = { reply_markup: { inline_keyboard: [[{ text: tr(lang, '📅 Открыть расписание'), web_app: { url: env.WEBAPP_URL } }]] } }
+  if (lang === 'en') {
+    const i = index ?? Math.floor(Math.random() * GREETINGS_EN.length)
+    await sendMessage(env, chatId, renderGreeting(GREETINGS_EN[i] ?? GREETINGS_EN[0], name), extra)
+    return
+  }
+  const { greetings } = await loadSettings(env).catch(() => ({ greetings: DEFAULT_GREETINGS }))
+  const i = index ?? Math.floor(Math.random() * greetings.length)
+  try {
+    await sendMessage(env, chatId, renderGreeting(greetings[i], name), extra)
+  } catch (err) {
+    if (!(err instanceof TelegramError && err.code === 400) || greetings === DEFAULT_GREETINGS) throw err
+    await sendMessage(env, chatId, renderGreeting(DEFAULT_GREETINGS[i] ?? DEFAULT_GREETINGS[0], name), extra)
+    await reportError(env, `Приветствие №${i + 1} из админ-панели`, err)
+  }
+}
+
+const start = ({ env, message, lang }: Context) => sendGreeting(env, message.chat.id, message.from?.first_name, undefined, lang)
+
+// /today, /tomorrow — для группы, выбранной в приложении (преподавателю — его пары);
+// не выбрана — для МБ(МП) 1-1 и 1-2
+const dayCommand =
+  (offset: number): Handler =>
+  async ({ env, message, lang }) => {
+    const user = await getUser(env.DB, message.from!.id)
+    const group = personalKey(user)
+    // в личке — как в приложении: свои подгруппы, скрытые пары и язык
+    const [tt, personal, loc] = await Promise.all([loadTimetable(env, groupsFor(group)), personalOf(env.DB, message.from!.id), localeFor(env, lang)])
+    await sendMessage(env, message.chat.id, formatDay(personalize(tt, personal.hidden), todayMsk() + offset, group, personal.mine, loc))
+  }
+
+const PUBLIC: Record<string, Handler> = {
+  '/start': start,
+  '/today': dayCommand(0),
+  '/tomorrow': dayCommand(1),
+}
+
+// ---------- только для владельца ----------
+
+const ADMIN: Record<string, Handler> = {
+  '/stats': ({ env, message }) => sendStats(env, message.chat.id),
+  '/broadcast': ({ env, message }) => startBroadcast(env, message),
+  '/broadcasts': ({ env, message }) => listBroadcasts(env, message.chat.id),
+  '/export': ({ env, message }) => exportUsers(env, message.chat.id),
+  '/ban': ({ env, message, args }) => banCommand(env, message.chat.id, args),
+  '/unban': ({ env, message, args }) => unbanCommand(env, message.chat.id, args),
+  '/bans': ({ env, message }) => listBans(env, message.chat.id),
+  '/usage': async ({ env, message }) => void (await sendMessage(env, message.chat.id, usageText(await usageToday(env)))),
+  '/backup': async ({ env }) => void (await backupToOwner(env)),
+  // состояние вебхука; «/webhook fix» — поставить заново (адрес — из конфигурации, setup.ts)
+  '/webhook': async ({ env, message, args }) => {
+    if (args.trim() === 'fix') await setupBot(env, true)
+    await sendMessage(env, message.chat.id, webhookText(await webhookCheck(env)))
+  },
+}
+
+function webhookText(c: WebhookCheck): string {
+  const at = (ms: number | null) =>
+    ms ? new Date(ms).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+  return [
+    `🔗 <b>Вебхук</b> ${c.url_ok && c.updates_ok ? '✅ на месте' : '❌ не на месте'}`,
+    `Адрес: ${escapeHtml(c.url || 'пусто')}`,
+    `В очереди: ${c.pending}`,
+    `Последняя ошибка доставки: ${c.last_error ? `${at(c.last_error_at)} — ${escapeHtml(c.last_error)}` : 'нет'}`,
+    c.url_ok && c.updates_ok ? '' : 'Поставить заново: /webhook fix',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+export async function handlePrivateMessage(env: Env, ctx: ExecutionContext, message: TgMessage): Promise<void> {
+  const from = message.from
+  if (!from || from.is_bot) return
+  // команда — в тексте или в подписи к фото («/broadcast» с картинкой)
+  const text = (message.text ?? message.caption ?? '').trim()
+  const command = text.startsWith('/') ? text.split(/\s+/)[0].split('@')[0].toLowerCase() : null
+  const args = text.replace(/^\S+\s*/, '')
+  const owner = isOwner(env, from.id)
+
+  // учёт не должен мешать ответу: база недоступна — сообщаем владельцу и отвечаем как обычно
+  let banned = false
+  let lang = langOf(null, from.language_code)
+  try {
+    // режим экономии: пишем только /start, остальное — чтение
+    if (economyMode() && command !== '/start') {
+      const row = await getUser(env.DB, from.id)
+      banned = Boolean(row?.banned)
+      lang = langOf(row, from.language_code)
+    } else {
+      const seen = await touchUser(env.DB, profileOf(from), command === '/start' ? 'start' : 'message')
+      banned = seen.banned
+      lang = langOf(seen.me, from.language_code)
+    }
+  } catch (err) {
+    await reportError(env, 'Учёт пользователя', err)
+  }
+  // удалить свои данные можно и с баном (бан при этом остаётся)
+  if (command === '/deleteme') return void (await safely(env, 'Команда /deleteme', message.chat.id, () => deleteMeCommand(env, message, lang), lang))
+  if (banned && !owner) return void (await sendMessage(env, message.chat.id, tr(lang, BANNED_REPLY)))
+  // владелец отвечает на обращение в поддержку (ответом на «✍️ Ответ на обращение №…»)
+  if (owner && !command && message.reply_to_message) {
+    let handled = false
+    await safely(env, 'Ответ в поддержку', message.chat.id, async () => {
+      handled = await handleSupportReply(env, message)
+    })
+    if (handled) return
+  }
+  if (!command) return
+
+  // админские команды у остальных — как несуществующие: ни ответа, ни намёка
+  const handler = PUBLIC[command] ?? (owner ? ADMIN[command] : undefined)
+  if (!handler) return
+  if (owner && ADMIN[command] && command !== '/usage' && command !== '/stats' && command !== '/bans' && command !== '/broadcasts') {
+    await logAdmin(env, from.id, command, null, args.slice(0, 300))
+  }
+  await safely(env, `Команда ${command}`, message.chat.id, () => handler({ env, ctx, message, args, lang }), lang)
+}
+
+export async function handleBannedCallback(env: Env, query: TgCallbackQuery): Promise<boolean> {
+  if (isOwner(env, query.from.id)) return false
+  const user = await getUser(env.DB, query.from.id)
+  if (!user?.banned) return false
+  await answerCallback(env, query.id, tr(langOf(user, query.from.language_code), BANNED_REPLY))
+  return true
+}

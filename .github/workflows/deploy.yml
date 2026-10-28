@@ -1,0 +1,132 @@
+# Сборка и деплой на GitHub Pages + ежечасная проверка расписания всего ГУУ на guu.ru.
+#
+#   push в main            → сборка и деплой
+#   каждый час (cron)      → update.py; если данные изменились — коммит, сборка и деплой
+#   вручную (Run workflow) → update.py (можно с --force), затем сборка и деплой
+#
+# update.py пишет public/data/ (группы, пары, преподаватели, аудитории, сессия, отчёт разбора),
+# schedule.json (МБ(МП) 1-1/1-2 для старых версий приложения) и служебное в data/.
+# Сломанный файл ГУУ не публикуется (остаются прошлые данные его групп), тревога — владельцу в бот.
+# Если guu.ru недоступен вовсе, запуск красный, а GitHub присылает письмо о сбое.
+# LibreOffice (для .doc УМБ) ставится, только если .doc изменился и его ещё нет в data/doc-cache/.
+
+name: Update & deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *" # раз в час, в :17 UTC — в ровные часы очереди GitHub длиннее
+    # GitHub пропускает часть запусков по расписанию (в октябре — раз в 3–5 часов): второй слот на :47
+    - cron: "47 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Скачать и пересобрать расписание, даже если файл на guu.ru не менялся"
+        type: boolean
+        default: false
+
+# один запуск за раз: ежечасная проверка не должна пересечься с деплоем после push
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# права по минимуму: сверху — только чтение, запись — в тех job, где нужна. Actions закреплены по SHA
+# (тег можно перевесить на другой код), обновления предлагает Dependabot (.github/dependabot.yml).
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # коммит обновлённых данных
+    outputs:
+      pushed: ${{ steps.commit.outputs.pushed }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - id: update
+        run: python update.py ${{ inputs.force && '--force' || '' }}
+
+      # .doc изменился, а LibreOffice нет — ставим и запускаем ещё раз (файлы уже скачаны
+      # не будут: update.py скачает заново, это несколько секунд)
+      - id: update_doc
+        if: steps.update.outputs.need_soffice == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libreoffice-writer-nogui \
+            || sudo apt-get install -y -qq --no-install-recommends libreoffice-writer
+          python update.py --force
+
+      - id: commit
+        env:
+          # текст из имени файла на guu.ru — только через env, не подставляем в скрипт напрямую
+          MESSAGE: ${{ steps.update_doc.outputs.message || steps.update.outputs.message }}
+        run: |
+          # коммитим, только если данные реально изменились
+          if [ -z "$(git status --porcelain -- public/data schedule.json data)" ]; then
+            echo "Данные не изменились — коммитить нечего."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A public/data schedule.json data
+            git commit -m "${MESSAGE:-Обновление расписания}"
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: update
+    # update пропускается на push — поэтому always() и явная проверка результата
+    if: >-
+      always() &&
+      (needs.update.result == 'success' || needs.update.result == 'skipped') &&
+      (github.event_name != 'schedule' || needs.update.outputs.pushed == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # после коммита из update собираем уже новую версию
+          ref: ${{ needs.update.outputs.sha || github.sha }}
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    # без always() GitHub пропустит деплой, раз выше по цепочке пропущен update
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

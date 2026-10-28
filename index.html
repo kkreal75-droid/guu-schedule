@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Расписание ГУУ</title>
+    <!-- Telegram WebApp SDK: должен грузиться до кода приложения -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- тема до запуска приложения (дальше — src/theme.ts): без вспышки светлого фона в тёмном Telegram -->
+    <script>
+      try {
+        var mode = JSON.parse(localStorage.getItem('prefs') || '{}').theme || 'system'
+        var app = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null
+        var dark = mode === 'system' ? (app ? app.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) : mode === 'dark'
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

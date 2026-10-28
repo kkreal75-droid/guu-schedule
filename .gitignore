@@ -1,0 +1,18 @@
+node_modules
+dist
+*.local
+*.log
+.DS_Store
+__pycache__/
+.venv/
+.claude/
+.dev.vars
+.wrangler/
+bot/worker-configuration.d.ts
+data/raw/
+
+# отчёт по безопасности — только локально
+docs/security/
+
+# скриншоты проверок (локально, не в git)
+docs/screens/

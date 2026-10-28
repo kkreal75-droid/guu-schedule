@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "guu-schedule-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "vars": {
+    // сайт мини-приложения: оттуда же бот берёт schedule.json и overrides.json
+    "WEBAPP_URL": "https://kkreal75-droid.github.io/guu-schedule/",
+    // имя бота — для ссылок t.me/<бот>/schedule (проверяется при настройке бота через getMe)
+    "BOT_USERNAME": "GUU_Scheduule_bot",
+    // адрес вебхука — только отсюда (https, путь /webhook), никогда из входящего запроса;
+    // npm run deploy и автотесты проверяют его до деплоя
+    "WEBHOOK_URL": "https://guu-schedule-bot.guu-schedule-bot.workers.dev/webhook",
+    // «Обновить сейчас» в админ-панели запускает этот workflow (нужен секрет GITHUB_TOKEN)
+    "GITHUB_REPO": "kkreal75-droid/guu-schedule",
+    "GITHUB_WORKFLOW": "deploy.yml"
+  },
+  // D1 — всё, что часто пишется: пользователи, визиты, рассылки (миграции — в migrations/)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "guu-bot",
+      "database_id": "b21fb0f4-bb06-4c28-b639-0c21d88e4750",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // KV — редкие записи: настройки. (Namespace называется STATS: раньше там была статистика,
+  // теперь она в D1.)
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "bb0c6081b6c441e7ac3c52afeb245b45"
+    }
+  ],
+  // Лимиты запросов (Workers Rate Limiting): считаются на стороне Cloudflare, без записей в KV/D1.
+  // Ключ — id пользователя Telegram или IP; превышение — 429 до обращения к базе (guard.ts).
+  "ratelimits": [
+    { "name": "RL_IP", "namespace_id": "4101", "simple": { "limit": 1200, "period": 60 } },
+    { "name": "RL_USER", "namespace_id": "4102", "simple": { "limit": 120, "period": 60 } },
+    { "name": "RL_WRITE", "namespace_id": "4103", "simple": { "limit": 30, "period": 60 } },
+    { "name": "RL_SEEN", "namespace_id": "4104", "simple": { "limit": 15, "period": 60 } },
+    { "name": "RL_BOT", "namespace_id": "4105", "simple": { "limit": 40, "period": 60 } },
+    { "name": "RL_PUBLIC", "namespace_id": "4106", "simple": { "limit": 60, "period": 60 } },
+    { "name": "RL_SETUP", "namespace_id": "4107", "simple": { "limit": 3, "period": 60 } }
+  ],
+  // раз в минуту: досылает рассылки пачками (лимит 50 подзапросов на вызов)
+  "triggers": { "crons": ["* * * * *"] },
+  // версия воркера (id, время) — cron после деплоя или отката проверяет вебхук и пишет владельцу (setup.ts)
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // логи воркера видны в панели Cloudflare и в `npx wrangler tail`
+  "observability": { "enabled": true }
+}

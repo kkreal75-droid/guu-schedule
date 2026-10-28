@@ -1,0 +1,625 @@
+{
+ "updated_at": "2026-10-20",
+ "sources": [
+  "https://guu.ru/campus/ — список корпусов и строений",
+  "OpenStreetMap (© участники OpenStreetMap, ODbL) — координаты зданий, входов, проходных, столовых и кафе"
+ ],
+ "note": "Координаты — точка входа (если вход есть в OSM), иначе центр здания. todo — что не проверено; его видит только владелец в админке. «Как пройти»: строка — пункт.",
+ "places": [
+  {
+   "id": "a",
+   "group": "buildings",
+   "short": "А",
+   "name": "Административный корпус",
+   "icon": "🏢",
+   "address": "Рязанский проспект, 99, корп. 1",
+   "lat": 55.714214,
+   "lon": 37.817501,
+   "rooms": [
+    "А"
+   ],
+   "aliases": [
+    "администрация",
+    "учебно-административный",
+    "ректорат"
+   ],
+   "howto": "Корпус у проходной ГУУ — ближе всех к метро «Выхино».\nОт проходной до него меньше минуты.",
+   "note": "На guu.ru — «Учебно-административный корпус, строение 1».",
+   "todo": "координата — вход по OSM; проверить, где вход для студентов",
+   "name_en": "Administration building",
+   "address_en": "99 Ryazansky Prospekt, bldg 1",
+   "howto_en": "The building by the GUU gate — the closest one to Vykhino metro.\nLess than a minute from the gate.",
+   "note_en": "On guu.ru: «Academic and administration building, structure 1»."
+  },
+  {
+   "id": "u",
+   "group": "buildings",
+   "short": "У",
+   "name": "Главный учебный корпус",
+   "icon": "🏛",
+   "address": "Рязанский проспект, 99, стр. 8",
+   "lat": 55.713973,
+   "lon": 37.81151,
+   "rooms": [
+    "У"
+   ],
+   "aliases": [
+    "ГУ",
+    "ГУК",
+    "учебный корпус"
+   ],
+   "howto": "От проходной ГУУ — через всю территорию на запад, мимо Лабораторного корпуса: минут 5.\nСамое большое здание в западной части кампуса.\nВход — с юго-западной стороны.",
+   "note": null,
+   "todo": "проверить, какой вход открыт для студентов; можно добавить, как читать номер аудитории (этаж)",
+   "name_en": "Main academic building",
+   "address_en": "99 Ryazansky Prospekt, structure 8",
+   "howto_en": "From the GUU gate, cross the whole campus to the west, past the Laboratory building: about 5 minutes.\nThe largest building in the western part of the campus.\nThe entrance is on the south-west side."
+  },
+  {
+   "id": "pa",
+   "group": "buildings",
+   "short": "ПА",
+   "name": "Корпус поточных аудиторий",
+   "icon": "🎓",
+   "address": "Рязанский проспект, 99, корп. 5",
+   "lat": 55.713498,
+   "lon": 37.81683,
+   "rooms": [
+    "ПА",
+    "Актовый зал"
+   ],
+   "aliases": [
+    "поточный",
+    "поточка",
+    "П"
+   ],
+   "howto": "От проходной ГУУ — на юг, около 100 метров.\nЗдесь большие поточные аудитории и Актовый зал.",
+   "note": null,
+   "todo": "координата — центр здания, уточнить вход",
+   "name_en": "Lecture hall building",
+   "address_en": "99 Ryazansky Prospekt, bldg 5",
+   "howto_en": "From the GUU gate, head south, about 100 metres.\nThe big lecture halls and the Assembly hall are here."
+  },
+  {
+   "id": "lk",
+   "group": "buildings",
+   "short": "ЛК",
+   "name": "Лабораторный корпус",
+   "icon": "🧪",
+   "address": "Рязанский проспект, 99, стр. 4",
+   "lat": 55.713667,
+   "lon": 37.815178,
+   "rooms": [
+    "ЛК"
+   ],
+   "aliases": [
+    "лабораторный"
+   ],
+   "howto": "От проходной ГУУ — на юго-запад, минуты 3.\nСтоит между Корпусом поточных аудиторий и Главным учебным корпусом.\nРядом — столовая ГУУ.",
+   "note": null,
+   "todo": "координата — восточный вход по OSM, уточнить, какой вход главный",
+   "name_en": "Laboratory building",
+   "address_en": "99 Ryazansky Prospekt, structure 4",
+   "howto_en": "From the GUU gate, head south-west, about 3 minutes.\nIt stands between the Lecture hall building and the Main academic building.\nThe GUU canteen is next to it."
+  },
+  {
+   "id": "bc",
+   "group": "buildings",
+   "short": "БЦ",
+   "name": "Бизнес-центр",
+   "icon": "💼",
+   "address": "Рязанский проспект, 99, стр. 16",
+   "lat": 55.715466,
+   "lon": 37.81333,
+   "rooms": [
+    "БЦ",
+    "ЦИТ"
+   ],
+   "aliases": [
+    "ЦИТ",
+    "центр информационных технологий"
+   ],
+   "howto": "В северной части кампуса, рядом со Спортивным комплексом и бассейном.\nОт проходной ГУУ — на северо-запад, минуты 4.\nЗдесь же аудитории ЦИТ.",
+   "note": null,
+   "todo": "проверить, что аудитории ЦИТ — в Бизнес-центре",
+   "name_en": "Business centre",
+   "address_en": "99 Ryazansky Prospekt, structure 16",
+   "howto_en": "In the northern part of the campus, next to the Sports complex and the swimming pool.\nFrom the GUU gate, head north-west, about 4 minutes.\nThe ЦИТ (IT centre) rooms are here too."
+  },
+  {
+   "id": "cuvp",
+   "group": "buildings",
+   "short": "ЦУВП",
+   "name": "Центр учебно-воспитательных программ",
+   "icon": "🎭",
+   "address": "Рязанский проспект, 99, стр. 2",
+   "lat": 55.714119,
+   "lon": 37.816133,
+   "rooms": [],
+   "aliases": [
+    "ЦУВП"
+   ],
+   "howto": "Сразу за проходной ГУУ, в одном здании с общежитием № 2.",
+   "note": null,
+   "todo": "координата — центр строения 2, уточнить вход",
+   "name_en": "Centre for educational programmes",
+   "address_en": "99 Ryazansky Prospekt, structure 2",
+   "howto_en": "Right behind the GUU gate, in the same building as Dormitory No. 2."
+  },
+  {
+   "id": "sk",
+   "group": "sport",
+   "short": "СК",
+   "name": "Спортивный комплекс",
+   "icon": "🏋️",
+   "address": "Рязанский проспект, 99, корп. 7",
+   "lat": 55.714609,
+   "lon": 37.813071,
+   "rooms": [
+    "Спортивный комплекс"
+   ],
+   "aliases": [
+    "спорткомплекс",
+    "спортзал",
+    "спортивный зал",
+    "физкультура"
+   ],
+   "howto": "От проходной ГУУ — на запад, к футбольному полю, минуты 4.\nВход — с южной стороны, напротив Главного учебного корпуса.\nНа физкультуру — в спортивной форме и сменной обуви.",
+   "note": null,
+   "todo": null,
+   "name_en": "Sports complex",
+   "address_en": "99 Ryazansky Prospekt, bldg 7",
+   "howto_en": "From the GUU gate, head west to the football pitch, about 4 minutes.\nThe entrance is on the south side, opposite the Main academic building.\nFor PE, bring sportswear and indoor shoes."
+  },
+  {
+   "id": "pool",
+   "group": "sport",
+   "short": null,
+   "name": "Бассейн",
+   "icon": "🏊",
+   "address": "Рязанский проспект, 99, корп. 3",
+   "lat": 55.715763,
+   "lon": 37.81197,
+   "rooms": [],
+   "aliases": [
+    "плавание"
+   ],
+   "howto": "В северо-западной части кампуса, за футбольным полем.\nВозьми шапочку, сланцы и полотенце.",
+   "note": "В OpenStreetMap здесь же отмечен центр плавания «Триумф».",
+   "todo": "проверить, где вход для студентов и нужна ли справка",
+   "name_en": "Swimming pool",
+   "address_en": "99 Ryazansky Prospekt, bldg 3",
+   "howto_en": "In the north-western part of the campus, behind the football pitch.\nBring a swim cap, flip-flops and a towel.",
+   "note_en": "OpenStreetMap also marks the «Triumph» swimming centre here."
+  },
+  {
+   "id": "stadium",
+   "group": "sport",
+   "short": null,
+   "name": "Стадион",
+   "icon": "⚽",
+   "address": "Рязанский проспект, 99, между Спортивным комплексом и бассейном",
+   "lat": 55.715122,
+   "lon": 37.811639,
+   "rooms": [],
+   "aliases": [
+    "поле",
+    "футбол",
+    "трибуны"
+   ],
+   "howto": "Футбольное поле с трибуной между Спортивным комплексом и бассейном.",
+   "note": null,
+   "todo": "проверить название и как туда попасть",
+   "name_en": "Stadium",
+   "address_en": "99 Ryazansky Prospekt, between the Sports complex and the swimming pool",
+   "howto_en": "A football pitch with a stand between the Sports complex and the swimming pool."
+  },
+  {
+   "id": "canteen",
+   "group": "food",
+   "short": null,
+   "name": "Столовая ГУУ",
+   "icon": "🍲",
+   "address": "Рязанский проспект, 99",
+   "lat": 55.713869,
+   "lon": 37.815853,
+   "rooms": [],
+   "aliases": [
+    "столовая",
+    "обед"
+   ],
+   "howto": "Между Лабораторным корпусом и Корпусом поточных аудиторий.",
+   "note": null,
+   "todo": "уточнить корпус, этаж и часы работы",
+   "name_en": "GUU canteen",
+   "address_en": "99 Ryazansky Prospekt",
+   "howto_en": "Between the Laboratory building and the Lecture hall building."
+  },
+  {
+   "id": "canteen-staff",
+   "group": "food",
+   "short": null,
+   "name": "Столовая для преподавателей",
+   "icon": "🍽",
+   "address": "Рязанский проспект, 99",
+   "lat": 55.71442,
+   "lon": 37.816402,
+   "rooms": [],
+   "aliases": [
+    "столовая"
+   ],
+   "howto": "Рядом с проходной ГУУ.",
+   "note": null,
+   "todo": "пускают ли студентов, часы работы",
+   "name_en": "Staff canteen",
+   "address_en": "99 Ryazansky Prospekt",
+   "howto_en": "Next to the GUU gate."
+  },
+  {
+   "id": "cafe-kletka",
+   "group": "food",
+   "short": null,
+   "name": "Кафе «Клетка»",
+   "icon": "☕",
+   "address": "Рязанский проспект, 99",
+   "lat": 55.713413,
+   "lon": 37.815902,
+   "rooms": [],
+   "aliases": [
+    "клетка",
+    "кофе"
+   ],
+   "howto": "У южной стороны Лабораторного корпуса.",
+   "note": null,
+   "todo": "часы работы, точное место",
+   "name_en": "Kletka café",
+   "address_en": "99 Ryazansky Prospekt",
+   "howto_en": "By the south side of the Laboratory building."
+  },
+  {
+   "id": "cafe-u",
+   "group": "food",
+   "short": null,
+   "name": "Кафе в Главном учебном корпусе",
+   "icon": "🥐",
+   "address": "Рязанский проспект, 99, стр. 8",
+   "lat": 55.714024,
+   "lon": 37.81208,
+   "rooms": [],
+   "aliases": [
+    "буфет",
+    "кофе"
+   ],
+   "howto": "Внутри Главного учебного корпуса.",
+   "note": null,
+   "todo": "название, этаж и часы работы",
+   "name_en": "Café in the Main academic building",
+   "address_en": "99 Ryazansky Prospekt, structure 8",
+   "howto_en": "Inside the Main academic building."
+  },
+  {
+   "id": "cofix",
+   "group": "food",
+   "short": null,
+   "name": "Cofix",
+   "icon": "☕",
+   "address": "ТЦ «Маяк», Рязанский проспект, 99А",
+   "lat": 55.712589,
+   "lon": 37.816231,
+   "rooms": [],
+   "aliases": [
+    "кофе",
+    "маяк"
+   ],
+   "howto": "За оградой кампуса, к югу от Корпуса поточных аудиторий, у ТЦ «Маяк».",
+   "note": "Пн–пт 7:30–22:00, сб–вс 9:00–22:00 (по OpenStreetMap).",
+   "todo": null,
+   "name_en": "Cofix",
+   "address_en": "Mayak shopping centre, 99A Ryazansky Prospekt",
+   "howto_en": "Outside the campus fence, south of the Lecture hall building, by the Mayak shopping centre.",
+   "note_en": "Mon–Fri 7:30–22:00, Sat–Sun 9:00–22:00 (per OpenStreetMap)."
+  },
+  {
+   "id": "rostics",
+   "group": "food",
+   "short": null,
+   "name": "Rostic's",
+   "icon": "🍗",
+   "address": "ТЦ «Маяк», Рязанский проспект, 99А",
+   "lat": 55.712782,
+   "lon": 37.815963,
+   "rooms": [],
+   "aliases": [
+    "ростикс",
+    "фастфуд",
+    "маяк"
+   ],
+   "howto": "За оградой кампуса, у ТЦ «Маяк».",
+   "note": null,
+   "todo": null,
+   "name_en": "Rostic's",
+   "address_en": "Mayak shopping centre, 99A Ryazansky Prospekt",
+   "howto_en": "Outside the campus fence, by the Mayak shopping centre."
+  },
+  {
+   "id": "pyaterochka",
+   "group": "food",
+   "short": null,
+   "name": "Пятёрочка",
+   "icon": "🛒",
+   "address": "ТЦ «Маяк», Рязанский проспект, 99А",
+   "lat": 55.71253,
+   "lon": 37.816493,
+   "rooms": [],
+   "aliases": [
+    "магазин",
+    "продукты",
+    "маяк"
+   ],
+   "howto": "За оградой кампуса, у ТЦ «Маяк».",
+   "note": null,
+   "todo": null,
+   "name_en": "Pyaterochka supermarket",
+   "address_en": "Mayak shopping centre, 99A Ryazansky Prospekt",
+   "howto_en": "Outside the campus fence, by the Mayak shopping centre."
+  },
+  {
+   "id": "one-price-coffee",
+   "group": "food",
+   "short": null,
+   "name": "One Price Coffee",
+   "icon": "☕",
+   "address": "у метро «Выхино»",
+   "lat": 55.715976,
+   "lon": 37.815398,
+   "rooms": [],
+   "aliases": [
+    "кофе"
+   ],
+   "howto": "По пути от метро «Выхино» к проходной.",
+   "note": "Ежедневно 7:00–23:00 (по OpenStreetMap).",
+   "todo": null,
+   "name_en": "One Price Coffee",
+   "address_en": "by Vykhino metro",
+   "howto_en": "On the way from Vykhino metro to the gate.",
+   "note_en": "Daily 7:00–23:00 (per OpenStreetMap)."
+  },
+  {
+   "id": "perekrestok",
+   "group": "food",
+   "short": null,
+   "name": "Перекрёсток",
+   "icon": "🛒",
+   "address": "ТЦ «Да», к югу от кампуса",
+   "lat": 55.710773,
+   "lon": 37.812223,
+   "rooms": [],
+   "aliases": [
+    "магазин",
+    "продукты",
+    "супермаркет"
+   ],
+   "howto": "К югу от кампуса, через Рязанский проспект, в ТЦ «Да».",
+   "note": "Круглосуточно (по OpenStreetMap).",
+   "todo": "проверить точный адрес ТЦ",
+   "name_en": "Perekrestok supermarket",
+   "address_en": "Da shopping centre, south of the campus",
+   "howto_en": "South of the campus, across Ryazansky Prospekt, in the Da shopping centre.",
+   "note_en": "Open 24/7 (per OpenStreetMap)."
+  },
+  {
+   "id": "kpp",
+   "group": "other",
+   "short": null,
+   "name": "Проходная ГУУ",
+   "icon": "🚪",
+   "address": "Рязанский проспект, 99 (со стороны метро «Выхино»)",
+   "lat": 55.714504,
+   "lon": 37.816751,
+   "rooms": [],
+   "aliases": [
+    "КПП",
+    "вход",
+    "турникеты",
+    "пропуск"
+   ],
+   "howto": "От метро «Выхино» — к университету вдоль ограды, минуты 3–5.\nНужен студенческий билет или пропуск.",
+   "note": null,
+   "todo": "номер КПП и есть ли другие проходные для студентов",
+   "name_en": "GUU gate",
+   "address_en": "99 Ryazansky Prospekt (Vykhino metro side)",
+   "howto_en": "From Vykhino metro, walk along the fence to the university, 3–5 minutes.\nYou need your student ID or a pass."
+  },
+  {
+   "id": "metro",
+   "group": "other",
+   "short": null,
+   "name": "Метро «Выхино»",
+   "icon": "🚇",
+   "address": "станция «Выхино», Таганско-Краснопресненская линия",
+   "lat": 55.71586,
+   "lon": 37.8172,
+   "rooms": [],
+   "aliases": [
+    "выхино",
+    "метро",
+    "электричка"
+   ],
+   "howto": "Ближайшее метро и платформа электричек.\nДо проходной ГУУ — 3–5 минут пешком.",
+   "note": null,
+   "todo": null,
+   "name_en": "Vykhino metro",
+   "address_en": "Vykhino station, Tagansko-Krasnopresnenskaya line",
+   "howto_en": "The nearest metro station and suburban train platform.\n3–5 minutes on foot to the GUU gate."
+  },
+  {
+   "id": "library",
+   "group": "other",
+   "short": null,
+   "name": "Библиотека",
+   "icon": "📚",
+   "address": "Рязанский проспект, 99",
+   "lat": 55.713848,
+   "lon": 37.816731,
+   "rooms": [],
+   "aliases": [
+    "читальный зал",
+    "книги"
+   ],
+   "howto": "Рядом с Корпусом поточных аудиторий.",
+   "note": null,
+   "todo": "уточнить корпус, этаж и часы работы",
+   "name_en": "Library",
+   "address_en": "99 Ryazansky Prospekt",
+   "howto_en": "Next to the Lecture hall building."
+  },
+  {
+   "id": "hall",
+   "group": "other",
+   "short": null,
+   "name": "Актовый зал",
+   "icon": "🎤",
+   "address": "Рязанский проспект, 99, корп. 5",
+   "lat": 55.713493,
+   "lon": 37.816601,
+   "rooms": [],
+   "aliases": [
+    "актовый"
+   ],
+   "howto": "В Корпусе поточных аудиторий.",
+   "note": null,
+   "todo": null,
+   "name_en": "Assembly hall",
+   "address_en": "99 Ryazansky Prospekt, bldg 5",
+   "howto_en": "In the Lecture hall building."
+  },
+  {
+   "id": "dorm-2",
+   "group": "other",
+   "short": null,
+   "name": "Общежитие № 2",
+   "icon": "🛏",
+   "address": "Рязанский проспект, 99, стр. 2",
+   "lat": 55.71433,
+   "lon": 37.815908,
+   "rooms": [],
+   "aliases": [
+    "общага",
+    "общежитие"
+   ],
+   "howto": "Сразу за проходной ГУУ.",
+   "note": null,
+   "todo": "координата — центр здания, уточнить вход",
+   "name_en": "Dormitory No. 2",
+   "address_en": "99 Ryazansky Prospekt, structure 2",
+   "howto_en": "Right behind the GUU gate."
+  },
+  {
+   "id": "dorm-6",
+   "group": "other",
+   "short": null,
+   "name": "Общежитие № 6",
+   "icon": "🛏",
+   "address": "Рязанский проспект, 99, корп. 6",
+   "lat": 55.714936,
+   "lon": 37.815652,
+   "rooms": [],
+   "aliases": [
+    "общага",
+    "общежитие"
+   ],
+   "howto": "От проходной ГУУ — на север, около 80 метров.",
+   "note": null,
+   "todo": null,
+   "name_en": "Dormitory No. 6",
+   "address_en": "99 Ryazansky Prospekt, bldg 6",
+   "howto_en": "From the GUU gate, head north, about 80 metres."
+  },
+  {
+   "id": "atm-u",
+   "group": "other",
+   "short": null,
+   "name": "Банкомат Сбербанка — Главный корпус",
+   "icon": "🏧",
+   "address": "Рязанский проспект, 99, стр. 8",
+   "lat": 55.714052,
+   "lon": 37.811901,
+   "rooms": [],
+   "aliases": [
+    "банкомат",
+    "сбер",
+    "деньги"
+   ],
+   "howto": "В Главном учебном корпусе.",
+   "note": null,
+   "todo": null,
+   "name_en": "Sberbank ATM — Main building",
+   "address_en": "99 Ryazansky Prospekt, structure 8",
+   "howto_en": "In the Main academic building."
+  },
+  {
+   "id": "atm-a",
+   "group": "other",
+   "short": null,
+   "name": "Банкомат Сбербанка — Административный корпус",
+   "icon": "🏧",
+   "address": "Рязанский проспект, 99, корп. 1",
+   "lat": 55.714157,
+   "lon": 37.817524,
+   "rooms": [],
+   "aliases": [
+    "банкомат",
+    "сбер",
+    "деньги"
+   ],
+   "howto": "В Административном корпусе.",
+   "note": null,
+   "todo": null,
+   "name_en": "Sberbank ATM — Administration building",
+   "address_en": "99 Ryazansky Prospekt, bldg 1",
+   "howto_en": "In the Administration building."
+  },
+  {
+   "id": "pharmacy",
+   "group": "other",
+   "short": null,
+   "name": "Аптека «Горздрав»",
+   "icon": "💊",
+   "address": "ТЦ «Маяк», Рязанский проспект, 99А",
+   "lat": 55.712555,
+   "lon": 37.816416,
+   "rooms": [],
+   "aliases": [
+    "аптека"
+   ],
+   "howto": "За оградой кампуса, у ТЦ «Маяк».",
+   "note": "Ежедневно 9:00–22:00 (по OpenStreetMap).",
+   "todo": null,
+   "name_en": "Gorzdrav pharmacy",
+   "address_en": "Mayak shopping centre, 99A Ryazansky Prospekt",
+   "howto_en": "Outside the campus fence, by the Mayak shopping centre.",
+   "note_en": "Daily 9:00–22:00 (per OpenStreetMap)."
+  },
+  {
+   "id": "post",
+   "group": "other",
+   "short": null,
+   "name": "Почта России 109542",
+   "icon": "✉️",
+   "address": "Рязанский проспект, 97",
+   "lat": 55.714583,
+   "lon": 37.80886,
+   "rooms": [],
+   "aliases": [
+    "почта"
+   ],
+   "howto": "К западу от кампуса, за Главным учебным корпусом.",
+   "note": "Пн–пт 8:00–20:00, сб 9:00–18:00, обед 13:00–14:00 (по OpenStreetMap).",
+   "todo": "проверить адрес",
+   "name_en": "Russian Post 109542",
+   "address_en": "97 Ryazansky Prospekt",
+   "howto_en": "West of the campus, behind the Main academic building.",
+   "note_en": "Mon–Fri 8:00–20:00, Sat 9:00–18:00, lunch break 13:00–14:00 (per OpenStreetMap)."
+  }
+ ]
+}
