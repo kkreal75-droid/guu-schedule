@@ -4,6 +4,7 @@ import { BottomAction } from '../components/BottomAction'
 import { BOT_USERNAME } from '../config'
 import { haptic, openTelegramLink } from '../telegram'
 import { t } from '../i18n'
+import { Icon } from '../icons'
 
 // «Сервисы → Написать в поддержку»: текст уходит автору приложения в бот, ответ придёт в чат с ботом.
 // Поле — серым блоком, «Отправить» — внизу экрана.
@@ -35,7 +36,7 @@ export function SupportPage() {
     return (
       <div className="page-fill">
         <div className="empty">
-          <div className="empty-emoji">💌</div>
+          <Icon name="mail" size={40} strokeWidth={1.5} className="empty-icon" />
           <div className="empty-title">{t('Отправлено')}</div>
           <div className="empty-text">{t('Ответ придёт в чат с ботом. Если ты ещё не писал боту — открой его и нажми «Старт», иначе ответ не дойдёт.')}</div>
           <button type="button" className="link-btn support-again" onClick={() => setSent(false)}>

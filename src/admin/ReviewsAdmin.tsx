@@ -56,7 +56,7 @@ function ReviewList({ reports }: { reports: boolean }) {
   return (
     <>
       {notice}
-      {items.length === 0 && <p className="empty-note">{reports ? 'Жалоб нет 🎉' : 'Отзывов пока нет'}</p>}
+      {items.length === 0 && <p className="empty-note">{reports ? 'Жалоб нет' : 'Отзывов пока нет'}</p>}
       {items.map((r) => (
         <ReviewAdminRow key={r.id} r={r} onDone={done} keepable={reports || r.hidden === 1 || r.reports > 0} />
       ))}

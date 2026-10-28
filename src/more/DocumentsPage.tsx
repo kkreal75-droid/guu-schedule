@@ -8,7 +8,7 @@ import { t, tn } from '../i18n'
 import { sessionPageText } from '../guu'
 
 // «Сервисы → Документы»: исходные таблицы ГУУ, из которых собрано расписание (parse_report.json, update.py).
-// Понятные названия «1 курс, очная» вместо «1 курс бакалавриат офо», у своего файла — «твоя группа» красным.
+// Понятные названия «1 курс, очная» вместо «1 курс бакалавриат офо», у своего файла — серая плашка «твоя группа».
 
 type FileRow = {
   kind: string
@@ -82,7 +82,7 @@ export function DocumentsPage({ group }: { group: string }) {
             {!mine && f.groups ? ` · ${tn(f.groups, '{n} группа|{n} группы|{n} групп')}` : ''}
           </>
         }
-        value="↗"
+        out
         onClick={() => openLink(f.url)}
       />
     )
@@ -112,11 +112,11 @@ export function DocumentsPage({ group }: { group: string }) {
         </Section>
       )}
       <Section>
-        <Row title={t('Страница расписания на guu.ru')} value="↗" onClick={() => openLink('https://guu.ru/student/schedule/')} />
+        <Row title={t('Страница расписания на guu.ru')} out onClick={() => openLink('https://guu.ru/student/schedule/')} />
         <Row
           title={t('Страница сессии на guu.ru')}
           sub={sessionPage ? t('сейчас там {what}', { what: sessionPageText(sessionPage) }) : undefined}
-          value="↗"
+          out
           onClick={() => openLink('https://guu.ru/student/session/')}
         />
       </Section>

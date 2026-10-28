@@ -44,7 +44,7 @@ export function InternationalPage({ onOpen }: { onOpen: (item: 'places' | 'suppo
   return (
     <div className="page-body intl">
       <p className="lead">
-        Welcome to GUU 👋 The official schedule is published in Russian — this app translates it for you. Here’s how to read
+        Welcome to GUU! The official schedule is published in Russian — this app translates it for you. Here’s how to read
         it.
       </p>
 

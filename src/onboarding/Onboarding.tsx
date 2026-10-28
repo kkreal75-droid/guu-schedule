@@ -11,6 +11,7 @@ import { haptic } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { GroupSearch } from './GroupSearch'
 import { Progress } from './Stories'
+import { Icon } from '../icons'
 import { TeacherPicker } from './TeacherPicker'
 import { t, tn } from '../i18n'
 import { instituteShort, trDirection, trInstitute, trProgram, trSubject, trTeacher } from '../guu'
@@ -360,8 +361,8 @@ export function Onboarding({ reason, startSearch, onDone, onCancel }: Props) {
         <p className="ob-text ob-text-s">{t('Покажем пары твоей группы или твои занятия.')}</p>
         {reason && <p className="callout ob-reason">{reason}</p>}
         <div className="list">
-          <Row emoji="🎓" title={t('Учусь')} sub={t('Расписание своей группы')} chevron onClick={() => (haptic(), setScreen('student'))} />
-          <Row emoji="👩‍🏫" title={t('Преподаю')} sub={t('Расписание по своей фамилии')} chevron onClick={() => (haptic(), setScreen('teacher'))} />
+          <Row icon="cap" title={t('Учусь')} sub={t('Расписание своей группы')} chevron onClick={() => (haptic(), setScreen('student'))} />
+          <Row icon="board" title={t('Преподаю')} sub={t('Расписание по своей фамилии')} chevron onClick={() => (haptic(), setScreen('teacher'))} />
         </div>
         <p className="ob-note">{t('Это займёт меньше минуты. Поменять можно в профиле.')}</p>
       </Shell>
@@ -424,9 +425,7 @@ export function Onboarding({ reason, startSearch, onDone, onCancel }: Props) {
       progress={(1 + stepNo) / STAGES}
       top={
         <button type="button" className="search ob-search" onClick={() => (haptic(), setScreen('search'))}>
-          <span className="search-emoji" aria-hidden="true">
-            🔎
-          </span>
+          <Icon name="search" size={18} strokeWidth={2} className="search-icon" />
           <span>{t('Знаю свою группу, найти по названию')}</span>
         </button>
       }

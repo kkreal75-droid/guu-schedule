@@ -11,7 +11,7 @@ import { t, tn } from '../i18n'
 import { trKind, trSubject } from '../guu'
 
 // Меню пары — окно снизу: нажатие на карточку, «···» или долгое нажатие. Сверху ход предмета (этап 12):
-// «Занятие 4 из 8 · осталось 5», красная полоска, недели, последнее занятие и часы. Действия: заметка, «Это не моя
+// «Занятие 4 из 8 · осталось 5», полоска, недели, последнее занятие и часы. Действия: заметка, «Это не моя
 // пара» → скрыть в этот день, по чётным, по нечётным или всегда (только у себя: приложение, календарь, inline).
 // У пары языкового блока потока (lesson.stream) — объяснение, почему у неё несколько окон. В чужом расписании —
 // только детали.
@@ -90,8 +90,8 @@ export function LessonMenu({ lesson, subtitle, week, start, progress, actions = 
 
       {!actions ? null : step === 'menu' ? (
         <div className="list">
-          {onNote && <Row emoji="📝" title={t('Заметка к паре')} chevron onClick={() => (haptic(), onNote())} />}
-          <Row emoji="🙈" title={t('Это не моя пара')} sub={t('Скрыть, если это не твой поток')} chevron onClick={() => (haptic(), setStep('hide'))} />
+          {onNote && <Row icon="pencil" title={t('Заметка к паре')} chevron onClick={() => (haptic(), onNote())} />}
+          <Row icon="eye-off" title={t('Это не моя пара')} sub={t('Скрыть, если это не твой поток')} chevron onClick={() => (haptic(), setStep('hide'))} />
         </div>
       ) : (
         <>

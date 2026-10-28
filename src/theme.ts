@@ -8,8 +8,8 @@ const darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
 export const systemScheme = (): 'light' | 'dark' =>
   inTelegram ? tg!.colorScheme : darkQuery.matches ? 'dark' : 'light'
 
-// У приложения свои цвета (index.css); шапку Telegram красим в верх градиента фона, фон и нижнюю
-// панель Telegram — в цвет экрана
+// У приложения свои цвета (index.css); шапку Telegram красим в верх градиента фона, фон Telegram — в цвет
+// экрана, нижнюю панель — в цвет нижнего меню
 function applyTheme(mode: ThemeMode) {
   const root = document.documentElement
   const scheme = mode === 'system' ? systemScheme() : mode
@@ -18,9 +18,9 @@ function applyTheme(mode: ThemeMode) {
   const css = getComputedStyle(root)
   const color = (name: string) => css.getPropertyValue(name).trim()
   try {
-    tg!.setHeaderColor(color('--bg-top'))
+    tg!.setHeaderColor(color('--bg-tint'))
     tg!.setBackgroundColor(color('--bg'))
-    if (supports('7.10')) tg!.setBottomBarColor(color('--bg'))
+    if (supports('7.10')) tg!.setBottomBarColor(color('--card'))
   } catch {
     // цвет в неожиданном формате — оставим шапку Telegram как есть
   }

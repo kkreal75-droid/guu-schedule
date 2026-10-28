@@ -59,12 +59,12 @@ export function AddFavoriteSheet({ exclude, onPick, onClose }: Props) {
         {(foundGroups.length > 0 || foundTeachers.length > 0) && (
           <div className="list">
             {foundGroups.map((g) => (
-              <Row key={g.id} emoji="👥" title={g.name} lang="ru" sub={<GroupSubtitle group={g} className="gsearch-sub" />} chevron onClick={() => pick(g.id)} />
+              <Row key={g.id} icon="people" title={g.name} lang="ru" sub={<GroupSubtitle group={g} className="gsearch-sub" />} chevron onClick={() => pick(g.id)} />
             ))}
             {foundTeachers.map((teacher) => (
               <Row
                 key={teacher.id}
-                emoji="👩‍🏫"
+                icon="person"
                 title={trTeacher(teacher.name)}
                 sub={<span className="gsearch-sub">{[t('Преподаватель'), ...teacher.subjects.slice(0, 2).map(trSubject)].join(' · ')}</span>}
                 chevron

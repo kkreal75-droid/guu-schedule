@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { normalizeGroup, shortName } from '../../shared/groups'
 import { Row } from '../components/Row'
+import { Icon } from '../icons'
 import { Section } from '../components/Section'
 import { botAvailable, callBot } from '../api'
 import { confirmAction, haptic, openLink } from '../telegram'
@@ -69,8 +70,8 @@ export function CalendarPage({ group }: { group: string }) {
 
       <Section footer={status?.connected ? undefined : t('Работает с Apple и Google Календарём. Отключить можно здесь же.')}>
         <label className="row row-switch">
-          <span className="row-emoji" aria-hidden="true">
-            📅
+          <span className="row-icon">
+            <Icon name="calendar" />
           </span>
           <span className="row-label">
             <span className="row-text">{t('Подключить')}</span>
@@ -91,15 +92,15 @@ export function CalendarPage({ group }: { group: string }) {
           )}
           <Section title={t('Добавить в календарь')} footer={t('Google и iPhone обновляют подписки сами: Google — бывает, что и раз в сутки. Срочные изменения смотрите в боте.')}>
             {/* Telegram открывает только http(s): страница бота сама передаст webcal:// Календарю */}
-            <Row emoji="🍏" title={t('Apple Календарь')} sub={t('iPhone: «Подписаться»')} value="↗" onClick={() => openLink(status.url.replace(/\.ics$/, '/apple'))} />
+            <Row icon="phone" title={t('Apple Календарь')} sub={t('iPhone: «Подписаться»')} out onClick={() => openLink(status.url.replace(/\.ics$/, '/apple'))} />
             <Row
-              emoji="🗓️"
+              icon="calendar"
               title={t('Google Календарь')}
               sub={t('Android: «Добавить»')}
-              value="↗"
+              out
               onClick={() => openLink(`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`)}
             />
-            <Row emoji="🔗" title={copied ? t('Скопировано ✓') : t('Скопировать ссылку')} sub={t('Для других приложений календаря')} onClick={() => copy(status.url)} />
+            <Row icon="link" title={copied ? t('Скопировано') : t('Скопировать ссылку')} sub={t('Для других приложений календаря')} onClick={() => copy(status.url)} />
           </Section>
           <input className="input cal-url" readOnly value={status.url} onFocus={(e) => e.currentTarget.select()} />
         </>

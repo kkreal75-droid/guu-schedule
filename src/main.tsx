@@ -2,8 +2,6 @@ import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { saveFavorites, saveProfile } from './api'
 import { installTelegramMock } from './dev/telegram-mock'
-import '@fontsource/montserrat/cyrillic-800.css'
-import '@fontsource/montserrat/latin-800.css'
 import './index.css'
 import { cachedExtras, rememberExtras, type Extras } from './edits'
 import { rememberHidden } from './hidden'
@@ -186,7 +184,7 @@ async function boot() {
   if (checked?.maintenance) {
     root.render(
       <div className="boot">
-        <p className="boot-title">{t('🛠 Технические работы')}</p>
+        <p className="boot-title">{t('Технические работы')}</p>
         {getLang() === 'en' && checked.maintenanceEn ? (
           <p className="boot-text">{checked.maintenanceEn}</p>
         ) : (

@@ -3,30 +3,33 @@
    src/theme.ts). Светлая тема — по умолчанию, тёмная — :root[data-theme='dark']. Правила — CLAUDE.md → «Дизайн». */
 
 :root {
-  --red: #d92949; /* кнопки, выбранное, текущая пара, ссылки-действия */
-  --red-ink: #b8203c; /* текст на светло-красном */
-  --red-soft: #fcecef; /* блоки с важным, метка «Практика» */
-  --red-track: #f5d3d9; /* дорожка прогресса, полоска слева у карточки пары */
-  --link: #1b3a98; /* только кликабельные преподаватель, аудитория, группа в карточке пары */
-  --text: #1c1c21;
-  --text-2: #6b6b76; /* второстепенный текст */
-  --hint: #a6a6b0; /* подсказки, неактивное, шеврон */
-  --separator: #e7e7ec;
-  --fill: #f3f3f5; /* списки, поля, сегменты, чипы */
-  --chip: #f3f3f5; /* метка «Лекция» и другие серые метки на карточке */
-  --pressed: rgb(28 28 33 / 0.06); /* нажатая строка списка */
-  --card: #ffffff; /* карточка пары */
-  --card-border: #ececf0;
+  --accent: #0e7c8c; /* кнопки, выбранное, полоски прогресса */
+  --accent-text: #0e7c8c; /* ссылки-действия, активный раздел меню, текст и иконки цвета акцента */
+  --accent-ink: #0a5f6b; /* текст на светлом акценте, «ещё 34 мин», крупные цифры */
+  --accent-soft: #e4f2f4; /* маленькие кнопки, выбранные чипы, аватар */
+  --now-bg: #f4f9fa; /* фон текущей пары */
+  --text: #17171a;
+  --text-2: #6e6e73; /* второстепенный текст, иконки */
+  --hint: #a1a1a6; /* подсказки, неактивное, шевроны */
+  --separator: #ececef; /* линии и рамки списков */
+  --card-border: #e8e8eb; /* рамка карточки пары */
+  --fill: #f5f5f7; /* поля ввода, серые блоки */
+  --seg-track: #efeff2; /* дорожка сегментов, серые метки */
+  --track: #ebebef; /* дорожка полоски прогресса */
+  --dot: #c7c7cc; /* точка «в этот день есть пары» */
+  --danger: #d6303f; /* удаление и ошибки */
+  --pressed: rgb(23 23 26 / 0.05); /* нажатая строка списка */
+  --card: #ffffff; /* карточки, списки, окна снизу, нижнее меню */
   --bg: #ffffff;
-  --bg-top: #fbe3e7; /* верх градиента фона и шапка Telegram */
-  --sheet: #ffffff; /* окна снизу */
-  --switch-off: #e3e3e8;
-  --handle: #d6d6dc;
-  --overlay: rgb(28 28 33 / 0.38);
-  --on-red: #ffffff;
+  --bg-tint: #e2eff2; /* верх градиента фона и шапка Telegram */
+  --switch-off: #e5e5ea;
+  --handle: #dadadf;
+  --overlay: rgb(0 0 0 / 0.28);
+  --on-accent: #ffffff;
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 1px rgb(0 0 0 / 0.04); /* «бегунок» сегментов */
+  --glow: 14 124 140; /* цвет свечения карточек пар (RGB акцента) */
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
-  --font-display: Montserrat, var(--font); /* заголовки экранов и дня, время пар, большие цифры — 800 */
 
   --safe-bottom: max(env(safe-area-inset-bottom), var(--tg-safe-area-inset-bottom, 0px));
   --nav-height: calc(49px + var(--safe-bottom));
@@ -34,26 +37,30 @@
 }
 
 :root[data-theme='dark'] {
-  --red: #e8475f;
-  --red-ink: #ff8597;
-  --red-soft: #3a1a21;
-  --red-track: #5a2531;
-  --link: #9db4ff;
-  --text: #f2f2f5;
-  --text-2: #a0a0ab;
-  --hint: #6e6e78;
-  --separator: #2a2a30;
-  --fill: #1e1e23;
-  --chip: #2a2a30;
+  --accent: #0e7c8c;
+  --accent-text: #5cc3cf;
+  --accent-ink: #5cc3cf;
+  --accent-soft: #16363b;
+  --now-bg: #172a2d;
+  --text: #f2f3f5;
+  --text-2: #a2a7ae;
+  --hint: #6d727a;
+  --separator: #2b2e33;
+  --card-border: #2b2e33;
+  --fill: #23262a;
+  --seg-track: #23262a;
+  --track: #2b2e33;
+  --dot: #50555d;
+  --danger: #ff5f6b;
   --pressed: rgb(255 255 255 / 0.06);
-  --card: #1e1e23;
-  --card-border: #2a2a30;
-  --bg: #141417;
-  --bg-top: #2a1418;
-  --sheet: #141417;
-  --switch-off: #3a3a42;
-  --handle: #4a4a52;
-  --overlay: rgb(0 0 0 / 0.55);
+  --card: #1d1f22;
+  --bg: #141517;
+  --bg-tint: #16292c;
+  --switch-off: #3a3e44;
+  --handle: #4a4e55;
+  --overlay: rgb(0 0 0 / 0.5);
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  --glow: 92 195 207;
   color-scheme: dark;
 }
 
@@ -68,11 +75,11 @@ html {
   background: var(--bg);
 }
 
-/* фон экрана: белый, сверху светло-красный градиент на 300 px */
+/* фон экрана: белый, сверху лёгкий бирюзовый градиент на 320 px */
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(180deg, var(--bg-top) 0, var(--bg) 300px) no-repeat, var(--bg);
+  background: linear-gradient(180deg, var(--bg-tint) 0, var(--bg) 320px) no-repeat, var(--bg);
   color: var(--text);
   font: 15px/1.35 var(--font);
   -webkit-font-smoothing: antialiased;
@@ -89,7 +96,7 @@ button {
 }
 
 button:focus-visible {
-  outline: 2px solid var(--red);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
 
@@ -100,7 +107,7 @@ p {
 }
 
 a {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .app {
@@ -135,8 +142,8 @@ a {
 }
 
 .boot-title {
-  font: 800 22px/1.2 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 22px/1.2 var(--font);
+  letter-spacing: -0.02em;
   color: var(--text);
 }
 
@@ -144,8 +151,8 @@ a {
   height: 50px;
   padding: 0 24px;
   border-radius: 12px;
-  background: var(--red);
-  color: var(--on-red);
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 600;
 }
@@ -164,46 +171,33 @@ a {
 
 /* ---------- заголовки ---------- */
 
-/* Montserrat 800: заголовок экрана 28 px */
+/* заголовок экрана 28 px / 700 */
 .screen-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 18px 4px;
+  padding: 12px 16px 4px;
 }
 
 .screen-title {
   margin: 0;
-  font: 800 28px/1.15 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 28px/1.18 var(--font);
+  letter-spacing: -0.02em;
 }
 
-/* подпись группы в списках: заглавные, разрядка, красный квадрат слева */
+/* подпись группы в списках: 13 px / 500 серым, обычными буквами */
 .section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 2px 8px;
-  font-size: 12px;
-  font-weight: 600;
+  margin: 0 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.3;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text-2);
-}
-
-.section-title::before {
-  content: '';
-  flex: none;
-  width: 6px;
-  height: 6px;
-  background: var(--red);
 }
 
 /* ---------- кнопки ---------- */
 
-/* одна кнопка на всё приложение: красная 50 px */
+/* основная кнопка: акцент, белый текст 16/600, высота 50, скругление 14 */
 .button-primary {
   display: flex;
   align-items: center;
@@ -212,9 +206,9 @@ a {
   width: 100%;
   min-height: 50px;
   padding: 0 16px;
-  border-radius: 12px;
-  background: var(--red);
-  color: var(--on-red);
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 16px;
   font-weight: 600;
   text-align: center;
@@ -230,18 +224,18 @@ a {
   cursor: default;
 }
 
-/* маленькая красная кнопка 32 px */
+/* маленькая кнопка: светлый акцент, текст тёмного акцента 14/600, высота 34, скругление 10 */
 .button-small {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
+  height: 34px;
   padding: 0 12px;
-  border-radius: 9px;
-  background: var(--red);
-  color: var(--on-red);
-  font-size: 13.5px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -250,17 +244,17 @@ a {
   opacity: 0.45;
 }
 
-/* второстепенное действие — красная текстовая ссылка 15/600 */
+/* ссылка-действие: цвет акцента 15/500; серая — «Пропустить», «Другая группа» */
 .button-secondary,
 .link-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   padding: 6px 0;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--red);
+  font-weight: 500;
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -268,6 +262,10 @@ a {
   display: flex;
   width: 100%;
   min-height: 44px;
+}
+
+.link-btn-gray {
+  color: var(--text-2);
 }
 
 .button-secondary:disabled,
@@ -284,28 +282,30 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   margin-top: auto;
-  padding: 12px 16px calc(12px + var(--safe-bottom));
+  padding: 10px 16px calc(10px + var(--safe-bottom));
   background: var(--bg);
 }
 
 /* ---------- списки ---------- */
 
 .section {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
+/* белый блок с рамкой 1 px, скругление 16 */
 .section-body,
 .list {
-  border-radius: 14px;
-  background: var(--fill);
+  border: 1px solid var(--separator);
+  border-radius: 16px;
+  background: var(--card);
   overflow: hidden;
 }
 
 /* подсказка под списком */
 .section-footer {
-  margin: 6px 2px 0;
+  margin: 6px 4px 0;
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--hint);
@@ -319,7 +319,7 @@ a {
   gap: 12px;
   width: 100%;
   min-height: 50px;
-  padding: 10px 14px;
+  padding: 11px 16px;
   font-size: 16px;
   line-height: 1.3;
   text-align: left;
@@ -349,13 +349,106 @@ a {
   justify-content: flex-start;
 }
 
-/* эмодзи слева: 21 px в колонке 28 px */
-.row-emoji {
+/* иконка слева: 22 px в колонке 26 px */
+.row-icon {
   flex: none;
-  width: 28px;
-  font-size: 21px;
-  line-height: 1;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  width: 26px;
+  color: var(--text-2);
+}
+
+/* цветная иконка на светлой плашке 30 px (список «Сервисов») */
+.row-icon[data-tone] {
+  align-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgb(var(--tone) / 0.12);
+  color: rgb(var(--tone));
+}
+
+.row-icon[data-tone='teal'] {
+  --tone: 14 124 140;
+}
+
+.row-icon[data-tone='green'] {
+  --tone: 38 138 98;
+}
+
+.row-icon[data-tone='blue'] {
+  --tone: 47 111 179;
+}
+
+.row-icon[data-tone='indigo'] {
+  --tone: 88 92 196;
+}
+
+.row-icon[data-tone='violet'] {
+  --tone: 136 88 192;
+}
+
+.row-icon[data-tone='amber'] {
+  --tone: 196 132 22;
+}
+
+.row-icon[data-tone='coral'] {
+  --tone: 208 102 72;
+}
+
+.row-icon[data-tone='rose'] {
+  --tone: 194 78 122;
+}
+
+.row-icon[data-tone='slate'] {
+  --tone: 91 107 124;
+}
+
+
+:root[data-theme='dark'] .row-icon[data-tone] {
+  background: rgb(var(--tone) / 0.18);
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='teal'] {
+  --tone: 92 195 207;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='green'] {
+  --tone: 96 199 150;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='blue'] {
+  --tone: 128 174 232;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='indigo'] {
+  --tone: 156 160 240;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='violet'] {
+  --tone: 186 148 232;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='amber'] {
+  --tone: 228 178 84;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='coral'] {
+  --tone: 236 146 118;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='rose'] {
+  --tone: 228 136 172;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='slate'] {
+  --tone: 156 170 186;
+}
+
+
+.row:has(.row-icon) {
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 
 .row-label {
@@ -369,7 +462,7 @@ a {
 .row-text {
   display: block;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.3;
 }
 
@@ -389,22 +482,24 @@ a {
 }
 
 .row-link {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .row-chevron {
   flex: none;
-  width: 8px;
-  height: 13px;
   color: var(--hint);
 }
 
-/* выбранное — красная галочка */
+/* ↗ — ссылка наружу */
+.row-out {
+  flex: none;
+  color: var(--hint);
+}
+
+/* выбранное — галочка цвета акцента */
 .row-check {
   flex: none;
-  width: 17px;
-  height: 13px;
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .row-switch {
@@ -419,23 +514,6 @@ a {
 
 .section-body .row-chips {
   justify-content: flex-end;
-}
-
-/* поля и чипы внутри серого списка — белые, чтобы их было видно */
-.section-body .input,
-.list .input,
-.section-body .chip,
-.list .chip,
-.section-body .search,
-.list .search {
-  background: var(--bg);
-}
-
-.section-body .chip[aria-pressed='true'],
-.list .chip[aria-pressed='true'],
-.section-body .chip[aria-checked='true'],
-.list .chip[aria-checked='true'] {
-  background: var(--red);
 }
 
 /* абзац текста строкой списка */
@@ -455,7 +533,7 @@ a {
 }
 
 .page-body .section {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .lead {
@@ -465,20 +543,20 @@ a {
   color: var(--text-2);
 }
 
-/* светло-красный блок: важное сообщение, мероприятия дня */
+/* серый блок: важное сообщение, мероприятия дня */
 .callout {
-  padding: 14px;
+  padding: 14px 16px;
   border-radius: 14px;
-  background: var(--red-soft);
+  background: var(--fill);
   font-size: 15px;
   line-height: 1.45;
 }
 
-/* прогресс: дорожка светло-красная, заполнение красное */
+/* полоска прогресса 3 px: акцент на светлой дорожке */
 .progress {
-  height: 5px;
-  border-radius: 3px;
-  background: var(--red-track);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--track);
   overflow: hidden;
 }
 
@@ -486,7 +564,7 @@ a {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--red);
+  background: var(--accent);
 }
 
 /* ---------- поля ---------- */
@@ -517,21 +595,20 @@ a {
   line-height: 1.4;
 }
 
-/* поиск: 🔎 слева, круглый крестик справа */
+/* поиск: лупа слева, круглый серый крестик справа */
 .search {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 44px;
-  padding: 0 10px 0 12px;
+  padding: 0 12px;
   border-radius: 12px;
   background: var(--fill);
 }
 
-.search-emoji {
+.search-icon {
   flex: none;
-  font-size: 16px;
-  line-height: 1;
+  color: var(--hint);
 }
 
 .search-input {
@@ -567,40 +644,44 @@ a {
 }
 
 .search-clear svg {
-  width: 8px;
-  height: 8px;
+  width: 11px;
+  height: 11px;
+  stroke-width: 3;
 }
 
 /* ---------- сегменты, чипы, переключатель ---------- */
 
+/* сегменты как в iOS: серая дорожка, выбранный — белый «бегунок» с тенью */
 .segmented {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
-  padding: 3px;
-  border-radius: 12px;
-  background: var(--fill);
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--seg-track);
 }
 
 .segmented-item {
   min-width: 0;
-  height: 34px;
-  border-radius: 9px;
+  height: 32px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .segmented-item[aria-checked='true'] {
-  background: var(--red);
-  color: var(--on-red);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--text);
   font-weight: 600;
 }
 
+/* чип: белый с рамкой; выбранный — светлый акцент, текст тёмного акцента */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -608,8 +689,9 @@ a {
   gap: 6px;
   height: 34px;
   padding: 0 12px;
+  border: 1px solid var(--separator);
   border-radius: 10px;
-  background: var(--fill);
+  background: var(--card);
   color: var(--text);
   font-size: 14px;
   font-weight: 500;
@@ -618,8 +700,9 @@ a {
 
 .chip[aria-pressed='true'],
 .chip[aria-checked='true'] {
-  background: var(--red);
-  color: var(--on-red);
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -627,9 +710,12 @@ a {
   opacity: 0.45;
 }
 
-.chip-accent,
+.chip-accent {
+  color: var(--accent-text);
+}
+
 .chip-danger {
-  color: var(--red);
+  color: var(--danger);
 }
 
 .switch {
@@ -655,12 +741,12 @@ a {
   height: 27px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
   transition: transform 0.2s;
 }
 
 .switch:checked {
-  background: var(--red);
+  background: var(--accent);
 }
 
 .switch:checked::after {
@@ -693,8 +779,8 @@ a {
   /* клавиатура: окно поднимается над ней (--keyboard, Sheet.tsx) */
   margin-bottom: var(--keyboard, 0px);
   padding: 8px 16px calc(16px + var(--safe-bottom));
-  border-radius: 22px 22px 0 0;
-  background: var(--sheet);
+  border-radius: 16px 16px 0 0;
+  background: var(--card);
   overflow-y: auto;
   overscroll-behavior: contain;
   animation: sheet-up 0.22s ease-out;
@@ -730,14 +816,14 @@ a {
 }
 
 .sheet-title {
-  font: 800 22px/1.2 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 20px/1.25 var(--font);
+  letter-spacing: -0.01em;
 }
 
 .sheet-sub {
   margin-top: 4px;
-  font-size: 15px;
-  line-height: 1.35;
+  font-size: 14px;
+  line-height: 1.4;
   color: var(--text-2);
 }
 
@@ -754,7 +840,7 @@ a {
   height: var(--nav-height);
   padding-bottom: var(--safe-bottom);
   border-top: 1px solid var(--separator);
-  background: var(--bg);
+  background: var(--card);
 }
 
 .tabbar-inner {
@@ -763,32 +849,24 @@ a {
   max-width: 560px;
 }
 
+/* иконка 25 px, подпись 10.5 px; активный раздел — акцент 600, остальные серые */
 .tab {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
-  padding-top: 7px;
-  font-size: 11px;
+  padding-top: 9px;
+  font-size: 10.5px;
   font-weight: 500;
-  color: var(--text-2);
-}
-
-.tab-emoji {
-  font-size: 23px;
-  line-height: 1;
-  opacity: 0.55;
+  letter-spacing: 0.01em;
+  color: var(--hint);
 }
 
 .tab[aria-current='true'] {
   font-weight: 600;
-  color: var(--red);
-}
-
-.tab[aria-current='true'] .tab-emoji {
-  opacity: 1;
+  color: var(--accent-text);
 }
 
 /* «Пара скрыта · Вернуть» над нижним меню */
@@ -807,7 +885,7 @@ a {
   margin: 0 auto;
   padding: 10px 12px 10px 16px;
   border-radius: 14px;
-  background: rgb(28 28 33 / 0.94);
+  background: rgb(23 23 26 / 0.94);
   color: #fff;
   font-size: 14px;
   animation: fade-in 0.15s ease-out;
@@ -817,7 +895,7 @@ a {
   flex: none;
   font-size: 14px;
   font-weight: 600;
-  color: #ff8597;
+  color: #5cc3cf;
 }
 
 /* ---------- экран расписания ---------- */
@@ -826,46 +904,67 @@ a {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 4px 16px 0;
+  padding: 6px 16px 0;
 }
 
-/* заголовок — дата Montserrat 22/800, справа 📝 (заметка к дню) и 🗓️ (выбор даты) */
+/* шапка: дата 24/700 со стрелкой вниз (открывает выбор даты), справа заметка к дню */
 .sched-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 4px 2px 8px;
+  margin: 2px 0 6px;
 }
 
 .sched-date {
+  position: relative;
   min-width: 0;
   margin: 0;
-  font: 800 22px/1.2 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 24px/1.2 var(--font);
+  letter-spacing: -0.02em;
+}
+
+.sched-date-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.sched-date-btn > span {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sched-actions {
-  position: relative;
+.sched-date-arrow {
   flex: none;
-  display: flex;
-  gap: 14px;
+  margin-top: 3px;
+  color: var(--text-2);
 }
 
 .sched-act {
-  font-size: 21px;
-  line-height: 1;
+  flex: none;
+  display: flex;
+  margin: -6px;
+  padding: 6px;
+  color: var(--text-2);
 }
 
-/* вкладки избранного: активная — жирная с красной линией 2.5 px, справа красный «+» */
+/* есть заметка к дню — иконка цвета акцента */
+.sched-act-on {
+  color: var(--accent-text);
+}
+
+/* вкладки избранного: активная — тёмная 600 с линией акцента 2 px, остальные серые, справа серый «+» */
 .fav-tabs {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin: 0 2px 12px;
+  gap: 22px;
+  margin: 0 0 14px;
   border-bottom: 1px solid var(--separator);
   overflow-x: auto;
   scrollbar-width: none;
@@ -877,11 +976,12 @@ a {
 
 .fav-tab {
   flex: none;
-  padding: 7px 0 6px;
-  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 0 7px;
+  border-bottom: 2px solid transparent;
   font-size: 15px;
   font-weight: 500;
-  color: var(--text-2);
+  color: var(--hint);
   white-space: nowrap;
   -webkit-user-select: none;
   user-select: none;
@@ -889,15 +989,15 @@ a {
 }
 
 .fav-tab[aria-checked='true'] {
-  border-bottom-color: var(--red);
-  font-weight: 700;
+  border-bottom-color: var(--accent);
+  font-weight: 600;
   color: var(--text);
 }
 
 /* поднятая для перестановки вкладка */
 .fav-tab[data-lifted] {
   transform: scale(1.06);
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .fav-tabs[data-dragging] {
@@ -906,24 +1006,23 @@ a {
 
 .fav-add {
   flex: none;
-  padding: 4px 0;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--red);
+  display: flex;
+  padding: 6px 0;
+  color: var(--hint);
 }
 
-/* «8 неделя, чётная · 19–25 октября» со стрелками */
+/* «8 неделя, чётная · 19–25 октября» со стрелками ‹ › */
 .week-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 2px 6px;
+  margin: 0 0 8px;
 }
 
 .week-arrow {
   display: flex;
   padding: 4px 8px;
-  color: var(--text);
+  color: var(--hint);
 }
 
 .week-arrow:first-child {
@@ -935,71 +1034,64 @@ a {
 }
 
 .week-arrow:disabled {
-  color: var(--hint);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .week-title {
   min-width: 0;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-2);
   text-align: center;
 }
 
-/* дни сеткой: выбранный — красный квадрат, сегодня — красное число, воскресенье серое */
+/* дни: выбранный — круг 34 px цвета акцента, сегодня — число цвета акцента, воскресенье серое */
 .day-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .day {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 6px 0 4px;
-  border-radius: 12px;
+  gap: 3px;
   color: var(--text);
 }
 
 .day-wd {
-  font-size: 11px;
-  color: var(--text-2);
+  font-size: 11.5px;
+  color: var(--hint);
 }
 
 .day-num {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
-.day[data-sunday] .day-wd,
 .day[data-sunday] .day-num {
   color: var(--hint);
 }
 
 .day[data-today] .day-num {
-  color: var(--red);
+  font-weight: 600;
+  color: var(--accent-text);
 }
 
-.day[aria-selected='true'] {
-  background: var(--red);
-  color: var(--on-red);
-}
-
-.day[aria-selected='true'] .day-wd,
 .day[aria-selected='true'] .day-num {
-  color: var(--on-red);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
-.day[aria-selected='true'] .day-wd {
-  opacity: 0.85;
-}
-
-/* точки: есть пары, есть заметка */
+/* точки 4 px: серая — есть пары, цвета акцента — есть заметка */
 .day-dots {
   display: flex;
   gap: 3px;
@@ -1010,33 +1102,28 @@ a {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--hint);
+  background: var(--dot);
 }
 
 .day-dot-note {
-  background: var(--red);
+  background: var(--accent);
 }
 
-.day[aria-selected='true'] .day-dot {
-  background: var(--on-red);
-  opacity: 0.7;
-}
-
-/* «4 пары, с 9:00 до 16:05» и «Сегодня» справа */
+/* «4 пары · с 9:00 до 16:05» и «Сегодня» справа */
 .day-sub {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 20px;
-  margin: 0 2px 8px;
-  font-size: 13.5px;
+  min-height: 18px;
+  margin: 0 0 12px;
+  font-size: 13px;
   color: var(--text-2);
 }
 
 .day-today {
   padding: 0;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .content {
@@ -1048,7 +1135,7 @@ a {
 .day-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
 }
 
@@ -1086,29 +1173,21 @@ a {
   flex-direction: column;
 }
 
-/* «Перерыв 10 мин» по центру, тонкие линии по бокам */
+/* «Перерыв 10 мин» — 12.5 px светло-серым по центру */
 .gap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 6px 10px;
-  font-size: 13px;
+  padding: 0 0 7px;
+  font-size: 12.5px;
   color: var(--hint);
-}
-
-.gap::before,
-.gap::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--separator);
+  text-align: center;
 }
 
 /* заметка ко дню и пометки из админки — над парами */
 .day-note {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 14px;
   background: var(--fill);
   font-size: 14px;
@@ -1119,54 +1198,90 @@ a {
   overflow-wrap: anywhere;
 }
 
+.day-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 /* ---------- карточка пары ---------- */
 
+/* все карточки одного размера: белая, скругление 16, рамка 1 px, мягкое свечение снизу; текущая — рамка 1.5 px
+   цвета акцента, светлый фон, полоска по низу и пульсирующее свечение; прошедшие — бледнее */
 .lesson {
   position: relative;
-  padding: 12px 14px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 130px;
+  padding: 13px 16px 16px;
   border: 1px solid var(--card-border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--card);
+  box-shadow:
+    0 1px 2px rgb(var(--glow) / 0.05),
+    0 8px 20px -12px rgb(var(--glow) / 0.35);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-}
-
-/* полоска слева: светло-красная, у текущей пары — красная */
-.lesson::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: 14px;
-  bottom: 14px;
-  width: 4px;
-  border-radius: 0 3px 3px 0;
-  background: var(--red-track);
+  transition: transform 0.15s ease-out;
 }
 
 .lesson[data-clickable] {
   cursor: pointer;
 }
 
-.lesson.is-live {
-  border: 2px solid var(--red);
-  padding: 11px 13px 11px 17px;
+.lesson[data-clickable]:active {
+  transform: scale(0.985);
 }
 
-.lesson.is-live::before {
-  left: -2px;
-  top: 13px;
-  bottom: 13px;
-  background: var(--red);
+.lesson.is-live {
+  padding: 12.5px 15.5px 17.5px;
+  border: 1.5px solid var(--accent);
+  background: var(--now-bg);
+  animation: live-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes live-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(var(--glow) / 0.1),
+      0 8px 22px -10px rgb(var(--glow) / 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgb(var(--glow) / 0.08),
+      0 12px 30px -8px rgb(var(--glow) / 0.6);
+  }
 }
 
 .lesson.is-past {
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .lesson.is-cancelled .lesson-subject {
   text-decoration: line-through;
   color: var(--text-2);
+}
+
+/* карточки появляются по очереди */
+.day-item {
+  animation: card-in 0.35s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson.is-live,
+  .day-item {
+    animation: none;
+  }
 }
 
 .lesson-head {
@@ -1176,118 +1291,123 @@ a {
 }
 
 .lesson-start {
-  font: 800 24px/1.15 var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .lesson-end {
   font-size: 15px;
   color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.lesson-pair {
+.lesson-pair,
+.lesson-status {
   margin-left: 4px;
   font-size: 13px;
   color: var(--hint);
   white-space: nowrap;
 }
 
+/* «через 1 ч 19 мин» — серым, «ещё 34 мин» — тёмным акцентом */
+.lesson-status {
+  color: var(--text-2);
+}
+
+.lesson-status-live {
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
 .lesson-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-left: auto;
   align-self: center;
 }
 
 .lesson-act {
-  margin: -6px;
-  padding: 6px;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.lesson-dots {
-  font-size: 17px;
-  letter-spacing: 1px;
+  display: flex;
+  margin: -7px;
+  padding: 7px;
   color: var(--hint);
 }
 
-.lesson-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
+/* предмет — не длиннее двух строк */
+.lesson-subject {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.32;
+}
+
+/* английская версия: оригинальное название под переводом */
+.lesson-subject-ru {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* «Практика · Яценко О.Ю. · У-448/516» — внизу карточки */
+.lesson-meta {
+  margin: auto 0 0;
+  padding-top: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.lesson-kind,
+.lesson-sep {
+  color: var(--hint);
+}
+
+.lesson-link {
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.lesson-room {
+  white-space: nowrap;
 }
 
 .lesson-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 8px;
 }
 
-/* метка: лекция — серая, практика — светло-красная, остальное — белая с красной рамкой */
+/* маленькая серая плашка: «последнее занятие», подгруппа, «твоя группа» */
+.tag,
 .badge {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 7px;
-  background: var(--chip);
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--seg-track);
   color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.badge-practice {
-  background: var(--red-soft);
-  color: var(--red-ink);
-}
-
-.badge-other {
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--red-track);
-  color: var(--red-ink);
-}
-
-.lesson-subject {
-  margin: 0;
-  font-size: 16.5px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-/* английская версия: оригинальное название под переводом */
-.lesson-subject-ru {
-  margin-top: -4px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-/* синие ссылки: преподаватель, аудитория, группы */
-.lesson-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 14px;
-  color: var(--link);
-}
-
-.lesson-link {
-  color: var(--link);
-  text-align: left;
-}
-
-.lesson-group {
-  color: var(--link);
-}
-
-.lesson-emoji {
-  margin-right: 5px;
-}
-
 .lesson-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
   font-size: 14px;
   line-height: 1.4;
   color: var(--text-2);
@@ -1296,46 +1416,42 @@ a {
   overflow-wrap: anywhere;
 }
 
+.lesson-line svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--hint);
+}
+
+/* своя заметка к паре — одной строкой */
+.lesson-note > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button.lesson-hint {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
 
+/* отмена и перенос */
 .lesson-cancel {
+  margin-top: 4px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--red);
+  color: var(--danger);
 }
 
-/* следующая пара: «через 1 ч 19 мин» */
-.lesson-soon {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--red);
+/* текущая пара: полоска по низу карточки */
+.lesson-bar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 8px;
 }
 
-/* текущая пара: разделитель, красная полоска и «⏳ 34 мин» */
-.lesson-live {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--separator);
-}
-
-.lesson-live .progress {
-  flex: 1;
-}
-
-.lesson-timer {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--red);
-  white-space: nowrap;
-}
-
-/* «Выходной» по центру свободного места */
+/* «Выходной»: 😎 40 px, «Выходной» 20/700, под ним причина и мелко «Обновлено …» — по центру свободного места */
 .empty {
   display: flex;
   flex-direction: column;
@@ -1348,31 +1464,36 @@ button.lesson-hint {
 }
 
 .empty-emoji {
-  font-size: 48px;
+  font-size: 40px;
   line-height: 1;
+}
+
+/* иконка вместо эмодзи (поддержка: «Отправлено») */
+.empty-icon {
+  color: var(--accent-text);
 }
 
 .empty-title {
   margin-top: 12px;
-  font: 800 22px/1.2 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 20px/1.25 var(--font);
+  letter-spacing: -0.01em;
 }
 
 .empty-text {
-  margin-top: 6px;
-  font-size: 15px;
+  margin-top: 4px;
+  font-size: 14px;
   color: var(--text-2);
 }
 
 .empty-updated {
-  margin-top: 14px;
+  margin-top: 10px;
   font-size: 12.5px;
   color: var(--hint);
 }
 
 /* ---------- меню пары (окно снизу) ---------- */
 
-/* ход предмета: «Занятие 4 из 8 · осталось 5», полоска 4 px, недели и часы */
+/* ход предмета: «Занятие 4 из 8 · осталось 5», полоска 3 px, недели и часы */
 .course-progress {
   margin-bottom: 12px;
   padding: 12px 14px;
@@ -1395,7 +1516,7 @@ button.lesson-hint {
 }
 
 .course-progress-bar {
-  height: 4px;
+  height: 3px;
 }
 
 .course-progress-sub {
@@ -1497,69 +1618,48 @@ button.lesson-hint {
 
 /* ---------- мероприятия make.events ---------- */
 
-/* «Проектное обучение» — светло-красный блок в конце дня */
+/* «Проектное обучение» в конце дня: заголовок, время, полный список мероприятий дня */
 .project {
-  margin-top: 0;
+  margin-top: 8px;
 }
 
 .project-title {
-  margin: 0 0 2px;
+  margin: 0 4px 2px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .project-sub {
-  margin: 0 0 10px;
+  margin: 0 4px 10px;
   font-size: 13px;
   color: var(--text-2);
 }
 
-.project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.project-line {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.35;
-}
-
-.project-event,
-.project-more {
-  cursor: pointer;
-}
-
-.project-more {
-  color: var(--text-2);
-}
-
 .project-status {
-  margin: 0;
+  margin: 0 4px;
   font-size: 14px;
   color: var(--text-2);
 }
 
 .project-all {
-  margin-top: 10px;
+  margin: 10px 4px 0;
   padding: 0;
   font-size: 14px;
 }
 
-/* строка списка мероприятий */
+/* строка списка мероприятий: время и место серой строкой, название, описание */
 .event-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  padding: 12px 14px;
+  padding: 13px 16px;
 }
 
 .event-when {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--red);
+  font-weight: 500;
+  color: var(--text-2);
 }
 
 .event-title {
@@ -1579,8 +1679,17 @@ button.lesson-hint {
 }
 
 .event-place {
-  margin: 0 0 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0;
   font-size: 15px;
+}
+
+.event-place svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-2);
 }
 
 .event-text {
@@ -1630,7 +1739,7 @@ button.lesson-hint {
   margin: 6px 2px 10px;
 }
 
-/* «К» в красном круге, имя, @ник · группа */
+/* «К» в круге светлого акцента, имя, @ник · группа */
 .user-card {
   display: flex;
   align-items: center;
@@ -1646,12 +1755,13 @@ button.lesson-hint {
   object-fit: cover;
 }
 
+/* аватар без фото: светлый акцент, буква тёмного акцента */
 .avatar-initials {
   display: grid;
   place-items: center;
-  background: var(--red);
-  color: var(--on-red);
-  font: 800 22px/1 var(--font-display);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: 600 22px/1 var(--font);
 }
 
 .user-text {
@@ -1747,8 +1857,8 @@ button.lesson-hint {
 /* заголовок вложенной страницы: Montserrat 26/800; «Назад» — кнопкой Telegram */
 .page-title {
   margin: 8px 2px 4px;
-  font: 800 26px/1.15 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 26px/1.15 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .page-lead {
@@ -1771,10 +1881,15 @@ button.lesson-hint {
   font-size: 13px;
 }
 
+/* удаление и ошибки — красным (только там) */
 .form-error {
   margin: 0 4px;
   font-size: 14px;
-  color: var(--red);
+  color: var(--danger);
+}
+
+.text-danger {
+  color: var(--danger);
 }
 
 /* ---------- пустой список, короткое сообщение ---------- */
@@ -1802,7 +1917,7 @@ button.lesson-hint {
   white-space: pre-wrap;
 }
 
-/* объявление из админки над расписанием — светло-красный блок с крестиком */
+/* объявление из админки над расписанием — блок светлого акцента с крестиком */
 .notice-bar {
   display: flex;
   align-items: center;
@@ -1810,7 +1925,7 @@ button.lesson-hint {
   margin: 8px 16px 0;
   padding: 10px 8px 10px 14px;
   border-radius: 14px;
-  background: var(--red-soft);
+  background: var(--accent-soft);
   font-size: 14px;
   line-height: 1.4;
 }
@@ -1851,7 +1966,7 @@ button.lesson-hint {
   margin-top: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 /* ---------- админ-панель ---------- */
@@ -1884,7 +1999,7 @@ button.lesson-hint {
 }
 
 .stat-value {
-  font: 800 22px/1.2 var(--font-display);
+  font: 700 22px/1.2 var(--font);
   letter-spacing: -0.01em;
 }
 
@@ -1930,7 +2045,7 @@ button.lesson-hint {
   width: 100%;
   min-height: 2px;
   border-radius: 3px 3px 0 0;
-  background: var(--red);
+  background: var(--accent);
 }
 
 .chart-bar[data-zero] {
@@ -2007,18 +2122,18 @@ select.input {
   min-width: 0;
 }
 
-/* действие рядом с полем («Добавить», «Удалить») — красной ссылкой, серых кнопок нет */
+/* действие рядом с полем («Добавить», «Удалить») — ссылкой, серых кнопок нет */
 .button-inline {
   flex: none;
   padding: 0 6px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .danger,
 .button-inline.danger {
-  color: var(--red);
+  color: var(--danger);
 }
 
 .row-value-wrap {
@@ -2147,7 +2262,7 @@ select.input {
 }
 
 .preview-link {
-  color: var(--red);
+  color: var(--accent-text);
   text-decoration: underline;
 }
 
@@ -2158,7 +2273,7 @@ select.input {
 }
 
 .link-btn.danger {
-  color: var(--red);
+  color: var(--danger);
 }
 
 .button-inline {
@@ -2171,7 +2286,7 @@ select.input {
   margin-right: 4px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--chip);
+  background: var(--seg-track);
   color: var(--text-2);
   font-size: 11px;
   font-weight: 600;
@@ -2210,16 +2325,16 @@ select.input {
 .ob-progress {
   flex: none;
   height: 3px;
-  margin: 2px 0 12px;
+  margin: 2px 0 10px;
   border-radius: 2px;
-  background: var(--red-track);
+  background: var(--track);
   overflow: hidden;
 }
 
 .ob-progress > span {
   display: block;
   height: 100%;
-  background: var(--red);
+  background: var(--accent);
   transition: width 0.25s ease-out;
 }
 
@@ -2260,15 +2375,15 @@ select.input {
 }
 
 .ob-emoji {
-  margin: 0 0 14px;
-  font-size: 52px;
+  margin: 0 0 16px;
+  font-size: 40px;
   line-height: 1;
 }
 
 .ob-title {
-  margin: 0 0 10px;
-  font: 800 28px/1.15 var(--font-display);
-  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+  font: 700 26px/1.18 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .ob-title-m {
@@ -2315,13 +2430,13 @@ select.input {
 }
 
 .ob-overline-red {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .ob-name {
   margin: 4px 0 12px;
-  font: 800 30px/1.15 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 30px/1.15 var(--font);
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
@@ -2364,8 +2479,8 @@ select.input {
 /* экраны поиска: заголовок сверху, поле, результаты */
 .ob-top-title {
   margin: 0 0 12px;
-  font: 800 26px/1.15 var(--font-display);
-  letter-spacing: -0.015em;
+  font: 700 26px/1.15 var(--font);
+  letter-spacing: -0.02em;
 }
 
 .ob-top-text {
@@ -2522,7 +2637,7 @@ select.input {
 
 /* период, который идёт сейчас */
 .row.is-now .row-text {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 /* ---------- расписание группы и преподавателя в «Сервисах» ---------- */
@@ -2593,8 +2708,8 @@ select.input {
 }
 
 .rooms-free {
-  font: 800 34px/1.1 var(--font-display);
-  color: var(--red);
+  font: 700 34px/1.1 var(--font);
+  color: var(--accent-ink);
 }
 
 .rooms-total {
@@ -2647,8 +2762,8 @@ select.input {
 }
 
 .badge-edit {
-  background: var(--red-soft);
-  color: var(--red-ink);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 
 .badge-sub {
@@ -2708,7 +2823,7 @@ select.input {
   margin: 0 2px 8px;
 }
 
-/* оценки по критериям и распределение — красными полосками */
+/* оценки по критериям и распределение — полосками цвета акцента */
 .score-row {
   gap: 10px;
   min-height: 40px;
@@ -2817,16 +2932,26 @@ select.input {
 }
 
 .vote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 30px;
   padding: 0 10px;
+  border: 1px solid var(--separator);
   border-radius: 9px;
-  background: var(--bg);
+  background: var(--card);
+  color: var(--text-2);
   font-size: 13px;
 }
 
+.icon-flip {
+  transform: scaleY(-1);
+}
+
 .vote-btn[aria-pressed='true'] {
-  background: var(--red-soft);
-  color: var(--red-ink);
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 
 .review-report {
@@ -2873,19 +2998,23 @@ select.input {
   gap: 5px;
 }
 
+/* цифры 1–5 в квадратиках 28 px с рамкой; выбранная — цвета акцента */
 .score-btn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--separator);
   border-radius: 8px;
-  background: var(--bg);
+  background: var(--card);
+  color: var(--text-2);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .score-btn[aria-checked='true'] {
-  background: var(--red);
-  color: var(--on-red);
-  font-weight: 700;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
 /* строка-выбор: невидимый системный список поверх строки */
@@ -2913,7 +3042,7 @@ select.input {
   margin-top: -4px;
 }
 
-/* галочка: красный квадрат 20×20 */
+/* галочка: квадрат 20×20, отмеченная — цвета акцента */
 .check-row {
   position: relative;
   display: flex;
@@ -2937,7 +3066,8 @@ select.input {
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  background: var(--switch-off);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1.5px var(--dot);
   color: transparent;
 }
 
@@ -2947,12 +3077,13 @@ select.input {
 }
 
 .check:checked + .check-box {
-  background: var(--red);
-  color: var(--on-red);
+  background: var(--accent);
+  box-shadow: none;
+  color: var(--on-accent);
 }
 
 .check:focus-visible + .check-box {
-  outline: 2px solid var(--red);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
 
@@ -3048,12 +3179,19 @@ body[data-no-tabbar] .app > .screen {
 
 /* ---------- документы ---------- */
 
-/* «твоя группа» красным после названия файла */
+/* «твоя группа» — маленькой серой плашкой после названия файла */
 .doc-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
   margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--seg-track);
+  color: var(--text-2);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--red);
+  font-weight: 500;
+  vertical-align: 1px;
   white-space: nowrap;
 }
 
@@ -3068,7 +3206,7 @@ body[data-no-tabbar] .app > .screen {
   font-size: 15px;
 }
 
-/* пункты с красным квадратом */
+/* пункты с серой точкой */
 .bullets {
   display: flex;
   flex-direction: column;
@@ -3089,19 +3227,23 @@ body[data-no-tabbar] .app > .screen {
 .bullets li::before {
   content: '';
   flex: none;
-  width: 6px;
-  height: 6px;
-  margin-top: 8px;
-  background: var(--red);
+  width: 5px;
+  height: 5px;
+  margin-top: 8.5px;
+  border-radius: 50%;
+  background: var(--hint);
 }
 
-/* шаги настройки красными цифрами */
+/* шаги настройки пронумерованы */
 .step-no {
-  font-weight: 700;
-  color: var(--red);
+  flex: none;
+  width: 26px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
 }
 
-/* вопросы одним списком: «+» серый, у открытого — красный «−» */
+/* вопросы одним списком: «+» серый, у открытого — «−» цвета акцента */
 .faq-item + .faq-item {
   border-top: 1px solid var(--separator);
 }
@@ -3137,7 +3279,7 @@ body[data-no-tabbar] .app > .screen {
 
 .faq-item[open] .faq-q::after {
   content: '−';
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .faq-a {
@@ -3182,7 +3324,7 @@ body[data-no-tabbar] .app > .screen {
   --map-rail: #a6a6b0;
   --map-building: #d7d8de;
   --map-uni: #c6d8f0;
-  --map-pin: var(--red);
+  --map-pin: var(--accent);
 }
 
 :root[data-theme='dark'] {
@@ -3276,7 +3418,7 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .place-howto li::marker {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .place-address,
@@ -3284,6 +3426,17 @@ body[data-no-tabbar] .app > .screen {
   font-size: 14px;
   line-height: 1.45;
   color: var(--text-2);
+}
+
+.place-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.place-address svg {
+  flex: none;
+  margin-top: 1px;
 }
 
 .place-apps {
@@ -3371,7 +3524,7 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .cm-focus {
-  fill: var(--red);
+  fill: var(--accent-text);
   fill-opacity: 0.85;
 }
 
@@ -3394,13 +3547,24 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .cm-label-focus {
-  fill: var(--on-red);
-  stroke: var(--red);
+  fill: var(--on-accent);
+  stroke: var(--accent);
 }
 
-.cm-emoji {
-  fill: var(--red);
+/* метро — красный круг с белой «М» */
+.cm-metro circle {
+  fill: #d6303f;
+  stroke: #fff;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.cm-metro text {
+  fill: #fff;
   font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
 }
 
 .cm-pin path {
@@ -3450,9 +3614,9 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .cd-number {
-  font: 800 60px/1 var(--font-display);
+  font: 700 56px/1 var(--font);
   letter-spacing: -0.02em;
-  color: var(--red);
+  color: var(--accent-ink);
 }
 
 .cd-label {
@@ -3466,9 +3630,9 @@ body[data-no-tabbar] .app > .screen {
 
 .cd-today {
   margin: 4px 2px 2px;
-  font: 800 22px/1.25 var(--font-display);
-  letter-spacing: -0.015em;
-  color: var(--red);
+  font: 700 22px/1.25 var(--font);
+  letter-spacing: -0.02em;
+  color: var(--accent-text);
 }
 
 .cd-progress {
@@ -3582,7 +3746,7 @@ body[data-no-tabbar] .app > .screen {
 }
 
 .intl-link-title {
-  color: var(--red);
+  color: var(--accent-text);
 }
 
 .intl-link-sub {

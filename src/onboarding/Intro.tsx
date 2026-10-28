@@ -15,6 +15,7 @@ import { haptic, telegramLang } from '../telegram'
 import { useBackButton } from '../useBackButton'
 import { GroupFacts, Onboarding, Shell, type Choice } from './Onboarding'
 import { Stories, StoryEmoji, type Story } from './Stories'
+import type { IconName } from '../icons'
 import { trTeacher } from '../guu'
 
 // ---------- истории автора (тексты — от владельца, менять только опечатки) ----------
@@ -48,9 +49,9 @@ const author = (): Story[] => [
 // нажатие на строку — сразу показывает интерфейс на этом языке, «Далее» — сохраняет выбор
 function LanguagePicker({ onDone }: { onDone: (lang: Lang) => void }) {
   const lang = useLang()
-  const options: { lang: Lang; flag: string; label: string }[] = [
-    { lang: 'ru', flag: '🇷🇺', label: 'Русский' }, // i18n-ignore — название языка на нём самом
-    { lang: 'en', flag: '🇬🇧', label: 'English' },
+  const options: { lang: Lang; label: string }[] = [
+    { lang: 'ru', label: 'Русский' }, // i18n-ignore — название языка на нём самом
+    { lang: 'en', label: 'English' },
   ]
   return (
     <Shell
@@ -60,13 +61,12 @@ function LanguagePicker({ onDone }: { onDone: (lang: Lang) => void }) {
         </button>
       }
     >
-      <StoryEmoji emoji="🌐" />
       {/* i18n-ignore — на обоих языках */}
       <h1 className="ob-title ob-title-lang">Выбери язык</h1>
       <p className="ob-text ob-text-s">Choose language</p>
       <div className="list">
         {options.map((o) => (
-          <Row key={o.lang} emoji={o.flag} title={o.label} check={lang === o.lang} onClick={() => (haptic(), setLang(o.lang))} />
+          <Row key={o.lang} title={o.label} check={lang === o.lang} onClick={() => (haptic(), setLang(o.lang))} />
         ))}
       </div>
     </Shell>
@@ -108,11 +108,11 @@ function TourSchedule() {
   )
 }
 
-function FeatureList({ items }: { items: [string, string, string][] }) {
+function FeatureList({ items }: { items: [IconName, string, string][] }) {
   return (
     <div className="list tour-list" aria-hidden="true">
-      {items.map(([emoji, title, sub]) => (
-        <Row key={title} emoji={emoji} title={title} sub={sub} />
+      {items.map(([icon, title, sub]) => (
+        <Row key={title} icon={icon} title={title} sub={sub} />
       ))}
     </div>
   )
@@ -128,11 +128,11 @@ const tour = (): Story[] => [
     visual: (
       <FeatureList
         items={[
-          ['🏛', t('Корпуса и карты'), t('Как пройти и открыть в картах')],
-          ['⭐', t('Рейтинг преподавателей'), t('Оценки и отзывы студентов')],
-          ['🚪', t('Свободные аудитории'), t('Где посидеть между парами')],
-          ['📝', t('Заметки'), t('К паре и ко всему дню')],
-          ['📚', t('Сессия и каникулы'), t('Экзамены и учебный график')],
+          ['building', t('Корпуса и карты'), t('Как пройти и открыть в картах')],
+          ['star', t('Рейтинг преподавателей'), t('Оценки и отзывы студентов')],
+          ['door', t('Свободные аудитории'), t('Где посидеть между парами')],
+          ['note', t('Заметки'), t('К паре и ко всему дню')],
+          ['clipboard', t('Сессия и каникулы'), t('Экзамены и учебный график')],
         ]}
       />
     ),
@@ -143,9 +143,9 @@ const tour = (): Story[] => [
     visual: (
       <FeatureList
         items={[
-          ['📅', t('Календарь на телефоне'), t('Пары сами появятся в Apple или Google Календаре')],
-          ['💬', t('В любом чате'), t('Напиши @{bot} — и выбери день', { bot: BOT_USERNAME })],
-          ['📲', t('На домашний экран'), t('Открывается одним касанием')],
+          ['calendar', t('Календарь на телефоне'), t('Пары сами появятся в Apple или Google Календаре')],
+          ['chat', t('В любом чате'), t('Напиши @{bot} — и выбери день', { bot: BOT_USERNAME })],
+          ['phone', t('На домашний экран'), t('Открывается одним касанием')],
         ]}
       />
     ),
@@ -273,7 +273,6 @@ export function IntroFlow({ current, askLang, onChoice, onLang, onFinish }: Prop
 
   return (
     <Shell center>
-      <StoryEmoji emoji="🎓" />
       {error ? (
         <>
           <p className="ob-text">{t('Не получилось загрузить расписание. Проверь интернет.')}</p>

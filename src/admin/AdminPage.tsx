@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { Row } from '../components/Row'
+import type { IconName } from '../icons'
 import { Section } from '../components/Section'
 import { resetIntro } from '../intro'
 import { confirmAction, haptic } from '../telegram'
@@ -18,19 +19,19 @@ import { BroadcastAdmin } from './BroadcastAdmin'
 import { Users } from './Users'
 
 type SectionId = 'dashboard' | 'users' | 'broadcast' | 'reviews' | 'schedule' | 'hidden' | 'translations' | 'academic' | 'places' | 'settings'
-type Item = { id: SectionId; title: string; emoji: string; render: () => ReactNode }
+type Item = { id: SectionId; title: string; icon: IconName; render: () => ReactNode }
 
 const ITEMS: Item[] = [
-  { id: 'dashboard', title: 'Дашборд', emoji: '📊', render: () => <Dashboard /> },
-  { id: 'users', title: 'Пользователи', emoji: '👥', render: () => <Users /> },
-  { id: 'broadcast', title: 'Рассылка', emoji: '📣', render: () => <BroadcastAdmin /> },
-  { id: 'reviews', title: 'Отзывы', emoji: '⭐', render: () => <ReviewsAdmin /> },
-  { id: 'schedule', title: 'Расписание', emoji: '📅', render: () => <ScheduleAdmin /> },
-  { id: 'hidden', title: 'Скрытые пары', emoji: '🙈', render: () => <HiddenAdmin /> },
-  { id: 'translations', title: 'Переводы', emoji: '🔤', render: () => <TranslationsAdmin /> },
-  { id: 'academic', title: 'Учебный график', emoji: '🗓️', render: () => <AcademicAdmin /> },
-  { id: 'places', title: 'Места', emoji: '🏛', render: () => <PlacesAdmin /> },
-  { id: 'settings', title: 'Настройки', emoji: '⚙️', render: () => <SettingsAdmin /> },
+  { id: 'dashboard', title: 'Дашборд', icon: 'chart', render: () => <Dashboard /> },
+  { id: 'users', title: 'Пользователи', icon: 'people', render: () => <Users /> },
+  { id: 'broadcast', title: 'Рассылка', icon: 'megaphone', render: () => <BroadcastAdmin /> },
+  { id: 'reviews', title: 'Отзывы', icon: 'star', render: () => <ReviewsAdmin /> },
+  { id: 'schedule', title: 'Расписание', icon: 'calendar', render: () => <ScheduleAdmin /> },
+  { id: 'hidden', title: 'Скрытые пары', icon: 'eye-off', render: () => <HiddenAdmin /> },
+  { id: 'translations', title: 'Переводы', icon: 'globe', render: () => <TranslationsAdmin /> },
+  { id: 'academic', title: 'Учебный график', icon: 'calendar-lines', render: () => <AcademicAdmin /> },
+  { id: 'places', title: 'Места', icon: 'building', render: () => <PlacesAdmin /> },
+  { id: 'settings', title: 'Настройки', icon: 'sliders', render: () => <SettingsAdmin /> },
 ]
 
 // «Сервисы → Админ-панель» — только у владельца (пункт показывает приложение, права проверяет бот).
@@ -77,7 +78,7 @@ export function AdminPage() {
             {ITEMS.map((i) => (
               <Row
                 key={i.id}
-                emoji={i.emoji}
+                icon={i.icon}
                 title={i.title}
                 chevron
                 onClick={() => {

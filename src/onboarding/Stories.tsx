@@ -74,7 +74,7 @@ export function Stories({ stories, onDone, onBack, onSkip, doneLabel = t('Дал
       <Progress value={(index + 1) / stories.length} label={t('{n} из {total}', { n: index + 1, total: stories.length })} />
       {onSkip && (
         <div className="ob-skip-row">
-          <button type="button" className="link-btn" onClick={() => (haptic(), onSkip())}>
+          <button type="button" className="link-btn link-btn-gray" onClick={() => (haptic(), onSkip())}>
             {t('Пропустить')}
           </button>
         </div>

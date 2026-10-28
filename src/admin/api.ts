@@ -192,10 +192,10 @@ export function adminError(err: unknown): string {
   const code = (err as { code?: string; status?: number })?.code
   const status = (err as { status?: number })?.status
   if (status === 0 || code === undefined) return 'Нет связи с ботом. Попробуйте ещё раз.'
-  if (code === 'internal') return 'Что-то сломалось 🛠'
+  if (code === 'internal') return 'Что-то сломалось'
   if (code === 'no-token') return 'Нужен секрет GITHUB_TOKEN — см. инструкцию в отчёте'
   if (code === 'forbidden') return 'Нет доступа'
-  if (/^[a-z -]+$/.test(code)) return 'Что-то сломалось 🛠'
+  if (/^[a-z -]+$/.test(code)) return 'Что-то сломалось'
   return code // готовая фраза от бота: «Выберите пару», «Telegram не принял сообщение: …»
 }
 
