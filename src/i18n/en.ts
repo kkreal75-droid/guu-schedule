@@ -579,6 +579,8 @@ export const EN: Record<string, string> = {
   "iPhone: «Подписаться»": "iPhone: “Subscribe”",
   "{done} из {total}, последнее {date}": "{done} of {total}, last on {date}",
   "{n} неделя": "Week {n}",
+  "Чётная": "Even",
+  "Нечётная": "Odd",
   "{n} неделя, нечётная. Учёба до {date}": "Week {n}, odd. Classes until {date}",
   "{n} неделя, чётная. Учёба до {date}": "Week {n}, even. Classes until {date}",
   "{pct}% советуют": "{pct}% recommend",

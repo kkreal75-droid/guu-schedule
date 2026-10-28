@@ -992,7 +992,7 @@ a {
   margin-bottom: -1px;
   padding: 8px 0 7px;
   border-bottom: 2px solid transparent;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--hint);
   white-space: nowrap;
@@ -1002,6 +1002,7 @@ a {
 }
 
 .fav-tab[aria-checked='true'] {
+  border-bottom-width: 2.5px;
   border-bottom-color: var(--accent);
   font-weight: 700;
   color: var(--text);
@@ -1024,26 +1025,24 @@ a {
   color: var(--hint);
 }
 
-/* «8 неделя, чётная · 19–25 октября» со стрелками ‹ › */
+/* неделя: крупно «Нечётная», под ней «9 неделя», по бокам круглые кнопки ‹ › */
 .week-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 8px;
+  gap: 8px;
+  margin: 2px 0 10px;
 }
 
 .week-arrow {
-  display: flex;
-  padding: 4px 8px;
-  color: var(--hint);
-}
-
-.week-arrow:first-child {
-  padding-left: 2px;
-}
-
-.week-arrow:last-child {
-  padding-right: 2px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--text);
 }
 
 .week-arrow:disabled {
@@ -1051,17 +1050,33 @@ a {
 }
 
 .week-title {
+  flex: 1;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
 }
 
-/* дни: выбранный — круг 34 px цвета акцента, сегодня — число цвета акцента, воскресенье серое */
+.week-parity {
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.week-no {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* дни: день недели мелкими заглавными, число крупно и жирно; выбранный — закрашенная плашка цвета акцента с тенью,
+   сегодня — цвет акцента, воскресенье серое; точки: серая — есть пары, цвета акцента — есть заметка */
 .day-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
   margin-bottom: 8px;
 }
 
@@ -1069,24 +1084,25 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 1px;
+  padding: 8px 0 6px;
+  border-radius: 16px;
   color: var(--text);
+  transition: background-color 0.15s;
 }
 
 .day-wd {
-  font-size: 11.5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--hint);
-  font-weight: 500;
 }
 
 .day-num {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1094,33 +1110,42 @@ a {
   color: var(--hint);
 }
 
+.day[data-today] .day-wd,
 .day[data-today] .day-num {
-  font-weight: 700;
   color: var(--accent-text);
 }
 
-.day[aria-selected='true'] .day-num {
+.day[aria-selected='true'] {
   background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 700;
+  box-shadow: 0 4px 14px rgb(var(--glow) / 0.35);
 }
 
-/* точки 4 px: серая — есть пары, цвета акцента — есть заметка */
+.day[aria-selected='true'] .day-wd,
+.day[aria-selected='true'] .day-num {
+  color: var(--on-accent);
+}
+
 .day-dots {
   display: flex;
   gap: 3px;
-  height: 4px;
+  height: 5px;
+  margin-top: 3px;
 }
 
 .day-dot {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--dot);
 }
 
 .day-dot-note {
   background: var(--accent);
+}
+
+.day[aria-selected='true'] .day-dot {
+  background: var(--on-accent);
+  opacity: 0.8;
 }
 
 /* «4 пары · с 9:00 до 16:05» и «Сегодня» справа */
@@ -1131,14 +1156,14 @@ a {
   gap: 12px;
   min-height: 18px;
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-2);
   font-weight: 500;
 }
 
 .day-today {
   padding: 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .content {
