@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react'
 import { CheckIcon, ChevronRight, Icon, type IconName } from '../icons'
 
+// цвет иконки на светлой плашке (список «Сервисов»): мягкие тона, подобранные к бирюзовому акценту
+export type Tone = 'teal' | 'green' | 'blue' | 'indigo' | 'violet' | 'amber' | 'coral' | 'rose' | 'slate'
+
 type Props = {
   icon?: IconName // 22 px в колонке 26 px слева
+  tone?: Tone // иконка цветная на светлой плашке
   title: ReactNode
   sub?: ReactNode // подпись 13 px под заголовком
   value?: ReactNode // значение справа
@@ -16,12 +20,12 @@ type Props = {
 }
 
 // Строка списка: иконка, заголовок с подписью, значение справа, шеврон, ↗ или галочка
-export function Row({ icon, title, sub, value, out, chevron, check, onClick, lang, className, disabled }: Props) {
+export function Row({ icon, tone, title, sub, value, out, chevron, check, onClick, lang, className, disabled }: Props) {
   const inner = (
     <>
       {icon && (
-        <span className="row-icon">
-          <Icon name={icon} />
+        <span className="row-icon" data-tone={tone}>
+          <Icon name={icon} size={tone ? 20 : 22} />
         </span>
       )}
       <span className="row-label">

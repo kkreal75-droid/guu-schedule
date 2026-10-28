@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { AdminPage } from '../admin/AdminPage'
-import { Row } from '../components/Row'
+import { Row, type Tone } from '../components/Row'
 import type { IconName } from '../icons'
 import type { TeacherInfo } from '../data'
 import type { Extras } from '../edits'
@@ -33,6 +33,7 @@ type Item = {
   title: string
   sub?: string
   icon: IconName
+  tone: Tone
   render?: () => ReactNode // элемент, а не компонент: иначе при перерисовке страница сбрасывала бы состояние
   action?: () => void // вместо страницы (ссылка)
   bare?: boolean // страница рисует свою шапку (у админ-панели вложенные разделы)
@@ -86,6 +87,7 @@ export function MoreScreen({
                 title: 'For international students',
                 sub: 'Weeks, buildings, visas, contacts',
                 icon: 'globe' as const,
+                tone: 'blue' as const,
                 render: () => <InternationalPage onOpen={(item) => (setOpenId(item), window.scrollTo(0, 0))} />,
               },
             ],
@@ -97,22 +99,23 @@ export function MoreScreen({
       items: [
         ...(teacherMode
           ? []
-          : [{ id: 'session', title: t('Расписание сессии'), sub: t('Экзамены и зачёты'), icon: 'clipboard' as const, render: () => <SessionPage group={group} /> }]),
-        { id: 'kug', title: t('Учебный график'), sub: t('Сессии, каникулы, праздники'), icon: 'calendar-lines', render: () => <KugPage group={group} /> },
-        { id: 'teacher-schedule', title: t('Расписание преподавателя'), sub: t('Поиск по фамилии'), icon: 'person', ownTitle: true, render: () => <TeacherSchedulePage /> },
+          : [{ id: 'session', title: t('Расписание сессии'), sub: t('Экзамены и зачёты'), icon: 'clipboard' as const, tone: 'violet' as const, render: () => <SessionPage group={group} /> }]),
+        { id: 'kug', title: t('Учебный график'), sub: t('Сессии, каникулы, праздники'), icon: 'calendar-lines', tone: 'blue', render: () => <KugPage group={group} /> },
+        { id: 'teacher-schedule', title: t('Расписание преподавателя'), sub: t('Поиск по фамилии'), icon: 'person', tone: 'teal', ownTitle: true, render: () => <TeacherSchedulePage /> },
         {
           id: 'group-schedule',
           title: t('Расписание группы'),
           sub: t('Любая группа ГУУ'),
           icon: 'people',
+          tone: 'indigo',
           ownTitle: true,
           render: () => <GroupSchedulePage initial={request?.item === 'group-schedule' ? request.group : undefined} />,
         },
-        { id: 'rooms', title: t('Свободные аудитории'), sub: t('Где посидеть между парами'), icon: 'door', render: () => <FreeRoomsPage /> },
-        { id: 'documents', title: t('Документы'), sub: t('Таблицы с сайта ГУУ'), icon: 'document', render: () => <DocumentsPage group={group} /> },
+        { id: 'rooms', title: t('Свободные аудитории'), sub: t('Где посидеть между парами'), icon: 'door', tone: 'green', render: () => <FreeRoomsPage /> },
+        { id: 'documents', title: t('Документы'), sub: t('Таблицы с сайта ГУУ'), icon: 'document', tone: 'slate', render: () => <DocumentsPage group={group} /> },
         ...(teacherMode
           ? []
-          : [{ id: 'calendar', title: t('Календарь на телефоне'), sub: t('Apple и Google'), icon: 'phone' as const, render: () => <CalendarPage group={group} /> }]),
+          : [{ id: 'calendar', title: t('Календарь на телефоне'), sub: t('Apple и Google'), icon: 'phone' as const, tone: 'coral' as const, render: () => <CalendarPage group={group} /> }]),
       ],
     },
     {
@@ -123,6 +126,7 @@ export function MoreScreen({
           title: t('Рейтинг преподавателей'),
           sub: t('Отзывы и оценки'),
           icon: 'star',
+          tone: 'amber',
           ownTitle: true,
           render: () => (
             <TeachersPage
@@ -132,8 +136,8 @@ export function MoreScreen({
             />
           ),
         },
-        { id: 'events', title: t('Мероприятия ГУУ'), sub: t('Проектное обучение, Make.Events'), icon: 'ticket', render: () => <EventsPage /> },
-        { id: 'groupbot', title: t('Бот в беседе группы'), sub: t('Расписание в чат каждое утро'), icon: 'chat', render: () => <GroupBotPage /> },
+        { id: 'events', title: t('Мероприятия ГУУ'), sub: t('Проектное обучение, Make.Events'), icon: 'ticket', tone: 'rose', render: () => <EventsPage /> },
+        { id: 'groupbot', title: t('Бот в беседе группы'), sub: t('Расписание в чат каждое утро'), icon: 'chat', tone: 'blue', render: () => <GroupBotPage /> },
       ],
     },
     {
@@ -144,18 +148,19 @@ export function MoreScreen({
           title: t('Корпуса ГУУ'),
           sub: t('Адреса и карта'),
           icon: 'building',
+          tone: 'teal',
           render: () => <PlacesPage target={request?.item === 'places' ? request : undefined} />,
         },
-        { id: 'faq', title: t('Частые вопросы'), icon: 'question', render: () => <FaqPage /> },
-        { id: 'install', title: t('Установить приложение'), sub: t('На домашний экран'), icon: 'download', ownTitle: true, render: () => <InstallPage /> },
+        { id: 'faq', title: t('Частые вопросы'), icon: 'question', tone: 'violet', render: () => <FaqPage /> },
+        { id: 'install', title: t('Установить приложение'), sub: t('На домашний экран'), icon: 'download', tone: 'indigo', ownTitle: true, render: () => <InstallPage /> },
       ],
     },
     {
       title: t('Помощь'),
       items: [
-        { id: 'support', title: t('Написать в поддержку'), sub: t('Ошибка, идея, вопрос'), icon: 'mail', render: () => <SupportPage /> },
+        { id: 'support', title: t('Написать в поддержку'), sub: t('Ошибка, идея, вопрос'), icon: 'mail', tone: 'coral', render: () => <SupportPage /> },
         ...(channel
-          ? [{ id: 'channel', title: t('Канал новостей'), sub: t('Что нового в приложении'), icon: 'megaphone' as const, action: () => openTelegramLink(channel) }]
+          ? [{ id: 'channel', title: t('Канал новостей'), sub: t('Что нового в приложении'), icon: 'megaphone' as const, tone: 'amber' as const, action: () => openTelegramLink(channel) }]
           : []),
       ],
     },
@@ -163,9 +168,9 @@ export function MoreScreen({
   // у старосты и владельца — отдельной карточкой внизу (остальным ни пункта, ни намёка; права проверяет бот)
   const special: Item[] = [
     ...(starosta
-      ? [{ id: 'starosta', title: t('Правки группы'), sub: t('Отмены, переносы, подгруппы'), icon: 'pencil' as const, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
+      ? [{ id: 'starosta', title: t('Правки группы'), sub: t('Отмены, переносы, подгруппы'), icon: 'pencil' as const, tone: 'amber' as const, render: () => <StarostaPage group={starosta} onExtras={onGroupExtras} /> }]
       : []),
-    ...(admin ? [{ id: 'admin', title: t('Админ-панель'), sub: t('Только для владельца'), icon: 'shield' as const, render: () => <AdminPage />, bare: true }] : []),
+    ...(admin ? [{ id: 'admin', title: t('Админ-панель'), sub: t('Только для владельца'), icon: 'shield' as const, tone: 'slate' as const, render: () => <AdminPage />, bare: true }] : []),
   ]
   if (special.length) groups.push({ items: special })
 
@@ -195,6 +200,7 @@ export function MoreScreen({
               <Row
                 key={item.id}
                 icon={item.icon}
+                tone={item.tone}
                 title={item.title}
                 sub={item.sub}
                 chevron

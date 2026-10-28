@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { haptic } from '../telegram'
 import { t } from '../i18n'
+import { Icon } from '../icons'
 
 // Вкладки над расписанием (этап 12): первая — своё расписание (группа или своё ФИО у преподавателя), дальше
-// избранное — группы и преподаватели вперемешку; активная — жирная с красной линией снизу; прокручиваются, если
-// не влезают; красный «+» — найти и добавить.
+// избранное — группы и преподаватели вперемешку; активная — тёмная с линией цвета акцента снизу; прокручиваются,
+// если не влезают; серый «+» — найти и добавить.
 // Подержать чип ~0,4 с — он «поднимется»: потянуть — переставить, отпустить на месте — убрать из избранного.
 type Props = {
   value: string // что показано сейчас
@@ -136,7 +137,7 @@ export function FavoritesBar({ value, home, items, label, onChange, onAdd, onReo
       {order.map((id) => chip(id, false))}
       {onAdd && (
         <button type="button" className="fav-add" aria-label={t('Добавить в избранное')} onClick={onAdd}>
-          +
+          <Icon name="plus" size={20} strokeWidth={1.8} />
         </button>
       )}
     </div>

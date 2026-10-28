@@ -1,7 +1,7 @@
 import { WEEK_INDEXES, dateOf, formatDate, weekdayFull, weekdayShort } from '../format'
 import { getLang, t } from '../i18n'
 
-// Дни недели сеткой: выбранный — красный квадрат, сегодня — красное число, воскресенье серое;
+// Дни недели сеткой: выбранный — круг цвета акцента, сегодня — число цвета акцента, воскресенье серое;
 // под числом точки: есть пары, есть заметка
 type Props = {
   monday: number

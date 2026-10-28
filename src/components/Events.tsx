@@ -1,10 +1,11 @@
-import { useCallback, useState, type ReactNode } from 'react'
-import { EVENTS_COMMUNITY_URL, eventBlocks, eventTime, isEventUrl, type MakeEvent } from '../../shared/events-core'
+import { useCallback, useState } from 'react'
+import { EVENTS_COMMUNITY_URL, eventTime, isEventUrl, type MakeEvent } from '../../shared/events-core'
 import { dayFromIso } from '../../shared/schedule-core'
 import { formatDate, weekdayFull } from '../format'
 import { useEvents } from '../events'
 import { BOT_URL, haptic, openLink } from '../telegram'
 import { Sheet } from './Sheet'
+import { ChevronRight, Icon } from '../icons'
 import { t, tn } from '../i18n'
 
 // Мероприятия make.events (этап 13): строка списка, окно снизу, блок «Проектное обучение» в конце дня.
@@ -23,7 +24,7 @@ const dayTitle = (iso: string) => {
   return `${weekdayFull(weekdayOf(day))}, ${formatDate(day)}`
 }
 
-// Строка списка «Сервисы → Мероприятия ГУУ»: красным время и место, название, первое предложение описания
+// Строка списка «Сервисы → Мероприятия ГУУ»: время и место серой строкой, название, первое предложение описания
 export function EventCard({ event, showTime, onOpen }: { event: MakeEvent; showTime?: boolean; onOpen: (e: MakeEvent) => void }) {
   const extra = extraText(event)
   return (
@@ -67,7 +68,8 @@ export function EventSheet({ event, onClose }: { event: MakeEvent; onClose: () =
       </p>
       {event.place && (
         <p className="event-place">
-          📍 <span lang="ru">{event.place}</span>
+          <Icon name="map-pin" size={18} />
+          <span lang="ru">{event.place}</span>
         </p>
       )}
       {extra && (
@@ -80,12 +82,14 @@ export function EventSheet({ event, onClose }: { event: MakeEvent; onClose: () =
       <div className="sheet-actions">
         {isEventUrl(event.url) && (
           <button type="button" className="button-primary" onClick={() => (haptic(), openLink(event.url))}>
-            {t('Записаться')} ↗
+            {t('Записаться')}
+            <Icon name="arrow-up-right" size={18} strokeWidth={1.8} />
           </button>
         )}
         {BOT_URL && (
           <button type="button" className="link-btn" onClick={() => (haptic(), openLink(`${BOT_URL}/event/${event.id}.ics`))}>
-            🗓️ {t('В календарь')}
+            <Icon name="calendar" size={18} />
+            {t('В календарь')}
           </button>
         )}
       </div>
@@ -95,92 +99,41 @@ export function EventSheet({ event, onClose }: { event: MakeEvent; onClose: () =
 
 const openCommunity = () => (haptic(), openLink(EVENTS_COMMUNITY_URL))
 
-// Текст, который нажимается, но переносится как обычный текст (кнопка переносилась бы целиком)
-function InlineButton({ className, lang, onPress, children }: { className: string; lang?: string; onPress: () => void; children: ReactNode }) {
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      className={className}
-      lang={lang}
-      onClick={() => (haptic(), onPress())}
-      onKeyDown={(e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return
-        e.preventDefault()
-        onPress()
-      }}
-    >
-      {children}
-    </span>
-  )
-}
-
-// «10:40 «7 правил». Лекция о зарубежном автопроме и ещё 2»: нажатие на название — окно мероприятия,
-// «и ещё 2» — остальные в это время
-function ProjectLine({ time, events, onOpen }: { time: string; events: MakeEvent[]; onOpen: (e: MakeEvent) => void }) {
-  const [open, setOpen] = useState(false)
-  const [first, ...rest] = events
-  return (
-    <p className="project-line">
-      <b>{short(time)}</b>{' '}
-      <InlineButton className="project-event" lang="ru" onPress={() => onOpen(first)}>
-        {first.title}
-      </InlineButton>
-      {rest.length > 0 &&
-        (open ? (
-          rest.map((e) => (
-            <span key={e.id}>
-              {' · '}
-              <InlineButton className="project-event" lang="ru" onPress={() => onOpen(e)}>
-                {e.title}
-              </InlineButton>
-            </span>
-          ))
-        ) : (
-          <>
-            {' '}
-            <InlineButton className="project-more" onPress={() => setOpen(true)}>
-              {t('и ещё {n}', { n: rest.length })}
-            </InlineButton>
-          </>
-        ))}
-    </p>
-  )
-}
-
 const onDay = (events: MakeEvent[] | null | 'error', iso: string) =>
   Array.isArray(events) ? events.filter((e) => e.start.startsWith(iso)) : events
 
-// «Проектное обучение» — светло-красный блок в конце дня: время, мероприятия по времени начала, «Все мероприятия».
+// «Проектное обучение» в конце дня: время и число мероприятий, сразу полный список мероприятий дня (время и место,
+// название, первое предложение описания; нажатие — окно мероприятия), «Все мероприятия».
 // from/to — пары «Проектного обучения» у группы (нет — весь день проектный).
 export function ProjectDay({ iso, from, to, onAll }: { iso: string; from?: string; to?: string; onAll?: () => void }) {
   const all = useEvents()
   const events = onDay(all, iso)
   const [sheet, setSheet] = useState<MakeEvent | null>(null)
   const close = useCallback(() => setSheet(null), [])
-  const count = Array.isArray(events) ? events.length : null
+  const list = Array.isArray(events) ? [...events].sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title)) : []
 
   return (
-    <section className="callout project">
-      <p className="project-title">🚀 {t('Проектное обучение')}</p>
+    <section className="project">
+      <p className="project-title">{t('Проектное обучение')}</p>
       <p className="project-sub">
         {from && to ? `${short(from)}–${short(to)}` : t('Весь день')}
         {' · '}
-        {count ? t('{events} на make.events', { events: countText(count) }) : 'make.events'}
+        {list.length ? t('{events} на make.events', { events: countText(list.length) }) : 'make.events'}
       </p>
       {events === null ? (
         <p className="project-status">{t('Загружаю мероприятия…')}</p>
-      ) : events === 'error' || !events.length ? (
+      ) : events === 'error' || !list.length ? (
         <p className="project-status">{events === 'error' ? t('Не удалось загрузить мероприятия. Проверьте интернет.') : t('Мероприятий на этот день пока нет')}</p>
       ) : (
-        <div className="project-list">
-          {eventBlocks(events).map((b) => (
-            <ProjectLine key={b.time} time={b.time} events={b.events} onOpen={setSheet} />
+        <div className="list">
+          {list.map((e) => (
+            <EventCard key={e.id} event={e} showTime onOpen={setSheet} />
           ))}
         </div>
       )}
       <button type="button" className="link-btn project-all" onClick={() => (onAll ? (haptic(), onAll()) : openCommunity())}>
         {t('Все мероприятия')}
+        <ChevronRight width={6} height={10} />
       </button>
       {sheet && <EventSheet event={sheet} onClose={close} />}
     </section>

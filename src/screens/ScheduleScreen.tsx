@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from 'react'
 import { DayStrip } from '../components/DayStrip'
 import { LessonCard } from '../components/LessonCard'
 import { ProjectDay } from '../components/Events'
@@ -18,6 +18,7 @@ import { loadGroups } from '../data'
 import { mergeStreams, type ShownLesson } from '../lessons'
 import { isProjectLesson } from '../../shared/events-core'
 import { haptic } from '../telegram'
+import { ChevronDown, Icon } from '../icons'
 import { getLang, t } from '../i18n'
 import { groupSubtitleParts, trSubject } from '../guu'
 
@@ -202,17 +203,8 @@ export function ScheduleScreen({
     subtitle: `${trSubject(lesson.subject)} · ${getLang() === 'ru' ? weekdayFull(weekday).toLowerCase() : weekdayFull(weekday)}, ${shortTime(lesson.start)}`,
   })
 
-  // «4 пары, с 9:00 до 16:05»
-  const summary =
-    project.length && !shown.length
-      ? t('Проектное обучение')
-      : lessons.length
-        ? t('{pairs}, с {from} до {to}', {
-            pairs: pluralPairs(lessons.length),
-            from: shortTime(lessons[0].start),
-            to: shortTime(lessons[lessons.length - 1].end),
-          })
-        : null
+  // «4 пары»
+  const summary = project.length && !shown.length ? t('Проектное обучение') : lessons.length ? pluralPairs(lessons.length) : null
 
   // пар нет: выходной для всех (days_off), воскресенье и другие дни без пар — «Выходной»; вне семестра — «Пар нет»
   const empty = view.dayOff
@@ -226,18 +218,11 @@ export function ScheduleScreen({
       {!readOnly && (
         <>
           <header className="sched-head">
-            <h1 className="sched-date">{dayLabel}</h1>
-            <div className="sched-actions">
-              <button
-                type="button"
-                className="sched-act"
-                aria-label={dayNote ? t('Заметка к дню') : t('Добавить заметку к дню')}
-                onClick={editDayNote}
-              >
-                📝
-              </button>
-              <button type="button" className="sched-act" aria-label={t('Выбрать дату')} onClick={openPicker}>
-                🗓️
+            {/* дата открывает выбор даты; справа — заметка к дню */}
+            <h1 className="sched-date">
+              <button type="button" className="sched-date-btn" aria-label={t('Выбрать дату')} onClick={openPicker}>
+                <span>{dayLabel}</span>
+                <ChevronDown className="sched-date-arrow" />
               </button>
               <input
                 ref={datePicker}
@@ -250,7 +235,15 @@ export function ScheduleScreen({
                 value={isoFromDay(day)}
                 onChange={(e) => e.target.value && goDay(dayFromIso(e.target.value))}
               />
-            </div>
+            </h1>
+            <button
+              type="button"
+              className={`sched-act${dayNote ? ' sched-act-on' : ''}`}
+              aria-label={dayNote ? t('Заметка к дню') : t('Добавить заметку к дню')}
+              onClick={editDayNote}
+            >
+              <Icon name="note" />
+            </button>
           </header>
           {bar}
         </>
@@ -258,7 +251,6 @@ export function ScheduleScreen({
 
       <WeekCard
         week={week}
-        monday={monday}
         prevDisabled={week <= 1}
         nextDisabled={week >= MAX_WEEK}
         onPrev={() => go({ week: week - 1, weekday })}
@@ -289,12 +281,14 @@ export function ScheduleScreen({
         <div key={`${group}|${day}`} className={`day-list${direction ? ` slide-${direction}` : ''}`}>
           {view.notes.map((text, i) => (
             <div key={i} className="day-note">
-              📌 {text}
+              <Icon name="pin" size={17} />
+              <span>{text}</span>
             </div>
           ))}
           {!readOnly && dayNote && (
             <button type="button" className="day-note" onClick={editDayNote}>
-              📝 {dayNote}
+              <Icon name="note" size={17} />
+              <span>{dayNote}</span>
             </button>
           )}
 
@@ -316,7 +310,7 @@ export function ScheduleScreen({
                 setEditing(lessonNote(lesson))
               }
               return (
-                <div key={`${lesson.start}|${lesson.subject}|${lesson.kind}`} className="day-item">
+                <div key={`${lesson.start}|${lesson.subject}|${lesson.kind}`} className="day-item" style={{ '--i': i } as CSSProperties}>
                   {gap > 0 && (
                     <div className="gap">
                       {gap >= GAP_MIN ? t('Окно {d}', { d: formatDuration(gap) }) : t('Перерыв {d}', { d: formatDuration(gap) })}

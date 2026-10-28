@@ -27,6 +27,7 @@
   --overlay: rgb(0 0 0 / 0.28);
   --on-accent: #ffffff;
   --shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 1px rgb(0 0 0 / 0.04); /* «бегунок» сегментов */
+  --glow: 14 124 140; /* цвет свечения карточек пар (RGB акцента) */
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Roboto, 'Segoe UI', system-ui, sans-serif;
 
@@ -59,6 +60,7 @@
   --handle: #4a4e55;
   --overlay: rgb(0 0 0 / 0.5);
   --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  --glow: 92 195 207;
   color-scheme: dark;
 }
 
@@ -355,6 +357,94 @@ a {
   width: 26px;
   color: var(--text-2);
 }
+
+/* цветная иконка на светлой плашке 30 px (список «Сервисов») */
+.row-icon[data-tone] {
+  align-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgb(var(--tone) / 0.12);
+  color: rgb(var(--tone));
+}
+
+.row-icon[data-tone='teal'] {
+  --tone: 14 124 140;
+}
+
+.row-icon[data-tone='green'] {
+  --tone: 38 138 98;
+}
+
+.row-icon[data-tone='blue'] {
+  --tone: 47 111 179;
+}
+
+.row-icon[data-tone='indigo'] {
+  --tone: 88 92 196;
+}
+
+.row-icon[data-tone='violet'] {
+  --tone: 136 88 192;
+}
+
+.row-icon[data-tone='amber'] {
+  --tone: 196 132 22;
+}
+
+.row-icon[data-tone='coral'] {
+  --tone: 208 102 72;
+}
+
+.row-icon[data-tone='rose'] {
+  --tone: 194 78 122;
+}
+
+.row-icon[data-tone='slate'] {
+  --tone: 91 107 124;
+}
+
+
+:root[data-theme='dark'] .row-icon[data-tone] {
+  background: rgb(var(--tone) / 0.18);
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='teal'] {
+  --tone: 92 195 207;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='green'] {
+  --tone: 96 199 150;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='blue'] {
+  --tone: 128 174 232;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='indigo'] {
+  --tone: 156 160 240;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='violet'] {
+  --tone: 186 148 232;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='amber'] {
+  --tone: 228 178 84;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='coral'] {
+  --tone: 236 146 118;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='rose'] {
+  --tone: 228 136 172;
+}
+
+:root[data-theme='dark'] .row-icon[data-tone='slate'] {
+  --tone: 156 170 186;
+}
+
 
 .row:has(.row-icon) {
   padding-top: 9px;
@@ -814,46 +904,67 @@ a {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 4px 16px 0;
+  padding: 6px 16px 0;
 }
 
-/* заголовок — дата Montserrat 22/800, справа 📝 (заметка к дню) и 🗓️ (выбор даты) */
+/* шапка: дата 24/700 со стрелкой вниз (открывает выбор даты), справа заметка к дню */
 .sched-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 4px 2px 8px;
+  margin: 2px 0 6px;
 }
 
 .sched-date {
+  position: relative;
   min-width: 0;
   margin: 0;
-  font: 700 22px/1.2 var(--font);
+  font: 700 24px/1.2 var(--font);
   letter-spacing: -0.02em;
+}
+
+.sched-date-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.sched-date-btn > span {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sched-actions {
-  position: relative;
+.sched-date-arrow {
   flex: none;
-  display: flex;
-  gap: 14px;
+  margin-top: 3px;
+  color: var(--text-2);
 }
 
 .sched-act {
-  font-size: 21px;
-  line-height: 1;
+  flex: none;
+  display: flex;
+  margin: -6px;
+  padding: 6px;
+  color: var(--text-2);
 }
 
-/* вкладки избранного: активная — жирная с красной линией 2.5 px, справа красный «+» */
+/* есть заметка к дню — иконка цвета акцента */
+.sched-act-on {
+  color: var(--accent-text);
+}
+
+/* вкладки избранного: активная — тёмная 600 с линией акцента 2 px, остальные серые, справа серый «+» */
 .fav-tabs {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin: 0 2px 12px;
+  gap: 22px;
+  margin: 0 0 14px;
   border-bottom: 1px solid var(--separator);
   overflow-x: auto;
   scrollbar-width: none;
@@ -865,11 +976,12 @@ a {
 
 .fav-tab {
   flex: none;
-  padding: 7px 0 6px;
-  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 0 7px;
+  border-bottom: 2px solid transparent;
   font-size: 15px;
   font-weight: 500;
-  color: var(--text-2);
+  color: var(--hint);
   white-space: nowrap;
   -webkit-user-select: none;
   user-select: none;
@@ -878,7 +990,7 @@ a {
 
 .fav-tab[aria-checked='true'] {
   border-bottom-color: var(--accent);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -894,24 +1006,23 @@ a {
 
 .fav-add {
   flex: none;
-  padding: 4px 0;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--accent-text);
+  display: flex;
+  padding: 6px 0;
+  color: var(--hint);
 }
 
-/* «8 неделя, чётная · 19–25 октября» со стрелками */
+/* «8 неделя, чётная · 19–25 октября» со стрелками ‹ › */
 .week-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 2px 6px;
+  margin: 0 0 8px;
 }
 
 .week-arrow {
   display: flex;
   padding: 4px 8px;
-  color: var(--text);
+  color: var(--hint);
 }
 
 .week-arrow:first-child {
@@ -923,71 +1034,64 @@ a {
 }
 
 .week-arrow:disabled {
-  color: var(--hint);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .week-title {
   min-width: 0;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-2);
   text-align: center;
 }
 
-/* дни сеткой: выбранный — красный квадрат, сегодня — красное число, воскресенье серое */
+/* дни: выбранный — круг 34 px цвета акцента, сегодня — число цвета акцента, воскресенье серое */
 .day-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .day {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 6px 0 4px;
-  border-radius: 12px;
+  gap: 3px;
   color: var(--text);
 }
 
 .day-wd {
-  font-size: 11px;
-  color: var(--text-2);
+  font-size: 11.5px;
+  color: var(--hint);
 }
 
 .day-num {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
-.day[data-sunday] .day-wd,
 .day[data-sunday] .day-num {
   color: var(--hint);
 }
 
 .day[data-today] .day-num {
+  font-weight: 600;
   color: var(--accent-text);
 }
 
-.day[aria-selected='true'] {
+.day[aria-selected='true'] .day-num {
   background: var(--accent);
   color: var(--on-accent);
+  font-weight: 600;
 }
 
-.day[aria-selected='true'] .day-wd,
-.day[aria-selected='true'] .day-num {
-  color: var(--on-accent);
-}
-
-.day[aria-selected='true'] .day-wd {
-  opacity: 0.85;
-}
-
-/* точки: есть пары, есть заметка */
+/* точки 4 px: серая — есть пары, цвета акцента — есть заметка */
 .day-dots {
   display: flex;
   gap: 3px;
@@ -998,33 +1102,28 @@ a {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--hint);
+  background: var(--dot);
 }
 
 .day-dot-note {
   background: var(--accent);
 }
 
-.day[aria-selected='true'] .day-dot {
-  background: var(--on-accent);
-  opacity: 0.7;
-}
-
-/* «4 пары, с 9:00 до 16:05» и «Сегодня» справа */
+/* «4 пары · с 9:00 до 16:05» и «Сегодня» справа */
 .day-sub {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 20px;
-  margin: 0 2px 8px;
-  font-size: 13.5px;
+  min-height: 18px;
+  margin: 0 0 12px;
+  font-size: 13px;
   color: var(--text-2);
 }
 
 .day-today {
   padding: 0;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .content {
@@ -1036,7 +1135,7 @@ a {
 .day-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
 }
 
@@ -1074,29 +1173,21 @@ a {
   flex-direction: column;
 }
 
-/* «Перерыв 10 мин» по центру, тонкие линии по бокам */
+/* «Перерыв 10 мин» — 12.5 px светло-серым по центру */
 .gap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 6px 10px;
-  font-size: 13px;
+  padding: 0 0 7px;
+  font-size: 12.5px;
   color: var(--hint);
-}
-
-.gap::before,
-.gap::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--separator);
+  text-align: center;
 }
 
 /* заметка ко дню и пометки из админки — над парами */
 .day-note {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 14px;
   background: var(--fill);
   font-size: 14px;
@@ -1107,54 +1198,90 @@ a {
   overflow-wrap: anywhere;
 }
 
+.day-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 /* ---------- карточка пары ---------- */
 
+/* все карточки одного размера: белая, скругление 16, рамка 1 px, мягкое свечение снизу; текущая — рамка 1.5 px
+   цвета акцента, светлый фон, полоска по низу и пульсирующее свечение; прошедшие — бледнее */
 .lesson {
   position: relative;
-  padding: 12px 14px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 130px;
+  padding: 13px 16px 16px;
   border: 1px solid var(--card-border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--card);
+  box-shadow:
+    0 1px 2px rgb(var(--glow) / 0.05),
+    0 8px 20px -12px rgb(var(--glow) / 0.35);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-}
-
-/* полоска слева: светло-красная, у текущей пары — красная */
-.lesson::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: 14px;
-  bottom: 14px;
-  width: 4px;
-  border-radius: 0 3px 3px 0;
-  background: var(--track);
+  transition: transform 0.15s ease-out;
 }
 
 .lesson[data-clickable] {
   cursor: pointer;
 }
 
-.lesson.is-live {
-  border: 2px solid var(--accent);
-  padding: 11px 13px 11px 17px;
+.lesson[data-clickable]:active {
+  transform: scale(0.985);
 }
 
-.lesson.is-live::before {
-  left: -2px;
-  top: 13px;
-  bottom: 13px;
-  background: var(--accent);
+.lesson.is-live {
+  padding: 12.5px 15.5px 17.5px;
+  border: 1.5px solid var(--accent);
+  background: var(--now-bg);
+  animation: live-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes live-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(var(--glow) / 0.1),
+      0 8px 22px -10px rgb(var(--glow) / 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgb(var(--glow) / 0.08),
+      0 12px 30px -8px rgb(var(--glow) / 0.6);
+  }
 }
 
 .lesson.is-past {
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .lesson.is-cancelled .lesson-subject {
   text-decoration: line-through;
   color: var(--text-2);
+}
+
+/* карточки появляются по очереди */
+.day-item {
+  animation: card-in 0.35s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson.is-live,
+  .day-item {
+    animation: none;
+  }
 }
 
 .lesson-head {
@@ -1164,118 +1291,123 @@ a {
 }
 
 .lesson-start {
-  font: 700 24px/1.15 var(--font);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .lesson-end {
   font-size: 15px;
   color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.lesson-pair {
+.lesson-pair,
+.lesson-status {
   margin-left: 4px;
   font-size: 13px;
   color: var(--hint);
   white-space: nowrap;
 }
 
+/* «через 1 ч 19 мин» — серым, «ещё 34 мин» — тёмным акцентом */
+.lesson-status {
+  color: var(--text-2);
+}
+
+.lesson-status-live {
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
 .lesson-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-left: auto;
   align-self: center;
 }
 
 .lesson-act {
-  margin: -6px;
-  padding: 6px;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.lesson-dots {
-  font-size: 17px;
-  letter-spacing: 1px;
+  display: flex;
+  margin: -7px;
+  padding: 7px;
   color: var(--hint);
 }
 
-.lesson-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
+/* предмет — не длиннее двух строк */
+.lesson-subject {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.32;
+}
+
+/* английская версия: оригинальное название под переводом */
+.lesson-subject-ru {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* «Практика · Яценко О.Ю. · У-448/516» — внизу карточки */
+.lesson-meta {
+  margin: auto 0 0;
+  padding-top: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.lesson-kind,
+.lesson-sep {
+  color: var(--hint);
+}
+
+.lesson-link {
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.lesson-room {
+  white-space: nowrap;
 }
 
 .lesson-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 8px;
 }
 
-/* метка: лекция — серая, практика — светло-красная, остальное — белая с красной рамкой */
+/* маленькая серая плашка: «последнее занятие», подгруппа, «твоя группа» */
+.tag,
 .badge {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 7px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
   background: var(--seg-track);
   color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.badge-practice {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-}
-
-.badge-other {
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--track);
-  color: var(--accent-ink);
-}
-
-.lesson-subject {
-  margin: 0;
-  font-size: 16.5px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-/* английская версия: оригинальное название под переводом */
-.lesson-subject-ru {
-  margin-top: -4px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-/* синие ссылки: преподаватель, аудитория, группы */
-.lesson-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  font-size: 14px;
-  color: var(--text-2);
-}
-
-.lesson-link {
-  color: var(--text-2);
-  text-align: left;
-}
-
-.lesson-group {
-  color: var(--text-2);
-}
-
-.lesson-emoji {
-  margin-right: 5px;
-}
-
 .lesson-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
   font-size: 14px;
   line-height: 1.4;
   color: var(--text-2);
@@ -1284,46 +1416,42 @@ a {
   overflow-wrap: anywhere;
 }
 
+.lesson-line svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--hint);
+}
+
+/* своя заметка к паре — одной строкой */
+.lesson-note > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 button.lesson-hint {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
 
+/* отмена и перенос */
 .lesson-cancel {
+  margin-top: 4px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--accent-text);
+  color: var(--danger);
 }
 
-/* следующая пара: «через 1 ч 19 мин» */
-.lesson-soon {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--accent-text);
+/* текущая пара: полоска по низу карточки */
+.lesson-bar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 8px;
 }
 
-/* текущая пара: разделитель, красная полоска и «⏳ 34 мин» */
-.lesson-live {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--separator);
-}
-
-.lesson-live .progress {
-  flex: 1;
-}
-
-.lesson-timer {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent-text);
-  white-space: nowrap;
-}
-
-/* «Выходной» по центру свободного места */
+/* «Выходной»: 😎 40 px, «Выходной» 20/700, под ним причина и мелко «Обновлено …» — по центру свободного места */
 .empty {
   display: flex;
   flex-direction: column;
@@ -1336,31 +1464,31 @@ button.lesson-hint {
 }
 
 .empty-emoji {
-  font-size: 48px;
+  font-size: 40px;
   line-height: 1;
 }
 
 .empty-title {
   margin-top: 12px;
-  font: 700 22px/1.2 var(--font);
-  letter-spacing: -0.02em;
+  font: 700 20px/1.25 var(--font);
+  letter-spacing: -0.01em;
 }
 
 .empty-text {
-  margin-top: 6px;
-  font-size: 15px;
+  margin-top: 4px;
+  font-size: 14px;
   color: var(--text-2);
 }
 
 .empty-updated {
-  margin-top: 14px;
+  margin-top: 10px;
   font-size: 12.5px;
   color: var(--hint);
 }
 
 /* ---------- меню пары (окно снизу) ---------- */
 
-/* ход предмета: «Занятие 4 из 8 · осталось 5», полоска 4 px, недели и часы */
+/* ход предмета: «Занятие 4 из 8 · осталось 5», полоска 3 px, недели и часы */
 .course-progress {
   margin-bottom: 12px;
   padding: 12px 14px;
@@ -1383,7 +1511,7 @@ button.lesson-hint {
 }
 
 .course-progress-bar {
-  height: 4px;
+  height: 3px;
 }
 
 .course-progress-sub {
@@ -1485,69 +1613,48 @@ button.lesson-hint {
 
 /* ---------- мероприятия make.events ---------- */
 
-/* «Проектное обучение» — светло-красный блок в конце дня */
+/* «Проектное обучение» в конце дня: заголовок, время, полный список мероприятий дня */
 .project {
-  margin-top: 0;
+  margin-top: 8px;
 }
 
 .project-title {
-  margin: 0 0 2px;
+  margin: 0 4px 2px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .project-sub {
-  margin: 0 0 10px;
+  margin: 0 4px 10px;
   font-size: 13px;
   color: var(--text-2);
 }
 
-.project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.project-line {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.35;
-}
-
-.project-event,
-.project-more {
-  cursor: pointer;
-}
-
-.project-more {
-  color: var(--text-2);
-}
-
 .project-status {
-  margin: 0;
+  margin: 0 4px;
   font-size: 14px;
   color: var(--text-2);
 }
 
 .project-all {
-  margin-top: 10px;
+  margin: 10px 4px 0;
   padding: 0;
   font-size: 14px;
 }
 
-/* строка списка мероприятий */
+/* строка списка мероприятий: время и место серой строкой, название, описание */
 .event-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  padding: 12px 14px;
+  padding: 13px 16px;
 }
 
 .event-when {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-text);
+  font-weight: 500;
+  color: var(--text-2);
 }
 
 .event-title {
@@ -1567,8 +1674,17 @@ button.lesson-hint {
 }
 
 .event-place {
-  margin: 0 0 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 0;
   font-size: 15px;
+}
+
+.event-place svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-2);
 }
 
 .event-text {

@@ -1,21 +1,12 @@
-import { useRef } from 'react'
+import { Fragment, useRef, type ReactNode } from 'react'
 import { formatDuration, shortTime, weeksText } from '../format'
 import { shortWhen } from '../../shared/edits-core'
 import type { ShownLesson } from '../lessons'
 import { toMinutes } from '../schedule'
 import { haptic } from '../telegram'
+import { Icon, MoreIcon } from '../icons'
 import { t } from '../i18n'
 import { roomLabel, trKind, trSubject, trTeacher } from '../guu'
-
-// метка вида занятия: лекция — серая, практика и семинары — светло-красная, остальное — белая с красной рамкой
-const KIND_TONE: Record<string, string> = { Лекция: 'lecture', Практика: 'practice', Семинар: 'practice' } // i18n-ignore — виды из файлов ГУУ
-export const kindTone = (kind: string | null) => (kind && KIND_TONE[kind]) || 'other'
-
-const Emoji = ({ e }: { e: string }) => (
-  <span className="lesson-emoji" aria-hidden="true">
-    {e}
-  </span>
-)
 
 // «Предпринимательство 4-1, 4-2»: у соседних групп с одинаковым началом названия повторяется только номер
 const prefixOf = (name: string) => name.slice(0, name.lastIndexOf(' ') + 1)
@@ -82,9 +73,10 @@ function useLongPress(onLong: (() => void) | undefined) {
   }
 }
 
-// Карточка пары: время начала крупно, номер пары, ✏️ (заметка) и ··· (действия); метка вида, предмет, синие
-// «👤 преподаватель» и «📍 аудитория» (у преподавателя — «👥 группы»). Идёт сейчас — красная рамка и полоска
-// времени «⏳ 34 мин», следующая — «через 1 ч 19 мин», прошедшие — бледнее.
+// Карточка пары — все одного размера: время начала, «– 10:30», номер пары (у идущей — «ещё 34 мин», у следующей —
+// «через 1 ч 19 мин»), справа карандаш (заметка) и ··· (действия); предмет не длиннее двух строк; внизу одной строкой
+// «Практика · Яценко О.Ю. · У-448/516» (у преподавателя вместо фамилии — группы). Идёт сейчас — рамка цвета акцента,
+// светлый фон, полоска по низу и мягкое свечение; прошедшие — бледнее.
 export function LessonCard({
   lesson, nowMinutes, isNext, pair, note, last, showWeeks, onEditNote, onOpen, onGroup, groupTitle, onTeacher, onRoom, onMenu,
 }: Props) {
@@ -110,6 +102,62 @@ export function LessonCard({
     </>
   )
 
+  // «Практика · Яценко О.Ю. · У-448/516»: вид — светло-серым, преподаватель (группы) и аудитория — серым, нажимаются
+  const meta: ReactNode[] = []
+  if (lesson.kind) meta.push(<span className="lesson-kind">{trKind(lesson.kind)}</span>)
+  if (teachers.length)
+    meta.push(
+      teachers.map((name, i) => (
+        <Fragment key={name}>
+          {i > 0 && ', '}
+          {onTeacher ? (
+            <button type="button" className="lesson-link" onClick={() => onTeacher(name)}>
+              {trTeacher(name)}
+            </button>
+          ) : (
+            trTeacher(name)
+          )}
+        </Fragment>
+      )),
+    )
+  if (audience && audience.length)
+    meta.push(
+      audience.map((g, i) => {
+        const title = groupTitle?.(g.id, g.name) ?? g.name
+        return (
+          <Fragment key={g.id}>
+            {i > 0 && ', '}
+            {onGroup ? (
+              <button type="button" className="lesson-link" title={title} aria-label={title} onClick={() => (haptic(), onGroup(g.id))}>
+                <span lang="ru">{groupLabels[i]}</span>
+              </button>
+            ) : (
+              <span lang="ru" title={title}>
+                {groupLabels[i]}
+              </span>
+            )}
+          </Fragment>
+        )
+      }),
+    )
+  if (roomText)
+    meta.push(
+      onRoom ? (
+        <button type="button" className="lesson-link lesson-room" onClick={() => onRoom(lesson.room!)}>
+          {roomText}
+        </button>
+      ) : (
+        <span className="lesson-room">{roomText}</span>
+      ),
+    )
+
+  const tags = [
+    lesson.added && t('добавлена'),
+    lesson.subgroup?.name,
+    last && !cancelled && t('последнее занятие'),
+    lesson.overlap && t('накладка в расписании'),
+  ].filter((x): x is string => Boolean(x))
+
   return (
     <article
       className={`lesson${live ? ' is-live' : ''}${past ? ' is-past' : ''}${cancelled ? ' is-cancelled' : ''}`}
@@ -123,8 +171,16 @@ export function LessonCard({
     >
       <div className="lesson-head">
         <span className="lesson-start">{shortTime(lesson.start)}</span>
-        <span className="lesson-end">— {shortTime(lesson.end)}</span>
-        {pair ? <span className="lesson-pair">{t('{n} пара', { n: pair })}</span> : null}
+        <span className="lesson-end">– {shortTime(lesson.end)}</span>
+        {live ? (
+          <span className="lesson-status lesson-status-live" aria-label={t('До конца пары {d}', { d: formatDuration(end - nowMinutes!) })}>
+            {t('ещё {d}', { d: formatDuration(end - nowMinutes!) })}
+          </span>
+        ) : isNext ? (
+          <span className="lesson-status">{t('через {d}', { d: formatDuration(start - nowMinutes!) })}</span>
+        ) : pair ? (
+          <span className="lesson-pair">{t('{n} пара', { n: pair })}</span>
+        ) : null}
         {(onEditNote || onMenu) && (
           <span className="lesson-actions">
             {onEditNote && (
@@ -134,128 +190,82 @@ export function LessonCard({
                 aria-label={note ? t('Изменить заметку к паре') : t('Добавить заметку к паре')}
                 onClick={onEditNote}
               >
-                ✏️
+                <Icon name="pencil" size={17} />
               </button>
             )}
             {onMenu && (
-              <button type="button" className="lesson-act lesson-dots" aria-label={t('Действия с парой')} onClick={() => onMenu('menu')}>
-                ···
+              <button type="button" className="lesson-act" aria-label={t('Действия с парой')} onClick={() => onMenu('menu')}>
+                <MoreIcon />
               </button>
             )}
           </span>
         )}
       </div>
 
-      <div className="lesson-body">
-        {(lesson.kind || lesson.added || lesson.subgroup || last || lesson.overlap) && (
-          <div className="lesson-tags">
-            {lesson.kind && <span className={`badge badge-${kindTone(lesson.kind)}`}>{trKind(lesson.kind)}</span>}
-            {lesson.added && <span className="badge badge-practice">{t('добавлена')}</span>}
-            {lesson.subgroup && <span className="badge">{lesson.subgroup.name}</span>}
-            {last && !lesson.cancel && !lesson.movedTo && <span className="badge badge-other">{t('последнее занятие')}</span>}
-            {lesson.overlap && <span className="badge badge-practice">{t('накладка в расписании')}</span>}
-          </div>
-        )}
-        <h3 className="lesson-subject">{subject}</h3>
-        {/* по-английски — под переводом мелко оригинал, как в расписании ГУУ */}
-        {subject !== lesson.subject && (
-          <div className="lesson-subject-ru" lang="ru">
-            {lesson.subject}
-          </div>
-        )}
+      <h3 className="lesson-subject">{subject}</h3>
+      {/* по-английски — под переводом мелко оригинал, как в расписании ГУУ */}
+      {subject !== lesson.subject && (
+        <div className="lesson-subject-ru" lang="ru">
+          {lesson.subject}
+        </div>
+      )}
 
-        {(teachers.length > 0 || groupLabels.length > 0 || lesson.room) && (
-          <div className="lesson-links">
-            {teachers.map((name) =>
-              onTeacher ? (
-                <button key={name} type="button" className="lesson-link" onClick={() => onTeacher(name)}>
-                  <Emoji e="👤" />
-                  {trTeacher(name)}
-                </button>
-              ) : (
-                <span key={name} className="lesson-link">
-                  <Emoji e="👤" />
-                  {trTeacher(name)}
-                </span>
-              ),
-            )}
-            {audience && audience.length > 0 && (
-              <span className="lesson-link lesson-groups">
-                <Emoji e="👥" />
-                {audience.map((g, i) => {
-                  const title = groupTitle?.(g.id, g.name) ?? g.name
-                  return (
-                    <span key={g.id}>
-                      {i > 0 && ', '}
-                      {onGroup ? (
-                        <button type="button" className="lesson-group" title={title} aria-label={title} onClick={() => (haptic(), onGroup(g.id))}>
-                          <span lang="ru">{groupLabels[i]}</span>
-                        </button>
-                      ) : (
-                        <span lang="ru" title={title}>
-                          {groupLabels[i]}
-                        </span>
-                      )}
-                    </span>
-                  )
-                })}
-              </span>
-            )}
-            {lesson.room &&
-              (onRoom ? (
-                <button type="button" className="lesson-link" onClick={() => onRoom(lesson.room!)}>
-                  <Emoji e="📍" />
-                  {roomText}
-                </button>
-              ) : (
-                <span className="lesson-link">
-                  <Emoji e="📍" />
-                  {roomText}
-                </span>
-              ))}
-          </div>
-        )}
-
-        {showWeeks && lesson.weeks.length > 0 && <div className="lesson-line">{t('Недели: {weeks}', { weeks: weeksText(lesson.weeks) })}</div>}
-
-        {lesson.stream &&
-          (onMenu ? (
-            <button type="button" className="lesson-line lesson-hint" onClick={() => onMenu('hide')}>
-              {t('Языковая пара потока — у тебя может быть другое время')}
-            </button>
-          ) : (
-            <div className="lesson-line">{t('Языковая пара потока — у тебя может быть другое время')}</div>
+      {meta.length > 0 && (
+        <p className="lesson-meta">
+          {meta.map((part, i) => (
+            <Fragment key={i}>
+              {i > 0 && <span className="lesson-sep"> · </span>}
+              {part}
+            </Fragment>
           ))}
+        </p>
+      )}
 
-        {lesson.cancel && (
-          <div className="lesson-cancel">
-            {t('Пара отменена')}
-            {lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}
-          </div>
-        )}
-        {lesson.movedTo && <div className="lesson-cancel">{t('Перенесена на {when}', { when: shortWhen(lesson.movedTo.date, lesson.movedTo.start) })}</div>}
-        {lesson.movedFrom && <div className="lesson-line">{t('↩️ Перенос с {when}', { when: shortWhen(lesson.movedFrom.date, lesson.movedFrom.start) })}</div>}
-        {lesson.notes.map((text, i) => (
-          <div key={i} className="lesson-line">
-            📌 {text}
-          </div>
-        ))}
-        {note && (
-          <button type="button" className="lesson-line lesson-note" onClick={onEditNote}>
-            📝 {note}
+      {tags.length > 0 && (
+        <div className="lesson-tags">
+          {tags.map((tag) => (
+            <span key={tag} className="tag">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {showWeeks && lesson.weeks.length > 0 && <div className="lesson-line">{t('Недели: {weeks}', { weeks: weeksText(lesson.weeks) })}</div>}
+
+      {lesson.stream &&
+        (onMenu ? (
+          <button type="button" className="lesson-line lesson-hint" onClick={() => onMenu('hide')}>
+            {t('Языковая пара потока — у тебя может быть другое время')}
           </button>
-        )}
-        {isNext && !live && <div className="lesson-soon">{t('через {d}', { d: formatDuration(start - nowMinutes!) })}</div>}
-      </div>
+        ) : (
+          <div className="lesson-line">{t('Языковая пара потока — у тебя может быть другое время')}</div>
+        ))}
+
+      {lesson.cancel && (
+        <div className="lesson-cancel">
+          {t('Пара отменена')}
+          {lesson.cancel.text ? `: ${lesson.cancel.text}` : ''}
+        </div>
+      )}
+      {lesson.movedTo && <div className="lesson-cancel">{t('Перенесена на {when}', { when: shortWhen(lesson.movedTo.date, lesson.movedTo.start) })}</div>}
+      {lesson.movedFrom && <div className="lesson-line">{t('Перенос с {when}', { when: shortWhen(lesson.movedFrom.date, lesson.movedFrom.start) })}</div>}
+      {lesson.notes.map((text, i) => (
+        <div key={i} className="lesson-line">
+          <Icon name="pin" size={16} />
+          <span>{text}</span>
+        </div>
+      ))}
+      {note && (
+        <button type="button" className="lesson-line lesson-note" onClick={onEditNote}>
+          <Icon name="note" size={16} />
+          <span>{note}</span>
+        </button>
+      )}
 
       {live && (
-        <div className="lesson-live">
-          <div className="progress" aria-hidden="true">
-            <span style={{ width: `${((nowMinutes! - start) / (end - start)) * 100}%` }} />
-          </div>
-          <span className="lesson-timer" aria-label={t('До конца пары {d}', { d: formatDuration(end - nowMinutes!) })}>
-            ⏳ {formatDuration(end - nowMinutes!)}
-          </span>
+        <div className="progress lesson-bar" aria-hidden="true">
+          <span style={{ width: `${((nowMinutes! - start) / (end - start)) * 100}%` }} />
         </div>
       )}
     </article>
