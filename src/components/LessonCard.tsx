@@ -80,7 +80,7 @@ function useLongPress(onLong: (() => void) | undefined) {
 
 // Карточка пары: полоска слева цвета вида пары, время начала крупно, «— 10:30», номер пары, справа карандаш
 // (заметка) и ··· (действия); метка вида, предмет не длиннее двух строк; каждый преподаватель со значком (у
-// преподавателя — группы) и аудитория со значком — нажимаются. Обычные карточки одного размера, с мягким свечением.
+// преподавателя — группы), под ними аудитория со значком — нажимаются. Обычные карточки одного размера, с мягким свечением.
 // Идёт сейчас — рамка цвета акцента, светлый фон, пульсирующее свечение, под чертой полоска и «⏱ 34 мин»; следующая —
 // «через 1 ч 19 мин»; прошедшие — бледнее.
 export function LessonCard({
@@ -206,24 +206,30 @@ export function LessonCard({
 
       {(who.length > 0 || groups || roomText) && (
         <div className="lesson-who">
-          {who}
-          {groups && (
-            <span className="lesson-who-item">
-              <Icon name="people" size={16} strokeWidth={2} />
-              <span>{groups}</span>
-            </span>
+          {(who.length > 0 || groups) && (
+            <div className="lesson-who-row">
+              {who}
+              {groups && (
+                <span className="lesson-who-item">
+                  <Icon name="people" size={16} strokeWidth={2} />
+                  <span>{groups}</span>
+                </span>
+              )}
+            </div>
           )}
           {roomText && (
-            <span className="lesson-who-item lesson-room">
-              <Icon name="map-pin" size={16} strokeWidth={2} />
-              {onRoom ? (
-                <button type="button" className="lesson-link" onClick={() => onRoom(lesson.room!)}>
-                  {roomText}
-                </button>
-              ) : (
-                <span>{roomText}</span>
-              )}
-            </span>
+            <div className="lesson-who-row">
+              <span className="lesson-who-item lesson-room">
+                <Icon name="map-pin" size={16} strokeWidth={2} />
+                {onRoom ? (
+                  <button type="button" className="lesson-link" onClick={() => onRoom(lesson.room!)}>
+                    {roomText}
+                  </button>
+                ) : (
+                  <span>{roomText}</span>
+                )}
+              </span>
+            </div>
           )}
         </div>
       )}

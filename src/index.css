@@ -1263,7 +1263,7 @@ a {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 176px;
+  min-height: 200px;
   padding: 14px 16px 15px 18px;
   border: 1px solid var(--card-border);
   border-radius: 20px;
@@ -1464,18 +1464,24 @@ a {
   color: var(--text-2);
 }
 
-/* внизу карточки: каждый преподаватель со значком (группы), аудитория со значком — цвета акцента */
+/* внизу карточки: строка преподавателей со значками (группы), под ней аудитория со значком — цвета акцента */
 .lesson-who {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 14px;
+  flex-direction: column;
+  gap: 2px;
   margin: auto 0 0;
   padding-top: 8px;
   font-size: 15px;
   font-weight: 600;
   line-height: 1.35;
   color: var(--accent-text);
+}
+
+.lesson-who-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
 }
 
 .lesson-who-item {
